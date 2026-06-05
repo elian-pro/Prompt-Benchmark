@@ -22,6 +22,7 @@ export type Client = {
   notes: string | null;
   is_legacy: boolean;
   archived_at: string | null;
+  draft_content: string | null;
   created_at: string;
   updated_at: string;
 };
@@ -179,6 +180,7 @@ export async function updateClient(
     segment?: string | null;
     location?: string | null;
     notes?: string | null;
+    draft_content?: string | null;
   },
 ): Promise<Client> {
   const sb = getSupabase();
@@ -187,6 +189,7 @@ export async function updateClient(
   if (input.segment !== undefined) patch.segment = input.segment;
   if (input.location !== undefined) patch.location = input.location;
   if (input.notes !== undefined) patch.notes = input.notes;
+  if (input.draft_content !== undefined) patch.draft_content = input.draft_content;
 
   const { data, error } = await sb
     .from("clients")

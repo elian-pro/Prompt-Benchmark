@@ -21,6 +21,7 @@ export const updateClientSchema = z
     segment: z.string().trim().min(1).nullable(),
     location: z.string().trim().min(1).nullable(),
     notes: z.string().nullable(),
+    draft_content: z.string().nullable(),
   })
   .partial()
   .refine((v) => Object.keys(v).length > 0, {
