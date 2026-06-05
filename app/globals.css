@@ -653,3 +653,111 @@ button {
   gap: 12px;
   margin-top: 24px;
 }
+
+/* ===========================================================================
+   Client detail (manual editor)
+   =========================================================================== */
+
+.detail-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 24px;
+}
+.detail-title {
+  font-size: 24px;
+}
+.detail-sub {
+  margin-top: 8px;
+  display: flex;
+  gap: 14px;
+  align-items: center;
+}
+
+.detail-layout {
+  display: grid;
+  grid-template-columns: 30% 1fr;
+  gap: 24px;
+}
+@media (max-width: 800px) {
+  .detail-layout {
+    grid-template-columns: 1fr;
+  }
+}
+
+.version-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.version-item {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: 11px 13px;
+  border: 0.5px solid var(--border);
+  border-radius: 10px;
+}
+.version-item.is-prod {
+  border-color: var(--accent);
+}
+.version-item .vnum {
+  font-size: 14px;
+  font-weight: 500;
+  font-feature-settings: "tnum";
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.version-item .vmeta {
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.prod-tag {
+  font-size: 9px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: #0a0a0a;
+  background: var(--accent);
+  border-radius: 100px;
+  padding: 2px 7px;
+}
+
+.editor-title {
+  font-size: 13px;
+  letter-spacing: 0.04em;
+  color: var(--muted);
+  margin-bottom: 10px;
+}
+.editor-textarea {
+  width: 100%;
+  min-height: 420px;
+  background: var(--surface);
+  border: 0.5px solid var(--border);
+  border-radius: 12px;
+  padding: 16px;
+  font-family: ui-monospace, "SFMono-Regular", Menlo, monospace;
+  font-size: 13px;
+  line-height: 1.6;
+  color: var(--fg);
+  resize: vertical;
+  outline: none;
+}
+.editor-textarea:focus {
+  border-color: var(--border2);
+}
+.editor-meta {
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  color: var(--faint);
+  margin-top: 8px;
+  min-height: 14px;
+}
+.editor-actions {
+  display: flex;
+  gap: 12px;
+  margin-top: 18px;
+}
