@@ -12,6 +12,8 @@ body[data-theme="dark"] {
   --faint: #5a5a5a;
   --accent: #ffd602;
   --danger: #e24b4a;
+  --danger-soft: #f87171; /* brighter alert red: error status, crítico severity */
+  --warn: #fbbf24; /* amber: medio severity */
 }
 
 body[data-theme="light"] {
@@ -25,6 +27,8 @@ body[data-theme="light"] {
   --faint: #a8a7a0;
   --accent: #ffd602;
   --danger: #c2342f;
+  --danger-soft: #cf4b46; /* readable on light bg */
+  --warn: #b45309;
 }
 
 *,
@@ -323,6 +327,14 @@ button {
   justify-content: flex-end;
   gap: 12px;
   margin-top: 24px;
+}
+
+/* Icon color utilities (replace ad-hoc inline `style={{ color: … }}`). */
+.icon-accent {
+  color: var(--accent);
+}
+.icon-danger {
+  color: var(--danger);
 }
 
 /* Generic helpers */
@@ -843,8 +855,8 @@ button {
   color: var(--fg);
 }
 .session-status.status-error {
-  color: #f87171;
-  border-color: #f87171;
+  color: var(--danger-soft);
+  border-color: var(--danger-soft);
 }
 
 /* Editor chat */
@@ -1011,12 +1023,12 @@ button {
   flex-shrink: 0;
 }
 .severity-crítico {
-  color: #f87171;
-  border-color: #f87171;
+  color: var(--danger-soft);
+  border-color: var(--danger-soft);
 }
 .severity-medio {
-  color: #fbbf24;
-  border-color: #fbbf24;
+  color: var(--warn);
+  border-color: var(--warn);
 }
 .report-edge-cases {
   margin: 0;

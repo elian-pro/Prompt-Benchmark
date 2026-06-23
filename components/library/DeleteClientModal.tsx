@@ -58,11 +58,7 @@ export function DeleteClientModal({ client, onClose, onDone }: Props) {
       >
         {step === 1 ? (
           <>
-            <IconAlertTriangle
-              size={28}
-              className="modal-icon"
-              style={{ color: "var(--accent)" }}
-            />
+            <IconAlertTriangle size={28} className="modal-icon icon-accent" />
             <h2 className="modal-title">¿Eliminar &quot;{client.name}&quot;?</h2>
             <p className="modal-body">
               Esta acción es permanente. Si solo quieres ocultarlo de la
@@ -83,11 +79,7 @@ export function DeleteClientModal({ client, onClose, onDone }: Props) {
           </>
         ) : (
           <>
-            <IconTrash
-              size={28}
-              className="modal-icon"
-              style={{ color: "var(--danger)" }}
-            />
+            <IconTrash size={28} className="modal-icon icon-danger" />
             <h2 className="modal-title">¿Estás seguro?</h2>
             <ul className="consequences">
               <li>Se perderán las {client.version_count} versiones.</li>
