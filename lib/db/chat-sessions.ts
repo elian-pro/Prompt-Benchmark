@@ -116,26 +116,37 @@ export async function getSession(id: string): Promise<ChatSessionDetail | null> 
 }
 
 export async function createSession(input: {
-  clientId: string;
+  type?: SessionType;
+  clientId?: string | null;
   baseVersionId: string;
   title?: string | null;
 }): Promise<ChatSession> {
   const sb = getSupabase();
+  const type = input.type ?? "editor";
 
-  // Seed the working draft from the base version's content so the first edit
-  // starts from the real prompt rather than an empty buffer.
+  // The base version is the prompt under edit (editor) or the architectural
+  // reference (creator); it must exist either way.
   const baseVersion = await getVersion(input.baseVersionId);
   if (!baseVersion) throw new Error("La versión base no existe.");
+
+  // Editor: seed the working draft from the base version so the first edit
+  // starts from the real prompt, and the session belongs to that client from
+  // the start. Creator: the client doesn't exist yet (created at finalize) and
+  // the draft is built through the conversation — the reference is consulted
+  // for structure only, never seeded as content.
+  if (type === "editor" && !input.clientId) {
+    throw new Error("Una sesión de edición requiere un cliente.");
+  }
 
   const { data, error } = await sb
     .from("chat_sessions")
     .insert({
-      client_id: input.clientId,
-      type: "editor",
+      client_id: input.clientId ?? null,
+      type,
       title: input.title ?? null,
       status: "active",
       base_version_id: input.baseVersionId,
-      current_draft_content: baseVersion.content,
+      current_draft_content: type === "editor" ? baseVersion.content : null,
     })
     .select(SESSION_COLS)
     .single();
