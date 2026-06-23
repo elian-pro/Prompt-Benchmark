@@ -144,6 +144,75 @@ button {
   .app-shell {
     padding: 24px 20px;
   }
+
+  /* Header: stack the logo above a nav that scrolls horizontally instead of
+     overflowing, with the theme toggle pinned to the right. */
+  .app-header {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 14px;
+  }
+  /* Keep the logo at its natural size; only the nav row spans full width. */
+  .app-header .pill-logo {
+    align-self: flex-start;
+  }
+  .header-right {
+    gap: 12px;
+  }
+  .app-nav {
+    flex: 1;
+    min-width: 0;
+    gap: 16px;
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+  .app-nav::-webkit-scrollbar {
+    display: none;
+  }
+  .app-nav a {
+    white-space: nowrap;
+  }
+
+  /* Section headers: stack title above their action row. */
+  .library-header,
+  .detail-header {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .header-actions,
+  .detail-actions {
+    flex-wrap: wrap;
+  }
+  .detail-sub {
+    flex-wrap: wrap;
+    gap: 8px 14px;
+  }
+
+  /* Settings provider row: stack name above its actions. */
+  .provider-head {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 12px;
+  }
+  .provider-actions {
+    flex-wrap: wrap;
+  }
+  .settings-section-header {
+    flex-wrap: wrap;
+    gap: 12px;
+  }
+
+  /* Chat composer: full-width send button below the textarea. */
+  .chat-input-row {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  /* Modal footers: let crowded button rows wrap. */
+  .modal-footer,
+  .modal-footer-3 {
+    flex-wrap: wrap;
+  }
 }
 
 /* ===========================================================================
