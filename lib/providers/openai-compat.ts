@@ -1,0 +1,92 @@
+/**
+ * Adapter for OpenAI-compatible chat APIs (OpenAI, DeepSeek, Groq, Together,
+ * Mistral, etc.). Plain `fetch` against `{base_url}/chat/completions`.
+ */
+import type { ChatRequest, ChatResponse, AdapterContext } from "./types";
+
+type OpenAIMessage = { role: "system" | "user" | "assistant"; content: string };
+
+function buildMessages(req: ChatRequest): OpenAIMessage[] {
+  const messages: OpenAIMessage[] = [];
+  if (req.systemPrompt) messages.push({ role: "system", content: req.systemPrompt });
+  for (const m of req.messages) messages.push({ role: m.role, content: m.content });
+  return messages;
+}
+
+function endpoint(baseUrl: string | null | undefined): string {
+  const base = (baseUrl ?? "").replace(/\/+$/, "");
+  if (!base) throw new Error("El proveedor openai_compat requiere base_url.");
+  return `${base}/chat/completions`;
+}
+
+function buildBody(req: ChatRequest, stream: boolean) {
+  return JSON.stringify({
+    model: req.modelName,
+    messages: buildMessages(req),
+    temperature: req.temperature,
+    top_p: req.topP,
+    max_tokens: req.maxTokens,
+    stream,
+  });
+}
+
+function headers(ctx: AdapterContext): Record<string, string> {
+  return {
+    "Content-Type": "application/json",
+    Authorization: `Bearer ${ctx.apiKey}`,
+  };
+}
+
+export async function chat(req: ChatRequest, ctx: AdapterContext): Promise<ChatResponse> {
+  const res = await fetch(endpoint(ctx.baseUrl), {
+    method: "POST",
+    headers: headers(ctx),
+    body: buildBody(req, false),
+  });
+  if (!res.ok) {
+    throw new Error(`Error del proveedor (${res.status}): ${await res.text()}`);
+  }
+  const data = await res.json();
+  const content: string = data.choices?.[0]?.message?.content ?? "";
+  // TODO: some openai-compat backends omit usage; we report 0 in that case.
+  const tokensIn: number = data.usage?.prompt_tokens ?? 0;
+  const tokensOut: number = data.usage?.completion_tokens ?? 0;
+  return { content, tokensIn, tokensOut };
+}
+
+export async function* streamChat(
+  req: ChatRequest,
+  ctx: AdapterContext,
+): AsyncIterable<string> {
+  const res = await fetch(endpoint(ctx.baseUrl), {
+    method: "POST",
+    headers: headers(ctx),
+    body: buildBody(req, true),
+  });
+  if (!res.ok || !res.body) {
+    throw new Error(`Error del proveedor (${res.status}): ${await res.text()}`);
+  }
+  const reader = res.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = "";
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    buffer += decoder.decode(value, { stream: true });
+    const lines = buffer.split("\n");
+    buffer = lines.pop() ?? "";
+    for (const line of lines) {
+      const trimmed = line.trim();
+      if (!trimmed.startsWith("data:")) continue;
+      const payload = trimmed.slice(5).trim();
+      if (payload === "[DONE]") return;
+      try {
+        const json = JSON.parse(payload);
+        const delta: string | undefined = json.choices?.[0]?.delta?.content;
+        if (delta) yield delta;
+      } catch {
+        // Ignore partial/non-JSON keepalive lines.
+      }
+    }
+  }
+}
