@@ -2,11 +2,13 @@ import { NextRequest } from "next/server";
 import {
   getRun,
   appendRunMessage,
+  saveReport,
   updateRunStatus,
   type RunMessageRole,
 } from "@/lib/db/runs";
 import { buildLeadSystemPrompt } from "@/lib/prompts/adversarial-personas";
-import { streamChat, type ChatMessage } from "@/lib/providers";
+import { buildJudgeSystemPrompt, judgeReportSchema } from "@/lib/prompts/judge";
+import { chat, streamChat, type ChatMessage } from "@/lib/providers";
 import { handleError, jsonError } from "@/lib/http";
 
 export const dynamic = "force-dynamic";
@@ -44,14 +46,40 @@ function perspective(
   return messages;
 }
 
+/** Renders the transcript as a labeled text block for the judge to analyze. */
+function formatTranscript(transcript: Transcript): string {
+  return transcript
+    .map((m, i) => {
+      const who = m.role === "bot" ? "AGENTE (bot bajo prueba)" : "LEAD (adversario)";
+      return `[Turno ${i + 1}] ${who}:\n${m.content}`;
+    })
+    .join("\n\n");
+}
+
+/** Parses the judge's JSON, tolerating an accidental ```json fence wrapper. */
+function parseJudgeReply(reply: string): unknown {
+  const trimmed = reply.trim();
+  try {
+    return JSON.parse(trimmed);
+  } catch {
+    const start = trimmed.indexOf("{");
+    const end = trimmed.lastIndexOf("}");
+    if (start === -1 || end <= start) {
+      throw new Error("El juez no devolvió un JSON válido.");
+    }
+    return JSON.parse(trimmed.slice(start, end + 1));
+  }
+}
+
 /**
  * Orchestrates the bot↔lead conversation for a run and streams it turn by turn
  * as NDJSON events. Each event is a JSON object on its own line:
  *   {type:'turn_start', turn, role} · {type:'delta', text} ·
- *   {type:'turn_end', turn, role} · {type:'status', status} ·
- *   {type:'error', message}
- * Each turn is persisted to `run_messages`; the run status moves
- * running → completed (or error). The judge call lands in S4-T5.
+ *   {type:'turn_end', turn, role} · {type:'judging'} ·
+ *   {type:'report', report} · {type:'status', status} · {type:'error', message}
+ * Each turn is persisted to `run_messages`. When the conversation ends the
+ * judge analyzes the transcript, its validated report is saved to `reports`,
+ * and the run status moves running → completed (or error if anything throws).
  */
 export async function POST(_req: NextRequest, { params }: Params) {
   try {
@@ -107,6 +135,21 @@ export async function POST(_req: NextRequest, { params }: Params) {
 
             current = isBot ? "lead" : "bot";
           }
+
+          // Conversation done — judge the full transcript (non-streaming).
+          send({ type: "judging" });
+          const judgeReply = await chat({
+            providerId: run.judge_config.provider_id,
+            modelName: run.judge_config.model_name,
+            systemPrompt: buildJudgeSystemPrompt(),
+            messages: [{ role: "user", content: formatTranscript(transcript) }],
+            temperature: run.judge_config.temperature ?? undefined,
+            topP: run.judge_config.top_p ?? undefined,
+            maxTokens: run.judge_config.max_tokens ?? undefined,
+          });
+          const report = judgeReportSchema.parse(parseJudgeReply(judgeReply.content));
+          const saved = await saveReport(id, report);
+          send({ type: "report", report: saved });
 
           await updateRunStatus(id, "completed");
           send({ type: "status", status: "completed" });
