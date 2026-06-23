@@ -958,6 +958,74 @@ button {
   overflow-y: auto;
 }
 
+/* Adversarial Lab report */
+.report-panel {
+  border: 0.5px solid var(--border);
+  border-radius: 12px;
+  padding: 16px;
+  background: var(--surface);
+}
+.report-summary {
+  font-size: 13px;
+  line-height: 1.6;
+  color: var(--fg);
+  margin: 0 0 16px;
+}
+.finding-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.finding {
+  border: 0.5px solid var(--border2);
+  border-radius: 10px;
+  padding: 12px;
+}
+.finding-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+.finding-category {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--fg);
+  text-transform: capitalize;
+}
+.finding-text {
+  font-size: 12px;
+  line-height: 1.6;
+  color: var(--muted);
+  margin: 4px 0 0;
+}
+.severity {
+  font-size: 9px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  border-radius: 100px;
+  padding: 2px 8px;
+  border: 0.5px solid var(--border2);
+  color: var(--muted);
+  flex-shrink: 0;
+}
+.severity-crítico {
+  color: #f87171;
+  border-color: #f87171;
+}
+.severity-medio {
+  color: #fbbf24;
+  border-color: #fbbf24;
+}
+.report-edge-cases {
+  margin: 0;
+  padding-left: 18px;
+  font-size: 12px;
+  line-height: 1.7;
+  color: var(--muted);
+}
+
 /* File attachments */
 .visually-hidden {
   position: absolute;
