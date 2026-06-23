@@ -207,6 +207,29 @@ on cleanup it disappears from Storage too.
 
 ---
 
+### S2-T7b — Feed attachments to Opus (multimodal)
+
+Added mid-sprint (2026-06-23): the breakdown stored attachment references but
+never sent file content to the model, so Decision #4 ("passed to Opus
+natively") wasn't met. This wires it through.
+
+**Tasks**:
+- Extend the provider `ChatMessage` with optional typed attachments
+  (image / document / text) so the interface can carry file content.
+- Anthropic adapter: render attachments as native content blocks (base64
+  image / PDF document blocks; text files appended inline). Other adapters
+  keep ignoring attachments (editor role runs on Opus); note the degradation.
+- Message endpoint (S2-T4): for the current turn, download each attachment
+  from Storage and include it in the model call. Historical attachments are
+  not re-sent (cost + 7-day expiry).
+
+**Done when**: attaching an image/PDF/text file and describing a change makes
+Opus actually use the file's content in the edit.
+
+**Commits**: 2 (interface + adapter, endpoint wiring).
+
+---
+
 ### S2-T8 — Per-session token counter
 
 **Tasks**:

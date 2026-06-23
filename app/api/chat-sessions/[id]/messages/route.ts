@@ -5,14 +5,45 @@ import {
   updateDraft,
 } from "@/lib/db/chat-sessions";
 import { getRoleDefault } from "@/lib/db/role-defaults";
+import { downloadUploadBytes } from "@/lib/db/uploads";
 import { appendMessageSchema } from "@/lib/schemas/chat-sessions";
+import type { Attachment } from "@/lib/db/chat-sessions";
 import { buildEditorSystemPrompt, extractPromptFromReply } from "@/lib/prompts/editor-persona";
-import { streamChat, type ChatMessage } from "@/lib/providers";
+import { streamChat, type ChatMessage, type MessageAttachment } from "@/lib/providers";
 import { handleError, jsonError } from "@/lib/http";
 
 export const dynamic = "force-dynamic";
 
 type Params = { params: Promise<{ id: string }> };
+
+/**
+ * Downloads each attachment from Storage and shapes it for the model: images
+ * and PDFs as base64, text/markdown decoded inline. Only the current turn's
+ * files are sent (historical attachments may have expired).
+ */
+async function loadAttachmentsForModel(
+  attachments: Attachment[],
+): Promise<MessageAttachment[]> {
+  const out: MessageAttachment[] = [];
+  for (const a of attachments) {
+    const dl = await downloadUploadBytes(a.uploadId);
+    if (!dl) continue;
+    const mediaType = dl.upload.mime_type ?? a.mimeType ?? "";
+    if (mediaType.startsWith("image/")) {
+      out.push({ filename: dl.upload.filename, mediaType, kind: "image", data: dl.bytes.toString("base64") });
+    } else if (mediaType === "application/pdf") {
+      out.push({ filename: dl.upload.filename, mediaType, kind: "document", data: dl.bytes.toString("base64") });
+    } else {
+      out.push({
+        filename: dl.upload.filename,
+        mediaType: mediaType || "text/plain",
+        kind: "text",
+        data: dl.bytes.toString("utf-8"),
+      });
+    }
+  }
+  return out;
+}
 
 /**
  * Sends a user message and streams Opus's reply (text/plain). On stream close,
@@ -50,7 +81,13 @@ export async function POST(req: NextRequest, { params }: Params) {
     });
 
     const systemPrompt = buildEditorSystemPrompt(session.current_draft_content ?? "");
-    const messages: ChatMessage[] = [...history, { role: "user", content: input.content }];
+    const modelAttachments = input.attachments?.length
+      ? await loadAttachmentsForModel(input.attachments)
+      : undefined;
+    const messages: ChatMessage[] = [
+      ...history,
+      { role: "user", content: input.content, attachments: modelAttachments },
+    ];
 
     const encoder = new TextEncoder();
     const stream = new ReadableStream<Uint8Array>({

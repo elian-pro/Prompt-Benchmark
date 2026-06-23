@@ -105,6 +105,19 @@ export async function getUpload(id: string): Promise<Upload | null> {
   return (data as unknown as Upload | null) ?? null;
 }
 
+/** Downloads an upload's bytes from Storage (for feeding files to the model). */
+export async function downloadUploadBytes(
+  id: string,
+): Promise<{ upload: Upload; bytes: Buffer } | null> {
+  const upload = await getUpload(id);
+  if (!upload) return null;
+  const sb = getSupabase();
+  const { data, error } = await sb.storage.from(BUCKET).download(upload.storage_path);
+  if (error) throw new Error(`No se pudo descargar el archivo: ${error.message}`);
+  const bytes = Buffer.from(await data.arrayBuffer());
+  return { upload, bytes };
+}
+
 /** Deletes the DB row AND the Storage object (the cron only clears rows). */
 export async function deleteUpload(id: string): Promise<void> {
   const sb = getSupabase();
