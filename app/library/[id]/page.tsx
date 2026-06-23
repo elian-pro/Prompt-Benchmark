@@ -1,8 +1,8 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { useParams } from "next/navigation";
-import { IconCopy } from "@tabler/icons-react";
+import { useParams, useRouter } from "next/navigation";
+import { IconCopy, IconSparkles } from "@tabler/icons-react";
 import type { ClientDetail } from "@/lib/db/clients";
 import { computeNextNumber } from "@/lib/version-utils";
 import { relativeTimeEs } from "@/lib/format";
@@ -18,6 +18,7 @@ const SOURCE_LABELS: Record<string, string> = {
 
 export default function ClientDetailPage() {
   const params = useParams();
+  const router = useRouter();
   const id = Array.isArray(params.id) ? params.id[0] : (params.id as string);
 
   const [detail, setDetail] = useState<ClientDetail | null>(null);
@@ -91,6 +92,31 @@ export default function ClientDetailPage() {
     }
   }
 
+  async function openEditorSession() {
+    if (!detail) return;
+    const baseVersionId = detail.production_version?.id ?? detail.versions[0]?.id;
+    if (!baseVersionId) {
+      showToast("El cliente no tiene ninguna versión base.");
+      return;
+    }
+    setBusy(true);
+    try {
+      const res = await fetch("/api/chat-sessions", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ clientId: id, baseVersionId }),
+      });
+      if (!res.ok) {
+        throw new Error((await res.json()).error ?? "No se pudo abrir la edición.");
+      }
+      const session = await res.json();
+      router.push(`/editor/${session.id}`);
+    } catch (e) {
+      showToast(e instanceof Error ? e.message : "Error inesperado.");
+      setBusy(false);
+    }
+  }
+
   async function createVersion(bumpType: "minor" | "major") {
     setBusy(true);
     try {
@@ -140,13 +166,23 @@ export default function ClientDetailPage() {
             </span>
           </div>
         </div>
-        <Button
-          variant="secondary"
-          icon={<IconCopy size={14} />}
-          onClick={copyProduction}
-        >
-          Copiar versión de producción
-        </Button>
+        <div className="header-actions">
+          <Button
+            variant="secondary"
+            icon={<IconSparkles size={14} />}
+            onClick={openEditorSession}
+            disabled={busy}
+          >
+            Editar con IA
+          </Button>
+          <Button
+            variant="secondary"
+            icon={<IconCopy size={14} />}
+            onClick={copyProduction}
+          >
+            Copiar versión de producción
+          </Button>
+        </div>
       </div>
 
       <div className="detail-layout">

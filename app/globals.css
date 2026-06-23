@@ -761,3 +761,66 @@ button {
   gap: 12px;
   margin-top: 18px;
 }
+
+/* Editor session list */
+.session-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.session-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 14px 16px;
+  border: 0.5px solid var(--border);
+  border-radius: 12px;
+  text-decoration: none;
+  color: var(--fg);
+  transition: border-color 0.15s ease;
+}
+.session-item:hover {
+  border-color: var(--border2);
+}
+.session-main {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+}
+.session-client {
+  font-size: 14px;
+  font-weight: 500;
+}
+.session-title {
+  font-size: 12px;
+  color: var(--muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.session-meta {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-shrink: 0;
+  font-size: 12px;
+}
+.session-status {
+  font-size: 9px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  border-radius: 100px;
+  padding: 2px 8px;
+  border: 0.5px solid var(--border2);
+  color: var(--muted);
+}
+.session-status.status-active {
+  color: #0a0a0a;
+  background: var(--accent);
+  border-color: var(--accent);
+}
+.session-status.status-finalized {
+  color: var(--fg);
+}
