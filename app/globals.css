@@ -834,6 +834,18 @@ button {
 .session-status.status-finalized {
   color: var(--fg);
 }
+.session-status.status-running {
+  color: #0a0a0a;
+  background: var(--accent);
+  border-color: var(--accent);
+}
+.session-status.status-completed {
+  color: var(--fg);
+}
+.session-status.status-error {
+  color: #f87171;
+  border-color: #f87171;
+}
 
 /* Editor chat */
 .token-counter {
