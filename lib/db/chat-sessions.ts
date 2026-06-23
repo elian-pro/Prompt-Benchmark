@@ -54,8 +54,8 @@ export type ChatSession = {
 /** List item enriched with the client's name (resolved via join). */
 export type ChatSessionListItem = ChatSession & { client_name: string | null };
 
-/** A session plus its ordered messages. */
-export type ChatSessionDetail = ChatSession & { messages: ChatMessageRow[] };
+/** A session (with client name) plus its ordered messages. */
+export type ChatSessionDetail = ChatSessionListItem & { messages: ChatMessageRow[] };
 
 const SESSION_COLS =
   "id, client_id, type, title, status, base_version_id, current_draft_content, " +
@@ -96,7 +96,7 @@ export async function getSession(id: string): Promise<ChatSessionDetail | null> 
   const sb = getSupabase();
   const { data: session, error } = await sb
     .from("chat_sessions")
-    .select(SESSION_COLS)
+    .select(`${SESSION_COLS}, clients(name)`)
     .eq("id", id)
     .maybeSingle();
   if (error) throw new Error(`No se pudo obtener la sesión: ${error.message}`);
@@ -110,7 +110,7 @@ export async function getSession(id: string): Promise<ChatSessionDetail | null> 
   if (mErr) throw new Error(`No se pudieron obtener los mensajes: ${mErr.message}`);
 
   return {
-    ...(session as unknown as ChatSession),
+    ...flattenListItem(session),
     messages: (messages ?? []) as unknown as ChatMessageRow[],
   };
 }
