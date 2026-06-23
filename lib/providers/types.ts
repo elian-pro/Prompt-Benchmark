@@ -1,6 +1,23 @@
 /** Shared types for the unified provider interface (see docs/ARCHITECTURE.md). */
 
-export type ChatMessage = { role: "user" | "assistant"; content: string };
+/**
+ * A file attached to a message. `data` is base64-encoded bytes for binary
+ * kinds (image/document) and decoded UTF-8 text for the text kind. Adapters
+ * that don't support a kind may ignore it (only the Anthropic adapter renders
+ * attachments today, since the editor role runs on Opus).
+ */
+export type MessageAttachment = {
+  filename: string;
+  mediaType: string;
+  kind: "image" | "document" | "text";
+  data: string;
+};
+
+export type ChatMessage = {
+  role: "user" | "assistant";
+  content: string;
+  attachments?: MessageAttachment[];
+};
 
 export type ChatRequest = {
   providerId: string;

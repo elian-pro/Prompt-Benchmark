@@ -13,7 +13,7 @@ import * as anthropic from "./anthropic";
 import * as google from "./google";
 import * as openrouter from "./openrouter";
 
-export type { ChatRequest, ChatResponse, ChatMessage, StreamChunk } from "./types";
+export type { ChatRequest, ChatResponse, ChatMessage, StreamChunk, MessageAttachment } from "./types";
 
 const adapters: Record<AdapterType, Adapter> = {
   openai_compat: openaiCompat,
