@@ -826,6 +826,12 @@ button {
 }
 
 /* Editor chat */
+.token-counter {
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  color: var(--muted);
+  font-feature-settings: "tnum";
+}
 .back-link {
   display: inline-flex;
   align-items: center;

@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
 import { IconArrowLeft, IconCopy, IconSend } from "@tabler/icons-react";
@@ -56,6 +56,18 @@ export default function EditorSessionPage() {
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight });
   }, [session?.messages.length, pendingUser, streamingText]);
+
+  // Per-session token usage, summed across all persisted messages.
+  const tokens = useMemo(() => {
+    const messages = session?.messages ?? [];
+    return messages.reduce(
+      (acc, m) => ({
+        in: acc.in + (m.tokens_in ?? 0),
+        out: acc.out + (m.tokens_out ?? 0),
+      }),
+      { in: 0, out: 0 },
+    );
+  }, [session?.messages]);
 
   function showToast(message: string) {
     setToast(message);
@@ -143,6 +155,10 @@ export default function EditorSessionPage() {
             </span>
             <span className="muted" style={{ fontSize: 12 }}>
               {relativeTimeEs(session.updated_at)}
+            </span>
+            <span className="token-counter" title="Tokens usados en esta sesión">
+              ↑ {tokens.in.toLocaleString("es-MX")} · ↓{" "}
+              {tokens.out.toLocaleString("es-MX")} tokens
             </span>
           </div>
         </div>
