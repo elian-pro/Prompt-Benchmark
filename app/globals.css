@@ -742,6 +742,14 @@ button {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: 8px;
+}
+.vnum-tags {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 6px;
 }
 .version-item .vmeta {
   font-size: 11px;
