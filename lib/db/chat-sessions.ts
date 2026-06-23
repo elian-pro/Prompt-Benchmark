@@ -210,3 +210,26 @@ export async function abandonSession(sessionId: string): Promise<ChatSession> {
   if (error) throw new Error(`No se pudo descartar la sesión: ${error.message}`);
   return data as unknown as ChatSession;
 }
+
+/**
+ * Closes a session as finalized, linking the version it produced. The version
+ * itself is created by the API route (via `createVersion`) before this call.
+ */
+export async function finalizeSession(
+  sessionId: string,
+  versionId: string,
+): Promise<ChatSession> {
+  const sb = getSupabase();
+  const { data, error } = await sb
+    .from("chat_sessions")
+    .update({
+      status: "finalized",
+      final_version_id: versionId,
+      finalized_at: new Date().toISOString(),
+    })
+    .eq("id", sessionId)
+    .select(SESSION_COLS)
+    .single();
+  if (error) throw new Error(`No se pudo finalizar la sesión: ${error.message}`);
+  return data as unknown as ChatSession;
+}
