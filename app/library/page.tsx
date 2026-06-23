@@ -5,6 +5,7 @@ import { IconPlus, IconUpload, IconLibrary } from "@tabler/icons-react";
 import type { ClientSummary, ClientFilter } from "@/lib/db/clients";
 import { Button } from "@/components/ui/Button";
 import { EmptyState } from "@/components/ui/EmptyState";
+import { SkeletonCards } from "@/components/ui/Skeleton";
 import { ClientCard } from "@/components/library/ClientCard";
 import { NewClientModal } from "@/components/library/NewClientModal";
 import { ImportModal } from "@/components/library/ImportModal";
@@ -157,7 +158,7 @@ export default function LibraryPage() {
         ))}
       </div>
 
-      {loading && <p className="empty-hint">Cargando…</p>}
+      {loading && <SkeletonCards count={6} />}
       {error && <p className="form-error">{error}</p>}
 
       {isEmpty && (

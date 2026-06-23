@@ -478,6 +478,65 @@ button {
   padding: 24px 0;
 }
 
+/* Skeleton loading placeholders (docs/DESIGN-SYSTEM.md §Loading states). */
+@keyframes skeleton-pulse {
+  0%,
+  100% {
+    opacity: 0.4;
+  }
+  50% {
+    opacity: 0.7;
+  }
+}
+.skeleton-card,
+.skeleton-row {
+  animation: skeleton-pulse 2s ease-in-out infinite;
+}
+.skeleton-card {
+  background: var(--surface);
+  border: 0.5px solid var(--border);
+  border-radius: 14px;
+  padding: 22px;
+  min-height: 184px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.skeleton-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.skeleton-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 14px 16px;
+  border: 0.5px solid var(--border);
+  border-radius: 12px;
+}
+.skeleton-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.skeleton-bar {
+  background: var(--surface2);
+  border-radius: 6px;
+  height: 12px;
+}
+.skeleton-bar.tall {
+  height: 28px;
+}
+@media (prefers-reduced-motion: reduce) {
+  .skeleton-card,
+  .skeleton-row {
+    animation: none;
+    opacity: 0.5;
+  }
+}
+
 /* Consistent empty state (docs/DESIGN-SYSTEM.md §Empty states). */
 .empty-state {
   display: flex;

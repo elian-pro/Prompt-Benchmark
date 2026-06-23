@@ -6,6 +6,7 @@ import type { MaskedProvider } from "@/lib/db/providers";
 import type { RoleDefault } from "@/lib/db/role-defaults";
 import { Button } from "@/components/ui/Button";
 import { EmptyState } from "@/components/ui/EmptyState";
+import { SkeletonRows } from "@/components/ui/Skeleton";
 import { DangerConfirmModal } from "@/components/ui/DangerConfirmModal";
 import { ProviderFormModal } from "@/components/settings/ProviderFormModal";
 import { ProviderRow } from "@/components/settings/ProviderRow";
@@ -81,7 +82,7 @@ export default function SettingsPage() {
           </Button>
         </div>
 
-        {loading && <p className="empty-hint">Cargando…</p>}
+        {loading && <SkeletonRows count={3} />}
         {loadError && <p className="form-error">{loadError}</p>}
 
         {!loading && !loadError && providers.length === 0 && (

@@ -7,6 +7,7 @@ import type { ChatSessionListItem } from "@/lib/db/chat-sessions";
 import { relativeTimeEs } from "@/lib/format";
 import { Button } from "@/components/ui/Button";
 import { EmptyState } from "@/components/ui/EmptyState";
+import { SkeletonRows } from "@/components/ui/Skeleton";
 import { NewEditorSessionModal } from "@/components/editor/NewEditorSessionModal";
 
 const STATUS_LABELS: Record<string, string> = {
@@ -61,7 +62,7 @@ export default function EditorPage() {
         </div>
       </div>
 
-      {loading && <p className="empty-hint">Cargando…</p>}
+      {loading && <SkeletonRows count={4} />}
       {error && <p className="form-error">{error}</p>}
 
       {isEmpty && (
