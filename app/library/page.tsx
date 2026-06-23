@@ -1,9 +1,10 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { IconPlus, IconUpload } from "@tabler/icons-react";
+import { IconPlus, IconUpload, IconLibrary } from "@tabler/icons-react";
 import type { ClientSummary, ClientFilter } from "@/lib/db/clients";
 import { Button } from "@/components/ui/Button";
+import { EmptyState } from "@/components/ui/EmptyState";
 import { ClientCard } from "@/components/library/ClientCard";
 import { NewClientModal } from "@/components/library/NewClientModal";
 import { ImportModal } from "@/components/library/ImportModal";
@@ -160,19 +161,20 @@ export default function LibraryPage() {
       {error && <p className="form-error">{error}</p>}
 
       {isEmpty && (
-        <div className="empty-hint">
-          <p className="section-label">No hay clientes todavía</p>
-          <p style={{ marginTop: 8, marginBottom: 16 }}>
-            Importa uno existente o crea uno nuevo para empezar.
-          </p>
-          <Button
-            variant="primary"
-            icon={<IconPlus size={14} />}
-            onClick={() => setNewOpen(true)}
-          >
-            Nuevo cliente
-          </Button>
-        </div>
+        <EmptyState
+          icon={<IconLibrary size={32} stroke={1.5} />}
+          title="No hay clientes todavía"
+          description="Importa uno existente o crea uno nuevo para empezar."
+          action={
+            <Button
+              variant="primary"
+              icon={<IconPlus size={14} />}
+              onClick={() => setNewOpen(true)}
+            >
+              Nuevo cliente
+            </Button>
+          }
+        />
       )}
 
       {!loading && !error && !isEmpty && (

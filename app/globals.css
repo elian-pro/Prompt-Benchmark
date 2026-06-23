@@ -478,6 +478,37 @@ button {
   padding: 24px 0;
 }
 
+/* Consistent empty state (docs/DESIGN-SYSTEM.md §Empty states). */
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 10px;
+  padding: 56px 24px;
+  border: 0.5px dashed var(--border2);
+  border-radius: 14px;
+}
+.empty-state-icon {
+  color: var(--faint);
+  margin-bottom: 2px;
+}
+.empty-state-title {
+  text-transform: uppercase;
+  letter-spacing: 0.18em;
+  font-size: 11px;
+  color: var(--fg);
+}
+.empty-state-desc {
+  font-size: 14px;
+  color: var(--muted);
+  line-height: 1.6;
+  max-width: 440px;
+}
+.empty-state-action {
+  margin-top: 8px;
+}
+
 /* ===========================================================================
    Library
    =========================================================================== */

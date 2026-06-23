@@ -1,10 +1,11 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { IconPlus } from "@tabler/icons-react";
+import { IconPlus, IconServer } from "@tabler/icons-react";
 import type { MaskedProvider } from "@/lib/db/providers";
 import type { RoleDefault } from "@/lib/db/role-defaults";
 import { Button } from "@/components/ui/Button";
+import { EmptyState } from "@/components/ui/EmptyState";
 import { DangerConfirmModal } from "@/components/ui/DangerConfirmModal";
 import { ProviderFormModal } from "@/components/settings/ProviderFormModal";
 import { ProviderRow } from "@/components/settings/ProviderRow";
@@ -84,9 +85,20 @@ export default function SettingsPage() {
         {loadError && <p className="form-error">{loadError}</p>}
 
         {!loading && !loadError && providers.length === 0 && (
-          <p className="empty-hint">
-            No hay proveedores todavía. Agrega uno para empezar.
-          </p>
+          <EmptyState
+            icon={<IconServer size={32} stroke={1.5} />}
+            title="No hay proveedores todavía"
+            description="Agrega un proveedor de LLM para configurar sus modelos y asignarlos a roles."
+            action={
+              <Button
+                variant="primary"
+                icon={<IconPlus size={14} />}
+                onClick={openCreate}
+              >
+                Agregar proveedor
+              </Button>
+            }
+          />
         )}
 
         <div className="provider-list">
