@@ -6,9 +6,11 @@ import {
 } from "@/lib/db/chat-sessions";
 import { getRoleDefault } from "@/lib/db/role-defaults";
 import { downloadUploadBytes } from "@/lib/db/uploads";
+import { getVersion } from "@/lib/db/versions";
 import { appendMessageSchema } from "@/lib/schemas/chat-sessions";
 import type { Attachment } from "@/lib/db/chat-sessions";
 import { buildEditorSystemPrompt, extractPromptFromReply } from "@/lib/prompts/editor-persona";
+import { buildCreatorSystemPrompt } from "@/lib/prompts/creator-persona";
 import { streamChat, type ChatMessage, type MessageAttachment } from "@/lib/providers";
 import { handleError, jsonError } from "@/lib/http";
 
@@ -49,6 +51,12 @@ async function loadAttachmentsForModel(
  * Sends a user message and streams Opus's reply (text/plain). On stream close,
  * persists the assistant message with token usage and, if the reply contained a
  * fenced prompt block, updates the session's working draft.
+ *
+ * Editor and Creator share this endpoint, branching on `session.type`: the
+ * Editor edits the seeded draft (role `editor`); the Creator builds a new
+ * prompt from the architectural reference at `base_version_id` (role
+ * `creator`). The draft-extraction step is identical — Creator questionnaire
+ * turns produce no fenced block, so the draft stays null until construction.
  */
 export async function POST(req: NextRequest, { params }: Params) {
   try {
@@ -61,10 +69,13 @@ export async function POST(req: NextRequest, { params }: Params) {
 
     const input = appendMessageSchema.parse(await req.json());
 
-    const role = await getRoleDefault("editor");
+    const isCreator = session.type === "creator";
+    const role = await getRoleDefault(isCreator ? "creator" : "editor");
     if (!role) {
       return jsonError(
-        "No hay un modelo asignado al rol Editor. Configúralo en Configuración.",
+        isCreator
+          ? "No hay un modelo asignado al rol Creator. Configúralo en Configuración."
+          : "No hay un modelo asignado al rol Editor. Configúralo en Configuración.",
         400,
       );
     }
@@ -80,7 +91,16 @@ export async function POST(req: NextRequest, { params }: Params) {
       attachments: input.attachments ?? null,
     });
 
-    const systemPrompt = buildEditorSystemPrompt(session.current_draft_content ?? "");
+    let systemPrompt: string;
+    if (isCreator) {
+      // The base version is the architectural reference (structure only).
+      const reference = session.base_version_id
+        ? await getVersion(session.base_version_id)
+        : null;
+      systemPrompt = buildCreatorSystemPrompt(reference?.content ?? "");
+    } else {
+      systemPrompt = buildEditorSystemPrompt(session.current_draft_content ?? "");
+    }
     const modelAttachments = input.attachments?.length
       ? await loadAttachmentsForModel(input.attachments)
       : undefined;
