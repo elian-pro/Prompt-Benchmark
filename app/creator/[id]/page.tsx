@@ -9,6 +9,7 @@ import { relativeTimeEs } from "@/lib/format";
 import { Button } from "@/components/ui/Button";
 import { ChatMessage } from "@/components/editor/ChatMessage";
 import { FileUpload } from "@/components/editor/FileUpload";
+import { FinalizeCreatorButton } from "@/components/creator/FinalizeCreatorButton";
 
 const STATUS_LABELS: Record<string, string> = {
   active: "Activa",
@@ -154,6 +155,8 @@ export default function CreatorSessionPage() {
   if (!session) return <p className="empty-hint">Sesión no encontrada.</p>;
 
   const isAbandoned = session.status === "abandoned";
+  const isActive = session.status === "active";
+  const hasDraft = Boolean(session.current_draft_content?.trim());
 
   return (
     <div>
@@ -182,6 +185,17 @@ export default function CreatorSessionPage() {
           <Button variant="secondary" icon={<IconCopy size={14} />} onClick={copyDraft}>
             Copiar prompt
           </Button>
+          {isActive && (
+            <FinalizeCreatorButton
+              sessionId={id}
+              disabled={!hasDraft}
+              onDone={({ client, version }) => {
+                showToast(`Cliente "${client.name}" creado como ${version.version_number}.`);
+                load();
+              }}
+              onError={showToast}
+            />
+          )}
         </div>
       </div>
 
