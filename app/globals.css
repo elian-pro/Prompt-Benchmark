@@ -936,6 +936,15 @@ button {
   max-height: 60vh;
   overflow-y: auto;
 }
+.draft-report {
+  font-size: 12px;
+  line-height: 1.6;
+  color: var(--muted);
+  white-space: pre-wrap;
+  word-break: break-word;
+  max-height: 30vh;
+  overflow-y: auto;
+}
 
 /* File attachments */
 .visually-hidden {
