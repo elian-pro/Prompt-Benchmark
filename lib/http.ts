@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { ZodError } from "zod";
 import { ProviderInUseError } from "./db/providers";
 import { UnsupportedFileError } from "./db/uploads";
+import { RoleNotConfiguredError } from "./db/runs";
 
 /** JSON error envelope. Messages are in Spanish (user-facing). */
 export function jsonError(message: string, status: number) {
@@ -10,10 +11,11 @@ export function jsonError(message: string, status: number) {
 
 /**
  * Maps thrown errors to the right HTTP status:
- * - ZodError              → 400 (validation)
- * - UnsupportedFileError  → 400 (validation)
- * - ProviderInUseError    → 409 (conflict)
- * - everything else       → 500 (internal)
+ * - ZodError               → 400 (validation)
+ * - UnsupportedFileError    → 400 (validation)
+ * - RoleNotConfiguredError  → 400 (validation)
+ * - ProviderInUseError      → 409 (conflict)
+ * - everything else         → 500 (internal)
  */
 export function handleError(err: unknown) {
   if (err instanceof ZodError) {
@@ -21,6 +23,9 @@ export function handleError(err: unknown) {
     return jsonError(`Datos inválidos: ${msg}`, 400);
   }
   if (err instanceof UnsupportedFileError) {
+    return jsonError(err.message, 400);
+  }
+  if (err instanceof RoleNotConfiguredError) {
     return jsonError(err.message, 400);
   }
   if (err instanceof ProviderInUseError) {

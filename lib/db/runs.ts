@@ -93,12 +93,22 @@ function flattenListItem(row: any): RunListItem {
   return { ...(run as Run), client_name: client?.name ?? null };
 }
 
+/** Thrown when a required role has no model assigned (maps to HTTP 400). */
+export class RoleNotConfiguredError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "RoleNotConfiguredError";
+  }
+}
+
 /** Resolves a role's assigned model into a config snapshot, or throws. */
 async function resolveConfig(role: RoleName): Promise<RunModelConfig> {
   const rd = await getRoleDefault(role);
   if (!rd) {
     const label = ROLE_LABEL[role as keyof typeof ROLE_LABEL] ?? role;
-    throw new Error(`No hay un modelo asignado al rol ${label}. Configúralo en Configuración.`);
+    throw new RoleNotConfiguredError(
+      `No hay un modelo asignado al rol ${label}. Configúralo en Configuración.`,
+    );
   }
   return {
     provider_id: rd.provider_id,
