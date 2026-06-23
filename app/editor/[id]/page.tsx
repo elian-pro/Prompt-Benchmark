@@ -9,6 +9,7 @@ import { relativeTimeEs } from "@/lib/format";
 import { Button } from "@/components/ui/Button";
 import { ChatMessage } from "@/components/editor/ChatMessage";
 import { FileUpload } from "@/components/editor/FileUpload";
+import { FinalizeButton } from "@/components/editor/FinalizeButton";
 
 const STATUS_LABELS: Record<string, string> = {
   active: "Activa",
@@ -140,6 +141,8 @@ export default function EditorSessionPage() {
   if (!session) return <p className="empty-hint">Sesión no encontrada.</p>;
 
   const isAbandoned = session.status === "abandoned";
+  const isActive = session.status === "active";
+  const hasDraft = Boolean(session.current_draft_content?.trim());
 
   return (
     <div>
@@ -162,9 +165,22 @@ export default function EditorSessionPage() {
             </span>
           </div>
         </div>
-        <Button variant="secondary" icon={<IconCopy size={14} />} onClick={copyDraft}>
-          Copiar borrador
-        </Button>
+        <div className="detail-actions">
+          <Button variant="secondary" icon={<IconCopy size={14} />} onClick={copyDraft}>
+            Copiar borrador
+          </Button>
+          {isActive && (
+            <FinalizeButton
+              sessionId={id}
+              disabled={!hasDraft}
+              onDone={({ version }) => {
+                showToast(`Versión ${version.version_number} creada en la Biblioteca.`);
+                load();
+              }}
+              onError={showToast}
+            />
+          )}
+        </div>
       </div>
 
       <div className="chat-layout">
