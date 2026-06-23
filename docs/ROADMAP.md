@@ -17,7 +17,7 @@ Status: ✅ done · 🔨 in progress · ⏳ planned
 - ✅ Supabase schema designed and migration `001_initial.sql` ready to deploy
 - ✅ Visual preview approved by stakeholder
 
-## Sprint 1 — Settings + Library 🔨
+## Sprint 1 — Settings + Library ✅
 
 Build the foundation: providers configured, prompts importable, manual
 editing with version history. Detailed tickets in `docs/SPRINT-1.md`.
@@ -26,7 +26,7 @@ editing with version history. Detailed tickets in `docs/SPRINT-1.md`.
 existing prompt from production, make a manual edit, finalize as new
 version, copy to clipboard, see version count cap at 5.
 
-## Sprint 2 — Editor (chat-driven edits) ⏳
+## Sprint 2 — Editor (chat-driven edits) ✅
 
 Chat with Claude Opus to make guided edits to a prompt. File uploads with
 TTL of 7 days. Conversation persistence (reopenable). "Finalizar edición"
@@ -36,7 +36,7 @@ button commits the current state as a new minor version.
 ingeniero-de-prompts persona (from the existing manual template),
 streaming responses, token counter visible per session.
 
-## Sprint 3 — Creator (chat-driven creation) ⏳
+## Sprint 3 — Creator (chat-driven creation) 🔨
 
 Chat with Claude Opus to build a new prompt from scratch using an existing
 prompt as architectural reference and a brief as content source.

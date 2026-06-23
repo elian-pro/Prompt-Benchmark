@@ -1,5 +1,8 @@
 # Sprint 2 — Editor (chat-driven edits)
 
+> **Status: ✅ complete (closed 2026-06-23).** Archived. The active sprint is
+> now Sprint 3 — see `docs/SPRINT-3.md`. This file is kept for reference.
+
 **Goal**: Chat with Claude Opus to make guided edits to a prompt. The user
 selects a client from the Library, attaches context, describes the change in
 natural language, and Opus produces an updated prompt applying only what was
