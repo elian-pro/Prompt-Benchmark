@@ -36,7 +36,7 @@ button commits the current state as a new minor version.
 ingeniero-de-prompts persona (from the existing manual template),
 streaming responses, token counter visible per session.
 
-## Sprint 3 — Creator (chat-driven creation) 🔨
+## Sprint 3 — Creator (chat-driven creation) ✅
 
 Chat with Claude Opus to build a new prompt from scratch using an existing
 prompt as architectural reference and a brief as content source.
@@ -47,7 +47,7 @@ grouped by category).
 questionnaire UX, the "arquitectura trasladada / contenido extraído /
 pendiente" report appended to the new version.
 
-## Sprint 4 — Adversarial Lab ⏳
+## Sprint 4 — Adversarial Lab 🔨
 
 Reintegrate the original stress-test functionality on top of the new
 versioning model. Tests now run against a specific version selected from

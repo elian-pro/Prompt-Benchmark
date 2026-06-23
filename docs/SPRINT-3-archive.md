@@ -1,5 +1,8 @@
 # Sprint 3 — Creator (chat-driven creation)
 
+> **Status: ✅ complete (closed 2026-06-23).** Archived. The active sprint is
+> now Sprint 4 — see `docs/SPRINT-4.md`. This file is kept for reference.
+
 **Goal**: Chat with Claude Opus to build a *new* prompt from scratch, using an
 existing prompt from the Library as **architectural reference** (structure,
 lead flow, response format — not content) and a client brief as the content
