@@ -4,10 +4,11 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
 import { IconArrowLeft, IconCopy, IconSend } from "@tabler/icons-react";
-import type { ChatSessionDetail } from "@/lib/db/chat-sessions";
+import type { ChatSessionDetail, Attachment } from "@/lib/db/chat-sessions";
 import { relativeTimeEs } from "@/lib/format";
 import { Button } from "@/components/ui/Button";
 import { ChatMessage } from "@/components/editor/ChatMessage";
+import { FileUpload } from "@/components/editor/FileUpload";
 
 const STATUS_LABELS: Record<string, string> = {
   active: "Activa",
@@ -24,7 +25,9 @@ export default function EditorSessionPage() {
   const [error, setError] = useState<string | null>(null);
 
   const [input, setInput] = useState("");
+  const [attachments, setAttachments] = useState<Attachment[]>([]);
   const [pendingUser, setPendingUser] = useState<string | null>(null);
+  const [pendingAttachments, setPendingAttachments] = useState<Attachment[]>([]);
   const [streamingText, setStreamingText] = useState<string | null>(null);
   const [sending, setSending] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
@@ -62,16 +65,22 @@ export default function EditorSessionPage() {
   async function send() {
     const content = input.trim();
     if (!content || sending) return;
+    const sent = attachments;
     setSending(true);
     setError(null);
     setInput("");
+    setAttachments([]);
     setPendingUser(content);
+    setPendingAttachments(sent);
     setStreamingText("");
     try {
       const res = await fetch(`/api/chat-sessions/${id}/messages`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ content }),
+        body: JSON.stringify({
+          content,
+          attachments: sent.length > 0 ? sent : undefined,
+        }),
       });
       if (!res.ok || !res.body) {
         const data = await res.json().catch(() => ({}));
@@ -90,10 +99,12 @@ export default function EditorSessionPage() {
       await load();
     } catch (e) {
       setInput(content);
+      setAttachments(sent);
       showToast(e instanceof Error ? e.message : "Error al enviar el mensaje.");
     } finally {
       setSending(false);
       setPendingUser(null);
+      setPendingAttachments([]);
       setStreamingText(null);
     }
   }
@@ -150,9 +161,20 @@ export default function EditorSessionPage() {
               </p>
             )}
             {session.messages.map((m) => (
-              <ChatMessage key={m.id} role={m.role} content={m.content} />
+              <ChatMessage
+                key={m.id}
+                role={m.role}
+                content={m.content}
+                attachments={m.attachments}
+              />
             ))}
-            {pendingUser && <ChatMessage role="user" content={pendingUser} />}
+            {pendingUser && (
+              <ChatMessage
+                role="user"
+                content={pendingUser}
+                attachments={pendingAttachments}
+              />
+            )}
             {streamingText !== null && (
               <ChatMessage
                 role="assistant"
@@ -160,6 +182,15 @@ export default function EditorSessionPage() {
               />
             )}
           </div>
+
+          {!isAbandoned && (
+            <FileUpload
+              sessionId={id}
+              attachments={attachments}
+              onChange={setAttachments}
+              disabled={sending}
+            />
+          )}
 
           <div className="chat-input-row">
             <textarea
