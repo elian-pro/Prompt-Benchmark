@@ -208,10 +208,7 @@ export default function EditorSessionPage() {
               />
             )}
             {streamingText !== null && (
-              <ChatMessage
-                role="assistant"
-                content={streamingText.length > 0 ? streamingText : "…"}
-              />
+              <ChatMessage role="assistant" content={streamingText} streaming />
             )}
           </div>
 

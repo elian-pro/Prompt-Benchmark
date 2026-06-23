@@ -8,15 +8,21 @@ export function ChatMessage({
   role,
   content,
   attachments,
+  streaming = false,
 }: {
   role: MessageRole;
   content: string;
   attachments?: Attachment[] | null;
+  /** Show a blinking caret while the assistant response is still arriving. */
+  streaming?: boolean;
 }) {
   return (
     <div className={`chat-bubble chat-${role}`}>
       <span className="chat-role">{role === "user" ? "Tú" : "Opus"}</span>
-      <div className="chat-content">{content}</div>
+      <div className="chat-content">
+        {content}
+        {streaming && <span className="chat-caret" aria-hidden />}
+      </div>
       {attachments && attachments.length > 0 && (
         <div className="chat-attachments">
           {attachments.map((a) => (

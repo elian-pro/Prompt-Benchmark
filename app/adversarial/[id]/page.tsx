@@ -18,13 +18,24 @@ const STATUS_LABELS: Record<string, string> = {
 
 type LiveMessage = { turn: number; role: RunMessageRole; content: string };
 
-function Turn({ role, content }: { role: RunMessageRole; content: string }) {
+function Turn({
+  role,
+  content,
+  streaming = false,
+}: {
+  role: RunMessageRole;
+  content: string;
+  streaming?: boolean;
+}) {
   // Bot under test reads like the assistant; the adversarial lead like the user.
   const cls = role === "bot" ? "chat-assistant" : "chat-user";
   return (
     <div className={`chat-bubble ${cls}`}>
       <span className="chat-role">{role === "bot" ? "Agente (bot)" : "Lead"}</span>
-      <div className="chat-content">{content}</div>
+      <div className="chat-content">
+        {content}
+        {streaming && <span className="chat-caret" aria-hidden />}
+      </div>
     </div>
   );
 }
@@ -220,7 +231,7 @@ export default function RunDetailPage() {
           <Turn key={m.turn} role={m.role} content={m.content} />
         ))}
         {streaming && (
-          <Turn role={streaming.role} content={streaming.content.length ? streaming.content : "…"} />
+          <Turn role={streaming.role} content={streaming.content} streaming />
         )}
       </div>
 

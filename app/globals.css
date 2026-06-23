@@ -598,11 +598,91 @@ button {
 .skeleton-bar.tall {
   height: 28px;
 }
+
+/* Animation polish (S5-T8): entrances and micro-interactions. */
+@keyframes overlay-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+@keyframes modal-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@keyframes toast-in {
+  from {
+    opacity: 0;
+    transform: translate(-50%, 12px);
+  }
+  to {
+    opacity: 1;
+    transform: translate(-50%, 0);
+  }
+}
+@keyframes caret-blink {
+  50% {
+    opacity: 0;
+  }
+}
+.modal-overlay {
+  animation: overlay-in 0.15s ease;
+}
+.modal {
+  animation: modal-in 0.18s ease;
+}
+.toast {
+  animation: toast-in 0.2s ease;
+}
+
+/* Streaming caret in chat bubbles. */
+.chat-caret {
+  display: inline-block;
+  width: 7px;
+  height: 1em;
+  margin-left: 2px;
+  background: var(--accent);
+  vertical-align: text-bottom;
+  animation: caret-blink 1s step-end infinite;
+}
+
+/* Header nav: subtle underline + color on hover. */
+.app-nav a {
+  border-bottom: 1px solid transparent;
+  transition: color 0.15s, border-color 0.15s;
+}
+.app-nav a:hover {
+  color: var(--fg);
+  border-color: var(--accent);
+}
+
+/* Buttons: subtle press feedback. */
+.btn:active:not(:disabled) {
+  transform: translateY(0.5px);
+}
+
 @media (prefers-reduced-motion: reduce) {
   .skeleton-card,
   .skeleton-row {
     animation: none;
     opacity: 0.5;
+  }
+  .modal-overlay,
+  .modal,
+  .toast,
+  .chat-caret {
+    animation: none;
+  }
+  .btn:active:not(:disabled) {
+    transform: none;
   }
 }
 
