@@ -10,7 +10,7 @@
  */
 import { getSupabase } from "../supabase";
 import { listVersions } from "./versions";
-import type { VersionListItem, Version } from "./versions";
+import type { VersionListItem, Version, VersionSource } from "./versions";
 
 export type ClientFilter = "all" | "production" | "editing" | "legacy" | "archived";
 
@@ -140,6 +140,13 @@ export async function createClient(input: {
   segment?: string | null;
   location?: string | null;
   notes?: string | null;
+  // When present, v1.0 carries this content/source instead of an empty manual
+  // seed (used by the Creator's "Finalizar" flow, source: 'creator_chat').
+  initialVersion?: {
+    content: string;
+    source: VersionSource;
+    sourceSessionId?: string | null;
+  };
 }): Promise<{ client: Client; version: Version }> {
   const sb = getSupabase();
   const { data: client, error } = await sb
@@ -154,17 +161,18 @@ export async function createClient(input: {
     .single();
   if (error) throw new Error(`No se pudo crear el cliente: ${error.message}`);
 
-  // Seed an empty v1.0 directly (not via createVersion, which always bumps).
-  // Not production — a brand-new client is "en edición" until promoted.
+  // Seed v1.0 directly (not via createVersion, which always bumps). Not
+  // production — a brand-new client is "en edición" until promoted.
   const { data: version, error: vErr } = await sb
     .from("versions")
     .insert({
       client_id: (client as Client).id,
       version_number: "v1.0",
-      content: "",
+      content: input.initialVersion?.content ?? "",
       is_production: false,
       bump_type: null,
-      source: "manual",
+      source: input.initialVersion?.source ?? "manual",
+      source_session_id: input.initialVersion?.sourceSessionId ?? null,
     })
     .select("*")
     .single();

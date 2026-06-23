@@ -7,13 +7,13 @@
  */
 import { getProvider, getDecryptedKey } from "../db/providers";
 import type { AdapterType } from "../db/providers";
-import type { Adapter, AdapterContext, ChatRequest, ChatResponse } from "./types";
+import type { Adapter, AdapterContext, ChatRequest, ChatResponse, StreamChunk } from "./types";
 import * as openaiCompat from "./openai-compat";
 import * as anthropic from "./anthropic";
 import * as google from "./google";
 import * as openrouter from "./openrouter";
 
-export type { ChatRequest, ChatResponse, ChatMessage } from "./types";
+export type { ChatRequest, ChatResponse, ChatMessage, StreamChunk, MessageAttachment } from "./types";
 
 const adapters: Record<AdapterType, Adapter> = {
   openai_compat: openaiCompat,
@@ -41,7 +41,7 @@ export async function chat(req: ChatRequest): Promise<ChatResponse> {
   return adapter.chat(req, ctx);
 }
 
-export async function* streamChat(req: ChatRequest): AsyncIterable<string> {
+export async function* streamChat(req: ChatRequest): AsyncIterable<StreamChunk> {
   const { adapter, ctx } = await resolve(req.providerId);
   yield* adapter.streamChat(req, ctx);
 }
