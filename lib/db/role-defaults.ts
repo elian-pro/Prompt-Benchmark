@@ -55,6 +55,17 @@ export async function listRoleDefaults(): Promise<RoleDefault[]> {
   return (data ?? []).map(flatten);
 }
 
+export async function getRoleDefault(role: RoleName): Promise<RoleDefault | null> {
+  const sb = getSupabase();
+  const { data, error } = await sb
+    .from("role_defaults")
+    .select(SELECT)
+    .eq("role", role)
+    .maybeSingle();
+  if (error) throw new Error(`No se pudo obtener la asignación del rol: ${error.message}`);
+  return data ? flatten(data) : null;
+}
+
 export async function setRoleDefault(
   role: RoleName,
   input: {

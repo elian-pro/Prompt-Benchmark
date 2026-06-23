@@ -65,3 +65,17 @@ PROMPT EN PRODUCCIÓN (estado actual sobre el que debes trabajar):
 
 ${draft}`;
 }
+
+/**
+ * Extracts the updated prompt from an assistant reply, per the output contract:
+ * the full prompt lives inside the first fenced code block. Returns null when
+ * the reply has no code block (the assistant only answered a question and did
+ * not produce a new draft), so the caller leaves the draft untouched.
+ */
+export function extractPromptFromReply(reply: string): string | null {
+  // First fenced block; tolerate an optional language tag after the backticks.
+  const match = reply.match(/```[^\n]*\n([\s\S]*?)```/);
+  if (!match) return null;
+  const extracted = match[1].trim();
+  return extracted.length > 0 ? extracted : null;
+}
