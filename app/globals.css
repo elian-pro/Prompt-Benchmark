@@ -108,10 +108,21 @@ button {
   margin-bottom: 28px;
 }
 
-/* Placeholder nav row (non-functional until later tickets). */
+/* Right cluster of the header: nav + theme toggle. */
+.header-right {
+  display: flex;
+  align-items: center;
+  gap: 22px;
+}
+
 .app-nav {
   display: flex;
   gap: 22px;
+}
+
+/* Theme toggle reuses .icon-btn; sits inline with the accent at hover. */
+.theme-toggle {
+  flex: none;
 }
 
 .app-nav a {
