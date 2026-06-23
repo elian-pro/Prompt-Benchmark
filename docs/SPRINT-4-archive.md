@@ -1,5 +1,8 @@
 # Sprint 4 — Adversarial Lab
 
+> **Status: ✅ complete (closed 2026-06-23).** Archived. The active sprint is
+> now Sprint 5 — see `docs/SPRINT-5.md`. This file is kept for reference.
+
 **Goal**: Reintegrate the original stress-test functionality on top of the
 versioning model. A **bot under test** runs a prompt selected from the Library
 (using the *exact* production model, temperature and system prompt — otherwise

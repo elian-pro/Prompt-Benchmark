@@ -47,7 +47,7 @@ grouped by category).
 questionnaire UX, the "arquitectura trasladada / contenido extraído /
 pendiente" report appended to the new version.
 
-## Sprint 4 — Adversarial Lab 🔨
+## Sprint 4 — Adversarial Lab ✅
 
 Reintegrate the original stress-test functionality on top of the new
 versioning model. Tests now run against a specific version selected from
@@ -58,7 +58,7 @@ taxonomy.
 rendering, judge call after conversation ends, report view, snapshot of
 prompt content into the run row so reports survive version deletion.
 
-## Sprint 5 — Visual polish ⏳
+## Sprint 5 — Visual polish 🔨
 
 Apply the full Zebra design system. Dark/light mode toggle. NEW and
 NEW VERSION badges. Two-step delete with typed-confirmation. Empty
