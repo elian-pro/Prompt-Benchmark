@@ -1,6 +1,6 @@
 /** OpenRouter adapter — openai-compat with OpenRouter's base URL hardcoded. */
 import * as openaiCompat from "./openai-compat";
-import type { ChatRequest, ChatResponse, AdapterContext } from "./types";
+import type { ChatRequest, ChatResponse, AdapterContext, StreamChunk } from "./types";
 
 const OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1";
 
@@ -15,6 +15,6 @@ export function chat(req: ChatRequest, ctx: AdapterContext): Promise<ChatRespons
 export async function* streamChat(
   req: ChatRequest,
   ctx: AdapterContext,
-): AsyncIterable<string> {
+): AsyncIterable<StreamChunk> {
   yield* openaiCompat.streamChat(req, withBaseUrl(ctx));
 }

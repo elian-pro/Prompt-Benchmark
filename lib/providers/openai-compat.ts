@@ -2,7 +2,7 @@
  * Adapter for OpenAI-compatible chat APIs (OpenAI, DeepSeek, Groq, Together,
  * Mistral, etc.). Plain `fetch` against `{base_url}/chat/completions`.
  */
-import type { ChatRequest, ChatResponse, AdapterContext } from "./types";
+import type { ChatRequest, ChatResponse, AdapterContext, StreamChunk } from "./types";
 
 type OpenAIMessage = { role: "system" | "user" | "assistant"; content: string };
 
@@ -27,6 +27,9 @@ function buildBody(req: ChatRequest, stream: boolean) {
     top_p: req.topP,
     max_tokens: req.maxTokens,
     stream,
+    // Ask the backend to append a final chunk with token usage. Supported by
+    // OpenAI and most compatible backends; ignored/absent on those that don't.
+    ...(stream ? { stream_options: { include_usage: true } } : {}),
   });
 }
 
@@ -57,7 +60,7 @@ export async function chat(req: ChatRequest, ctx: AdapterContext): Promise<ChatR
 export async function* streamChat(
   req: ChatRequest,
   ctx: AdapterContext,
-): AsyncIterable<string> {
+): AsyncIterable<StreamChunk> {
   const res = await fetch(endpoint(ctx.baseUrl), {
     method: "POST",
     headers: headers(ctx),
@@ -69,9 +72,14 @@ export async function* streamChat(
   const reader = res.body.getReader();
   const decoder = new TextDecoder();
   let buffer = "";
-  while (true) {
-    const { done, value } = await reader.read();
-    if (done) break;
+  // Captured from the usage-bearing chunk when the backend includes it; stays
+  // 0 otherwise (some openai-compat backends omit usage entirely).
+  let tokensIn = 0;
+  let tokensOut = 0;
+  let done = false;
+  while (!done) {
+    const { done: streamDone, value } = await reader.read();
+    if (streamDone) break;
     buffer += decoder.decode(value, { stream: true });
     const lines = buffer.split("\n");
     buffer = lines.pop() ?? "";
@@ -79,14 +87,22 @@ export async function* streamChat(
       const trimmed = line.trim();
       if (!trimmed.startsWith("data:")) continue;
       const payload = trimmed.slice(5).trim();
-      if (payload === "[DONE]") return;
+      if (payload === "[DONE]") {
+        done = true;
+        break;
+      }
       try {
         const json = JSON.parse(payload);
         const delta: string | undefined = json.choices?.[0]?.delta?.content;
-        if (delta) yield delta;
+        if (delta) yield { type: "text", text: delta };
+        if (json.usage) {
+          tokensIn = json.usage.prompt_tokens ?? tokensIn;
+          tokensOut = json.usage.completion_tokens ?? tokensOut;
+        }
       } catch {
         // Ignore partial/non-JSON keepalive lines.
       }
     }
   }
+  yield { type: "usage", tokensIn, tokensOut };
 }

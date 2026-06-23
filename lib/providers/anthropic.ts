@@ -1,6 +1,12 @@
 /** Anthropic native adapter using @anthropic-ai/sdk. */
 import Anthropic from "@anthropic-ai/sdk";
-import { type ChatRequest, type ChatResponse, type AdapterContext, DEFAULT_MAX_TOKENS } from "./types";
+import {
+  type ChatRequest,
+  type ChatResponse,
+  type AdapterContext,
+  type StreamChunk,
+  DEFAULT_MAX_TOKENS,
+} from "./types";
 
 function client(ctx: AdapterContext): Anthropic {
   return new Anthropic({ apiKey: ctx.apiKey });
@@ -32,11 +38,19 @@ export async function chat(req: ChatRequest, ctx: AdapterContext): Promise<ChatR
 export async function* streamChat(
   req: ChatRequest,
   ctx: AdapterContext,
-): AsyncIterable<string> {
+): AsyncIterable<StreamChunk> {
   const stream = await client(ctx).messages.create({ ...baseParams(req), stream: true });
+  let tokensIn = 0;
+  let tokensOut = 0;
   for await (const event of stream) {
-    if (event.type === "content_block_delta" && event.delta.type === "text_delta") {
-      yield event.delta.text;
+    if (event.type === "message_start") {
+      tokensIn = event.message.usage.input_tokens;
+    } else if (event.type === "content_block_delta" && event.delta.type === "text_delta") {
+      yield { type: "text", text: event.delta.text };
+    } else if (event.type === "message_delta") {
+      // output_tokens on message_delta is the cumulative final count.
+      tokensOut = event.usage.output_tokens;
     }
   }
+  yield { type: "usage", tokensIn, tokensOut };
 }

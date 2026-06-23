@@ -18,6 +18,16 @@ export type ChatResponse = {
   tokensOut: number;
 };
 
+/**
+ * A streamed response is a sequence of text deltas followed by exactly one
+ * final `usage` chunk carrying the token counts (so callers get the same
+ * tokensIn/tokensOut that chat() returns). Adapters that can't report usage
+ * still emit a usage chunk with zeros.
+ */
+export type StreamChunk =
+  | { type: "text"; text: string }
+  | { type: "usage"; tokensIn: number; tokensOut: number };
+
 /** Per-request context an adapter needs: the decrypted key and optional base URL. */
 export type AdapterContext = {
   apiKey: string;
@@ -26,7 +36,7 @@ export type AdapterContext = {
 
 export type Adapter = {
   chat(req: ChatRequest, ctx: AdapterContext): Promise<ChatResponse>;
-  streamChat(req: ChatRequest, ctx: AdapterContext): AsyncIterable<string>;
+  streamChat(req: ChatRequest, ctx: AdapterContext): AsyncIterable<StreamChunk>;
 };
 
 /** Anthropic requires max_tokens; used as a fallback when the caller omits it. */

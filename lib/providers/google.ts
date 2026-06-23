@@ -1,6 +1,6 @@
 /** Google Gemini native adapter using @google/genai (the current unified SDK). */
 import { GoogleGenAI } from "@google/genai";
-import type { ChatRequest, ChatResponse, AdapterContext, ChatMessage } from "./types";
+import type { ChatRequest, ChatResponse, AdapterContext, ChatMessage, StreamChunk } from "./types";
 
 function client(ctx: AdapterContext): GoogleGenAI {
   return new GoogleGenAI({ apiKey: ctx.apiKey });
@@ -39,9 +39,17 @@ export async function chat(req: ChatRequest, ctx: AdapterContext): Promise<ChatR
 export async function* streamChat(
   req: ChatRequest,
   ctx: AdapterContext,
-): AsyncIterable<string> {
+): AsyncIterable<StreamChunk> {
   const stream = await client(ctx).models.generateContentStream(buildParams(req));
+  let tokensIn = 0;
+  let tokensOut = 0;
   for await (const chunk of stream) {
-    if (chunk.text) yield chunk.text;
+    if (chunk.text) yield { type: "text", text: chunk.text };
+    // usageMetadata accumulates; the last chunk carries the final totals.
+    if (chunk.usageMetadata) {
+      tokensIn = chunk.usageMetadata.promptTokenCount ?? tokensIn;
+      tokensOut = chunk.usageMetadata.candidatesTokenCount ?? tokensOut;
+    }
   }
+  yield { type: "usage", tokensIn, tokensOut };
 }
