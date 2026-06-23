@@ -224,20 +224,26 @@ export async function abandonSession(sessionId: string): Promise<ChatSession> {
 
 /**
  * Closes a session as finalized, linking the version it produced. The version
- * itself is created by the API route (via `createVersion`) before this call.
+ * (and, for Creator sessions, the client) is created by the API route before
+ * this call. When `clientId` is given it's also linked here — Creator sessions
+ * start client-less and get their client only at finalize.
  */
 export async function finalizeSession(
   sessionId: string,
   versionId: string,
+  clientId?: string,
 ): Promise<ChatSession> {
   const sb = getSupabase();
+  const update: Record<string, unknown> = {
+    status: "finalized",
+    final_version_id: versionId,
+    finalized_at: new Date().toISOString(),
+  };
+  if (clientId) update.client_id = clientId;
+
   const { data, error } = await sb
     .from("chat_sessions")
-    .update({
-      status: "finalized",
-      final_version_id: versionId,
-      finalized_at: new Date().toISOString(),
-    })
+    .update(update)
     .eq("id", sessionId)
     .select(SESSION_COLS)
     .single();

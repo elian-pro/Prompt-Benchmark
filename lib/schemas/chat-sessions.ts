@@ -41,5 +41,17 @@ export const appendMessageSchema = z.object({
   attachments: z.array(attachmentSchema).optional(),
 });
 
+// Creator sessions have no client until finalize: the new client's metadata is
+// collected then. Editor finalize needs no body (it already has a client).
+export const finalizeCreatorSchema = z.object({
+  name: z
+    .string({ required_error: "El nombre del cliente es obligatorio." })
+    .trim()
+    .min(1, "El nombre del cliente es obligatorio."),
+  segment: z.string().trim().min(1).nullable().optional(),
+  location: z.string().trim().min(1).nullable().optional(),
+});
+
 export type CreateSessionInput = z.infer<typeof createSessionSchema>;
 export type AppendMessageInput = z.infer<typeof appendMessageSchema>;
+export type FinalizeCreatorInput = z.infer<typeof finalizeCreatorSchema>;
