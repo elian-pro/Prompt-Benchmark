@@ -197,3 +197,16 @@ export async function touch(sessionId: string): Promise<void> {
     .eq("id", sessionId);
   if (error) throw new Error(`No se pudo actualizar la sesión: ${error.message}`);
 }
+
+/** Soft-close a session the user discarded without finalizing. */
+export async function abandonSession(sessionId: string): Promise<ChatSession> {
+  const sb = getSupabase();
+  const { data, error } = await sb
+    .from("chat_sessions")
+    .update({ status: "abandoned" })
+    .eq("id", sessionId)
+    .select(SESSION_COLS)
+    .single();
+  if (error) throw new Error(`No se pudo descartar la sesión: ${error.message}`);
+  return data as unknown as ChatSession;
+}
