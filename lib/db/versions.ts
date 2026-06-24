@@ -130,6 +130,18 @@ export async function createVersion(
   return data as Version;
 }
 
+/**
+ * Hard-deletes a single version. Callers must enforce the business rules
+ * (don't delete the production version or a client's only version). FKs that
+ * point at this version (chat_sessions.base_version_id / final_version_id,
+ * runs.version_id) are ON DELETE SET NULL, so this never cascades.
+ */
+export async function deleteVersion(id: string): Promise<void> {
+  const sb = getSupabase();
+  const { error } = await sb.from("versions").delete().eq("id", id);
+  if (error) throw new Error(`No se pudo eliminar la versión: ${error.message}`);
+}
+
 export async function promoteToProduction(versionId: string): Promise<Version> {
   const sb = getSupabase();
   const { data: target, error: tErr } = await sb

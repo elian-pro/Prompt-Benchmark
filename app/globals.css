@@ -1172,6 +1172,12 @@ button {
   flex-wrap: wrap;
   gap: 6px;
 }
+.vfoot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
 .version-item .vmeta {
   font-size: 11px;
   letter-spacing: 0.08em;

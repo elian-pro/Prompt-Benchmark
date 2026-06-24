@@ -3,8 +3,9 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
-import { IconArrowLeft, IconCopy, IconSparkles } from "@tabler/icons-react";
+import { IconArrowLeft, IconCopy, IconSparkles, IconTrash } from "@tabler/icons-react";
 import type { ClientDetail } from "@/lib/db/clients";
+import type { VersionListItem } from "@/lib/db/versions";
 import { computeNextNumber } from "@/lib/version-utils";
 import { relativeTimeEs } from "@/lib/format";
 import { isNewVersion } from "@/lib/badges";
@@ -32,6 +33,7 @@ export default function ClientDetailPage() {
   const [toast, setToast] = useState<string | null>(null);
   const [finalizeOpen, setFinalizeOpen] = useState(false);
   const [promoteOpen, setPromoteOpen] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState<VersionListItem | null>(null);
   const [busy, setBusy] = useState(false);
 
   const hasEdited = useRef(false);
@@ -148,6 +150,24 @@ export default function ClientDetailPage() {
     }
   }
 
+  async function removeVersion(target: VersionListItem) {
+    setBusy(true);
+    try {
+      const res = await fetch(`/api/versions/${target.id}`, { method: "DELETE" });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.error ?? "No se pudo eliminar la versión.");
+      }
+      setDeleteTarget(null);
+      await load();
+      showToast(`Versión ${target.version_number} eliminada.`);
+    } catch (e) {
+      showToast(e instanceof Error ? e.message : "Error inesperado.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
   if (loading) return <p className="empty-hint">Cargando…</p>;
   if (error) return <p className="form-error">{error}</p>;
   if (!detail) return <p className="empty-hint">Cliente no encontrado.</p>;
@@ -213,13 +233,25 @@ export default function ClientDetailPage() {
                     {v.is_production && <span className="prod-tag">Prod</span>}
                   </span>
                 </span>
-                <span className="vmeta">
-                  {SOURCE_LABELS[v.source ?? ""] ?? "—"} ·{" "}
-                  {new Date(v.created_at).toLocaleDateString("es-MX", {
-                    day: "2-digit",
-                    month: "short",
-                  })}
-                </span>
+                <div className="vfoot">
+                  <span className="vmeta">
+                    {SOURCE_LABELS[v.source ?? ""] ?? "—"} ·{" "}
+                    {new Date(v.created_at).toLocaleDateString("es-MX", {
+                      day: "2-digit",
+                      month: "short",
+                    })}
+                  </span>
+                  {!v.is_production && detail.versions.length > 1 && (
+                    <button
+                      className="icon-btn danger"
+                      title="Eliminar versión"
+                      aria-label={`Eliminar versión ${v.version_number}`}
+                      onClick={() => setDeleteTarget(v)}
+                    >
+                      <IconTrash size={14} />
+                    </button>
+                  )}
+                </div>
               </div>
             ))}
           </div>
@@ -289,6 +321,31 @@ export default function ClientDetailPage() {
         <p className="modal-body">
           Se creará la versión mayor {nextMajor} y se marcará como la versión de
           producción del cliente.
+        </p>
+      </Modal>
+
+      <Modal
+        open={Boolean(deleteTarget)}
+        onClose={() => !busy && setDeleteTarget(null)}
+        title={`¿Eliminar la versión ${deleteTarget?.version_number ?? ""}?`}
+        footer={
+          <>
+            <Button variant="ghost" onClick={() => setDeleteTarget(null)} disabled={busy}>
+              Cancelar
+            </Button>
+            <Button
+              variant="danger"
+              onClick={() => deleteTarget && removeVersion(deleteTarget)}
+              disabled={busy}
+            >
+              {busy ? "Eliminando…" : "Eliminar"}
+            </Button>
+          </>
+        }
+      >
+        <p className="modal-body">
+          Se eliminará esta versión de forma permanente. Esta acción no se puede
+          deshacer.
         </p>
       </Modal>
 
