@@ -15,10 +15,11 @@ import "./globals.css";
 // with the localStorage key used by ThemeToggle ("zebra-theme").
 const NO_FLASH_THEME_SCRIPT = `(function(){try{var t=localStorage.getItem('zebra-theme');if(t==='light'||t==='dark'){document.body.dataset.theme=t;}}catch(e){}})();`;
 
-// Two weights only, per docs/DESIGN-SYSTEM.md (never 600/700).
+// Mostly two weights per docs/DESIGN-SYSTEM.md; 700 is loaded only for the
+// emphasized team name in the Editor/Creator welcome greeting.
 const inter = Inter({
   subsets: ["latin"],
-  weight: ["400", "500"],
+  weight: ["400", "500", "700"],
   display: "swap",
 });
 

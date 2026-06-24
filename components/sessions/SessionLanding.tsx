@@ -5,7 +5,7 @@ import Link from "next/link";
 import { IconSparkles } from "@tabler/icons-react";
 import type { ChatSessionListItem } from "@/lib/db/chat-sessions";
 import { relativeTimeEs } from "@/lib/format";
-import { getGreeting } from "@/lib/greeting";
+import { getGreeting, TEAM_NAME } from "@/lib/greeting";
 import { SkeletonRows } from "@/components/ui/Skeleton";
 import { ClientPicker } from "@/components/sessions/ClientPicker";
 
@@ -65,8 +65,24 @@ export function SessionLanding({ mode }: { mode: Mode }) {
   return (
     <div className="session-landing">
       <section className="landing-hero">
-        {/* Non-breaking space reserves height until the greeting is computed. */}
-        <h1 className="landing-greeting">{greeting || " "}</h1>
+        {/* Until the greeting is computed, a non-breaking space reserves the
+            line height. The team name is emphasized (bold + accent). */}
+        <h1 className="landing-greeting">
+          {greeting
+            ? greeting
+                .split(TEAM_NAME)
+                .flatMap((part, i) =>
+                  i === 0
+                    ? [part]
+                    : [
+                        <span key={i} className="greeting-team">
+                          {TEAM_NAME}
+                        </span>,
+                        part,
+                      ],
+                )
+            : "\u00A0"}
+        </h1>
 
         <ClientPicker mode={mode} />
 

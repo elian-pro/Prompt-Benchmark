@@ -7,7 +7,7 @@
  * appear at any moment (this is where the weekday line lives). Always addresses
  * the team by name.
  */
-const TEAM = "Equipo IA";
+export const TEAM_NAME = "Equipo IA";
 
 const WEEKDAYS = [
   "domingo",
@@ -28,43 +28,43 @@ export function getGreeting(now: Date): string {
   // Shown regardless of the hour — keeps the rotation varied. The first one
   // builds the real weekday.
   const general = [
-    `¡Feliz ${WEEKDAYS[day]}, ${TEAM}!`,
-    `¡Hola de nuevo, ${TEAM}!`,
-    `Qué gusto verte, ${TEAM}`,
-    `Hora de pulir prompts, ${TEAM}`,
+    `¡Feliz ${WEEKDAYS[day]}, ${TEAM_NAME}!`,
+    `¡Hola de nuevo, ${TEAM_NAME}!`,
+    `Qué gusto verte, ${TEAM_NAME}`,
+    `Hora de pulir prompts, ${TEAM_NAME}`,
   ];
 
   let band: string[];
   if (isWeekend || hour < 9 || hour >= 18) {
     band = [
-      `Trabajando hasta tarde, ${TEAM}`,
-      `Aquí andamos fuera de horario, ${TEAM}`,
-      `¿Fin de semana productivo, ${TEAM}?`,
+      `Trabajando hasta tarde, ${TEAM_NAME}`,
+      `Aquí andamos fuera de horario, ${TEAM_NAME}`,
+      `¿Fin de semana productivo, ${TEAM_NAME}?`,
     ];
   } else if (hour < 12) {
     band = [
-      `Buenos días, ${TEAM}`,
-      `Primer café y a darle, ${TEAM}`,
-      `Café en mano, ${TEAM}`,
-      `Arrancamos el día, ${TEAM}`,
+      `Buenos días, ${TEAM_NAME}`,
+      `Primer café y a darle, ${TEAM_NAME}`,
+      `Café en mano, ${TEAM_NAME}`,
+      `Arrancamos el día, ${TEAM_NAME}`,
     ];
   } else if (hour < 14) {
     band = [
-      `Vamos a mitad del día, ${TEAM}`,
-      `¿Ya con hambre, ${TEAM}?`,
-      `Casi hora del almuerzo, ${TEAM}`,
+      `Vamos a mitad del día, ${TEAM_NAME}`,
+      `¿Ya con hambre, ${TEAM_NAME}?`,
+      `Casi hora del almuerzo, ${TEAM_NAME}`,
     ];
   } else if (hour < 16) {
     band = [
-      `De vuelta del almuerzo, ${TEAM}`,
-      `Buenas tardes, ${TEAM}`,
-      `Segundo aire, ${TEAM}`,
+      `De vuelta del almuerzo, ${TEAM_NAME}`,
+      `Buenas tardes, ${TEAM_NAME}`,
+      `Segundo aire, ${TEAM_NAME}`,
     ];
   } else {
     band = [
-      `Solo queda un último empujón, ${TEAM}`,
-      `Recta final, ${TEAM}`,
-      `Cerramos con todo, ${TEAM}`,
+      `Solo queda un último empujón, ${TEAM_NAME}`,
+      `Recta final, ${TEAM_NAME}`,
+      `Cerramos con todo, ${TEAM_NAME}`,
     ];
   }
 
