@@ -49,7 +49,6 @@ export const finalizeCreatorSchema = z.object({
     .trim()
     .min(1, "El nombre del cliente es obligatorio."),
   segment: z.string().trim().min(1).nullable().optional(),
-  location: z.string().trim().min(1).nullable().optional(),
 });
 
 export type CreateSessionInput = z.infer<typeof createSessionSchema>;

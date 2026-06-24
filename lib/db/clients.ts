@@ -18,7 +18,6 @@ export type Client = {
   id: string;
   name: string;
   segment: string | null;
-  location: string | null;
   notes: string | null;
   is_legacy: boolean;
   archived_at: string | null;
@@ -89,9 +88,7 @@ export async function listClients({
     // Strip characters that would break the PostgREST or() grammar.
     const term = search.trim().replace(/[%,()]/g, "");
     if (term) {
-      query = query.or(
-        `name.ilike.%${term}%,segment.ilike.%${term}%,location.ilike.%${term}%`,
-      );
+      query = query.or(`name.ilike.%${term}%,segment.ilike.%${term}%`);
     }
   }
   query = query.order("updated_at", { ascending: false });
@@ -138,7 +135,6 @@ export async function getClient(id: string): Promise<ClientDetail | null> {
 export async function createClient(input: {
   name: string;
   segment?: string | null;
-  location?: string | null;
   notes?: string | null;
   // When present, v1.0 carries this content/source instead of an empty manual
   // seed (used by the Creator's "Finalizar" flow, source: 'creator_chat').
@@ -154,7 +150,6 @@ export async function createClient(input: {
     .insert({
       name: input.name,
       segment: input.segment ?? null,
-      location: input.location ?? null,
       notes: input.notes ?? null,
     })
     .select("*")
@@ -186,7 +181,6 @@ export async function updateClient(
   input: {
     name?: string;
     segment?: string | null;
-    location?: string | null;
     notes?: string | null;
     draft_content?: string | null;
   },
@@ -195,7 +189,6 @@ export async function updateClient(
   const patch: Record<string, unknown> = {};
   if (input.name !== undefined) patch.name = input.name;
   if (input.segment !== undefined) patch.segment = input.segment;
-  if (input.location !== undefined) patch.location = input.location;
   if (input.notes !== undefined) patch.notes = input.notes;
   if (input.draft_content !== undefined) patch.draft_content = input.draft_content;
 

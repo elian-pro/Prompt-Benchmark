@@ -22,7 +22,7 @@ const FILTERS: { key: ClientFilter; label: string }[] = [
 function matches(c: ClientSummary, term: string): boolean {
   if (!term) return true;
   const t = term.toLowerCase();
-  return [c.name, c.segment, c.location]
+  return [c.name, c.segment]
     .filter(Boolean)
     .some((v) => (v as string).toLowerCase().includes(t));
 }
@@ -142,7 +142,7 @@ export default function LibraryPage() {
           className="input"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          placeholder="Buscar por nombre, segmento o ubicación…"
+          placeholder="Buscar por nombre o segmento…"
         />
       </div>
 

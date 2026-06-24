@@ -637,6 +637,36 @@ button {
   background: var(--faint);
 }
 
+/* Selectable chips (client segment picker) */
+.chip-group {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 6px 0;
+}
+.chip {
+  background: transparent;
+  border: 0.5px solid var(--border2);
+  color: var(--muted);
+  border-radius: 100px;
+  padding: 7px 16px;
+  font-size: 11px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: border-color 0.15s, color 0.15s, background 0.15s;
+}
+.chip:hover {
+  border-color: var(--fg);
+  color: var(--fg);
+}
+.chip-selected,
+.chip-selected:hover {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #0a0a0a;
+}
+
 /* Info hint — small "i" with a tooltip */
 .info-hint {
   position: relative;

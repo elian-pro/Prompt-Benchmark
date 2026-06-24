@@ -14,7 +14,7 @@ type Params = { params: Promise<{ id: string }> };
  * finalized. Branches by session type:
  *  - editor:  a new MINOR version on the existing client (`editor_chat`).
  *  - creator: a brand-new client at v1.0 carrying the prompt (`creator_chat`),
- *             with metadata (name, segment, location) from the request body.
+ *             with metadata (name, segment) from the request body.
  * Idempotency is not attempted: a finalized or abandoned session is rejected.
  */
 export async function POST(req: NextRequest, { params }: Params) {
@@ -36,7 +36,6 @@ export async function POST(req: NextRequest, { params }: Params) {
       const { client, version } = await createClient({
         name: input.name,
         segment: input.segment ?? null,
-        location: input.location ?? null,
         initialVersion: { content: draft, source: "creator_chat", sourceSessionId: id },
       });
       const finalized = await finalizeSession(id, version.id, client.id);

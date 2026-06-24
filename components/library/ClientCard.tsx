@@ -90,9 +90,7 @@ export function ClientCard({ client, onDelete, onToast }: Props) {
       {badge && <Badge variant={badge.variant}>{badge.label}</Badge>}
 
       <div className="client-card-name">{client.name}</div>
-      <div className="client-card-meta">
-        {[client.segment, client.location].filter(Boolean).join(" · ") || "—"}
-      </div>
+      <div className="client-card-meta">{client.segment || "—"}</div>
 
       <div className="client-card-version">{versionLabel}</div>
       <div className="client-card-foot">

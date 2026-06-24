@@ -11,7 +11,6 @@ export const createClientSchema = z.object({
     .trim()
     .min(1, "El nombre es obligatorio."),
   segment: z.string().trim().min(1).nullable().optional(),
-  location: z.string().trim().min(1).nullable().optional(),
   notes: z.string().nullable().optional(),
 });
 
@@ -19,7 +18,6 @@ export const updateClientSchema = z
   .object({
     name: z.string().trim().min(1, "El nombre es obligatorio."),
     segment: z.string().trim().min(1).nullable(),
-    location: z.string().trim().min(1).nullable(),
     notes: z.string().nullable(),
     draft_content: z.string().nullable(),
   })
