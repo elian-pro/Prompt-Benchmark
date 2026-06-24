@@ -1,8 +1,9 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
-import { IconCopy, IconSparkles } from "@tabler/icons-react";
+import { IconArrowLeft, IconCopy, IconSparkles } from "@tabler/icons-react";
 import type { ClientDetail } from "@/lib/db/clients";
 import { computeNextNumber } from "@/lib/version-utils";
 import { relativeTimeEs } from "@/lib/format";
@@ -158,6 +159,11 @@ export default function ClientDetailPage() {
 
   return (
     <div>
+      <Link href="/library" className="back-link">
+        <IconArrowLeft size={15} />
+        Volver a la biblioteca
+      </Link>
+
       <div className="detail-header">
         <div>
           <h1 className="detail-title">{detail.name}</h1>

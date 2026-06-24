@@ -1093,6 +1093,20 @@ button {
    Client detail (manual editor)
    =========================================================================== */
 
+.back-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 18px;
+  font-size: 12px;
+  letter-spacing: 0.04em;
+  color: var(--muted);
+  text-decoration: none;
+  transition: color 0.15s ease;
+}
+.back-link:hover {
+  color: var(--fg);
+}
 .detail-header {
   display: flex;
   align-items: flex-start;
