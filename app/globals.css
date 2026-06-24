@@ -1155,6 +1155,59 @@ button {
 .detail-title {
   font-size: 24px;
 }
+/* Inline-editable text (client name): hover hints, click to edit. */
+.editable-text {
+  cursor: text;
+  border-radius: 6px;
+  padding: 2px 6px;
+  margin: -2px -6px;
+  transition: background 0.12s ease;
+}
+.editable-text:hover {
+  background: var(--surface2);
+}
+.title-input {
+  font-size: 24px;
+  font-weight: 500;
+  letter-spacing: -0.01em;
+  width: 100%;
+  max-width: 480px;
+  background: transparent;
+  border: none;
+  border-bottom: 1px solid var(--accent);
+  outline: none;
+  color: var(--fg);
+  font-family: inherit;
+  padding: 0 0 2px;
+}
+/* Editable segment chip in the detail header. */
+.segment-chip-display {
+  display: inline-flex;
+  align-items: center;
+  margin-top: 12px;
+  background: transparent;
+  border: 0.5px solid var(--border2);
+  border-radius: 100px;
+  padding: 5px 12px;
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+  cursor: pointer;
+  transition: border-color 0.15s ease, color 0.15s ease;
+}
+.segment-chip-display:hover {
+  border-color: var(--accent);
+  color: var(--fg);
+}
+.segment-edit {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 12px;
+  margin-top: 14px;
+  max-width: 460px;
+}
 .detail-sub {
   margin-top: 8px;
   display: flex;

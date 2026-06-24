@@ -12,6 +12,7 @@ import { isNewVersion } from "@/lib/badges";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { Modal } from "@/components/ui/Modal";
+import { SegmentPicker } from "@/components/library/SegmentPicker";
 
 const SOURCE_LABELS: Record<string, string> = {
   manual: "Manual",
@@ -35,6 +36,13 @@ export default function ClientDetailPage() {
   const [promoteOpen, setPromoteOpen] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<VersionListItem | null>(null);
   const [busy, setBusy] = useState(false);
+
+  // Inline editing of the client name and segment from the detail header.
+  const [editingName, setEditingName] = useState(false);
+  const [nameDraft, setNameDraft] = useState("");
+  const [editingSegment, setEditingSegment] = useState(false);
+  const [segmentDraft, setSegmentDraft] = useState("");
+  const segmentTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const hasEdited = useRef(false);
 
@@ -168,6 +176,61 @@ export default function ClientDetailPage() {
     }
   }
 
+  async function patchClient(patch: Record<string, unknown>) {
+    const res = await fetch(`/api/clients/${id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(patch),
+    });
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}));
+      throw new Error(data.error ?? "No se pudo guardar el cambio.");
+    }
+    return res.json();
+  }
+
+  async function saveName() {
+    if (!detail) return;
+    const next = nameDraft.trim();
+    setEditingName(false);
+    if (!next || next === detail.name) {
+      setNameDraft(detail.name);
+      return;
+    }
+    try {
+      await patchClient({ name: next });
+      setDetail((d) => (d ? { ...d, name: next } : d));
+    } catch (e) {
+      showToast(e instanceof Error ? e.message : "No se pudo guardar el nombre.");
+      setNameDraft(detail.name);
+    }
+  }
+
+  async function commitSegment(value: string) {
+    if (!detail) return;
+    const next = value.trim() || null;
+    if (next === (detail.segment ?? null)) return;
+    try {
+      await patchClient({ segment: next });
+      setDetail((d) => (d ? { ...d, segment: next } : d));
+    } catch (e) {
+      showToast(e instanceof Error ? e.message : "No se pudo guardar el segmento.");
+    }
+  }
+
+  // Debounce segment saves so free-text typing doesn't fire a request per key.
+  function onSegmentChange(value: string) {
+    setSegmentDraft(value);
+    if (segmentTimer.current) clearTimeout(segmentTimer.current);
+    segmentTimer.current = setTimeout(() => commitSegment(value), 700);
+  }
+
+  function finishSegment() {
+    if (segmentTimer.current) clearTimeout(segmentTimer.current);
+    void commitSegment(segmentDraft);
+    setEditingSegment(false);
+  }
+
   if (loading) return <p className="empty-hint">Cargando…</p>;
   if (error) return <p className="form-error">{error}</p>;
   if (!detail) return <p className="empty-hint">Cliente no encontrado.</p>;
@@ -186,13 +249,61 @@ export default function ClientDetailPage() {
 
       <div className="detail-header">
         <div>
-          <h1 className="detail-title">{detail.name}</h1>
+          {editingName ? (
+            <input
+              className="title-input"
+              value={nameDraft}
+              autoFocus
+              onChange={(e) => setNameDraft(e.target.value)}
+              onBlur={saveName}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  e.preventDefault();
+                  saveName();
+                } else if (e.key === "Escape") {
+                  setNameDraft(detail.name);
+                  setEditingName(false);
+                }
+              }}
+            />
+          ) : (
+            <h1
+              className="detail-title editable-text"
+              title="Clic para editar el nombre"
+              onClick={() => {
+                setNameDraft(detail.name);
+                setEditingName(true);
+              }}
+            >
+              {detail.name}
+            </h1>
+          )}
           <div className="detail-sub">
             <span className="section-label">Producción: {prodLabel}</span>
             <span className="muted" style={{ fontSize: 12 }}>
               {relativeTimeEs(detail.updated_at)}
             </span>
           </div>
+          {editingSegment ? (
+            <div className="segment-edit">
+              <SegmentPicker value={segmentDraft} onChange={onSegmentChange} />
+              <button type="button" className="segment-save" onClick={finishSegment}>
+                Listo
+              </button>
+            </div>
+          ) : (
+            <button
+              type="button"
+              className="segment-chip-display"
+              title="Clic para editar el segmento"
+              onClick={() => {
+                setSegmentDraft(detail.segment ?? "");
+                setEditingSegment(true);
+              }}
+            >
+              {detail.segment ? detail.segment : "Añadir segmento"}
+            </button>
+          )}
         </div>
         <div className="header-actions">
           <Button
