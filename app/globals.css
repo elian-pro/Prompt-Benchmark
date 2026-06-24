@@ -638,6 +638,39 @@ button {
 }
 
 /* Selectable chips (client segment picker) */
+.segment-field {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.segment-input-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.segment-input-row .input {
+  flex: 1;
+}
+.segment-save {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+  background: transparent;
+  border: 0.5px solid var(--border2);
+  border-radius: 100px;
+  padding: 7px 14px;
+  font-size: 11px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--fg);
+  cursor: pointer;
+  transition: border-color 0.15s, color 0.15s;
+}
+.segment-save:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
 .chip-group {
   display: flex;
   flex-wrap: wrap;
