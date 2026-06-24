@@ -2,10 +2,12 @@
 
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
-import { IconPlus } from "@tabler/icons-react";
+import { IconPlus, IconSparkles } from "@tabler/icons-react";
 import type { ChatSessionListItem } from "@/lib/db/chat-sessions";
 import { relativeTimeEs } from "@/lib/format";
 import { Button } from "@/components/ui/Button";
+import { EmptyState } from "@/components/ui/EmptyState";
+import { SkeletonRows } from "@/components/ui/Skeleton";
 import { NewCreatorSessionModal } from "@/components/creator/NewCreatorSessionModal";
 
 const STATUS_LABELS: Record<string, string> = {
@@ -60,24 +62,24 @@ export default function CreatorPage() {
         </div>
       </div>
 
-      {loading && <p className="empty-hint">Cargando…</p>}
+      {loading && <SkeletonRows count={4} />}
       {error && <p className="form-error">{error}</p>}
 
       {isEmpty && (
-        <div className="empty-hint">
-          <p className="section-label">No hay sesiones de creación todavía</p>
-          <p style={{ marginTop: 8, marginBottom: 16 }}>
-            Abre una creación para construir un prompt nuevo con Claude Opus a
-            partir de un prompt base como referencia y el brief del cliente.
-          </p>
-          <Button
-            variant="primary"
-            icon={<IconPlus size={14} />}
-            onClick={() => setNewOpen(true)}
-          >
-            Nueva creación
-          </Button>
-        </div>
+        <EmptyState
+          icon={<IconSparkles size={32} stroke={1.5} />}
+          title="No hay sesiones de creación todavía"
+          description="Abre una creación para construir un prompt nuevo con Claude Opus a partir de un prompt base como referencia y el brief del cliente."
+          action={
+            <Button
+              variant="primary"
+              icon={<IconPlus size={14} />}
+              onClick={() => setNewOpen(true)}
+            >
+              Nueva creación
+            </Button>
+          }
+        />
       )}
 
       {!loading && !error && !isEmpty && (

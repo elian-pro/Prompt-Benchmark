@@ -9,6 +9,9 @@ import {
 } from "@tabler/icons-react";
 import type { MaskedProvider } from "@/lib/db/providers";
 import { Button } from "@/components/ui/Button";
+import { DangerConfirmModal } from "@/components/ui/DangerConfirmModal";
+
+type ProviderModel = MaskedProvider["models"][number];
 
 type Props = {
   provider: MaskedProvider;
@@ -22,6 +25,22 @@ export function ProviderRow({ provider, onEdit, onDelete, onChanged }: Props) {
   const [newModel, setNewModel] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [modelToDelete, setModelToDelete] = useState<ProviderModel | null>(null);
+
+  const modelLabel = (m: ProviderModel) =>
+    m.display_name ? `${m.display_name} (${m.model_name})` : m.model_name;
+
+  async function deleteModel(model: ProviderModel) {
+    const res = await fetch(`/api/providers/${provider.id}/models/${model.id}`, {
+      method: "DELETE",
+    });
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}));
+      throw new Error(data.error ?? "No se pudo quitar el modelo.");
+    }
+    setModelToDelete(null);
+    onChanged();
+  }
 
   async function call(url: string, options: RequestInit) {
     setBusy(true);
@@ -93,7 +112,7 @@ export function ProviderRow({ provider, onEdit, onDelete, onChanged }: Props) {
               {provider.models.map((m) => (
                 <div key={m.id} className="model-item">
                   <span className={`model-name${m.enabled ? "" : " disabled"}`}>
-                    {m.display_name ? `${m.display_name} (${m.model_name})` : m.model_name}
+                    {modelLabel(m)}
                   </span>
                   <div className="provider-actions">
                     <label className="switch">
@@ -116,11 +135,7 @@ export function ProviderRow({ provider, onEdit, onDelete, onChanged }: Props) {
                       variant="ghost"
                       icon={<IconTrash size={14} />}
                       disabled={busy}
-                      onClick={() =>
-                        call(`/api/providers/${provider.id}/models/${m.id}`, {
-                          method: "DELETE",
-                        })
-                      }
+                      onClick={() => setModelToDelete(m)}
                     >
                       Quitar
                     </Button>
@@ -151,6 +166,19 @@ export function ProviderRow({ provider, onEdit, onDelete, onChanged }: Props) {
 
           {error && <p className="form-error">{error}</p>}
         </div>
+      )}
+
+      {modelToDelete && (
+        <DangerConfirmModal
+          onClose={() => setModelToDelete(null)}
+          onConfirm={() => deleteModel(modelToDelete)}
+          confirmTitle={`¿Quitar "${modelLabel(modelToDelete)}"?`}
+          consequences={[
+            "El modelo dejará de estar disponible para asignar a roles.",
+          ]}
+          confirmLabel="Quitar"
+          busyLabel="Quitando…"
+        />
       )}
     </div>
   );

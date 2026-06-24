@@ -25,7 +25,7 @@ and pastes into the corresponding n8n node.
 | Tech stack, file structure, provider architecture, security model | `docs/ARCHITECTURE.md` |
 | Colors, typography, component patterns | `docs/DESIGN-SYSTEM.md` |
 | All sprints overview | `docs/ROADMAP.md` |
-| **Active sprint — ticket-by-ticket plan** | `docs/SPRINT-5.md` |
+| Sprint plans (all complete, archived) | `docs/SPRINT-1-archive.md` … `docs/SPRINT-5-archive.md` |
 | Database schema source of truth | `supabase/migrations/` |
 
 ## Rules of engagement
@@ -64,8 +64,8 @@ and pastes into the corresponding n8n node.
 
 ## Active sprint
 
-**Sprint 5 — Visual polish.** See `docs/SPRINT-5.md`. Sprints 1–4 are complete;
-their plans are archived at `docs/SPRINT-1-archive.md` through
-`docs/SPRINT-4-archive.md`. This is the final planned sprint — when it
-finishes, there is no Sprint 6: mark the roadmap complete here, archive
-SPRINT-5.md, and revisit `docs/ROADMAP.md` "Future" for next steps.
+**None — the roadmap is complete.** Sprints 1–5 are all done; their plans are
+archived at `docs/SPRINT-1-archive.md` through `docs/SPRINT-5-archive.md`.
+There is no Sprint 6 in the current plan. For next steps, see
+`docs/ROADMAP.md` "Future (not in current scope)"; once a direction is chosen,
+spin up a new sprint plan before implementing.

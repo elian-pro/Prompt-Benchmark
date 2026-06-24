@@ -58,11 +58,17 @@ taxonomy.
 rendering, judge call after conversation ends, report view, snapshot of
 prompt content into the run row so reports survive version deletion.
 
-## Sprint 5 — Visual polish 🔨
+## Sprint 5 — Visual polish ✅
 
 Apply the full Zebra design system. Dark/light mode toggle. NEW and
 NEW VERSION badges. Two-step delete with typed-confirmation. Empty
-states. Loading states. Mobile responsive. Animation polish.
+states. Loading states. Mobile responsive. Animation polish. Tickets
+archived in `docs/SPRINT-5-archive.md`.
+
+---
+
+**Roadmap complete (2026-06-24).** Sprints 1–5 are all done. There is no
+Sprint 6 in the current plan; the items below are the candidate next steps.
 
 ## Future (not in current scope)
 

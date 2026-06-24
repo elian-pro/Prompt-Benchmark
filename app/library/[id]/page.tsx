@@ -6,6 +6,8 @@ import { IconCopy, IconSparkles } from "@tabler/icons-react";
 import type { ClientDetail } from "@/lib/db/clients";
 import { computeNextNumber } from "@/lib/version-utils";
 import { relativeTimeEs } from "@/lib/format";
+import { isNewVersion } from "@/lib/badges";
+import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { Modal } from "@/components/ui/Modal";
 
@@ -198,7 +200,12 @@ export default function ClientDetailPage() {
               >
                 <span className="vnum">
                   {v.version_number}
-                  {v.is_production && <span className="prod-tag">Prod</span>}
+                  <span className="vnum-tags">
+                    {isNewVersion(v.bump_type, v.created_at) && (
+                      <Badge variant="new-version">Nueva versión</Badge>
+                    )}
+                    {v.is_production && <span className="prod-tag">Prod</span>}
+                  </span>
                 </span>
                 <span className="vmeta">
                   {SOURCE_LABELS[v.source ?? ""] ?? "—"} ·{" "}

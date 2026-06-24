@@ -1,11 +1,13 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { IconPlus } from "@tabler/icons-react";
+import { IconPlus, IconServer } from "@tabler/icons-react";
 import type { MaskedProvider } from "@/lib/db/providers";
 import type { RoleDefault } from "@/lib/db/role-defaults";
 import { Button } from "@/components/ui/Button";
-import { Modal } from "@/components/ui/Modal";
+import { EmptyState } from "@/components/ui/EmptyState";
+import { SkeletonRows } from "@/components/ui/Skeleton";
+import { DangerConfirmModal } from "@/components/ui/DangerConfirmModal";
 import { ProviderFormModal } from "@/components/settings/ProviderFormModal";
 import { ProviderRow } from "@/components/settings/ProviderRow";
 import { RoleAssignments } from "@/components/settings/RoleAssignments";
@@ -20,8 +22,6 @@ export default function SettingsPage() {
   const [editing, setEditing] = useState<MaskedProvider | null>(null);
 
   const [deleteTarget, setDeleteTarget] = useState<MaskedProvider | null>(null);
-  const [deleteError, setDeleteError] = useState<string | null>(null);
-  const [deleting, setDeleting] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -56,23 +56,14 @@ export default function SettingsPage() {
     setFormOpen(true);
   }
 
-  async function confirmDelete() {
-    if (!deleteTarget) return;
-    setDeleting(true);
-    setDeleteError(null);
-    try {
-      const res = await fetch(`/api/providers/${deleteTarget.id}`, { method: "DELETE" });
-      if (!res.ok) {
-        const data = await res.json().catch(() => ({}));
-        throw new Error(data.error ?? "No se pudo eliminar el proveedor.");
-      }
-      setDeleteTarget(null);
-      load();
-    } catch (e) {
-      setDeleteError(e instanceof Error ? e.message : "Error inesperado.");
-    } finally {
-      setDeleting(false);
+  async function confirmDelete(target: MaskedProvider) {
+    const res = await fetch(`/api/providers/${target.id}`, { method: "DELETE" });
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}));
+      throw new Error(data.error ?? "No se pudo eliminar el proveedor.");
     }
+    setDeleteTarget(null);
+    load();
   }
 
   return (
@@ -91,13 +82,24 @@ export default function SettingsPage() {
           </Button>
         </div>
 
-        {loading && <p className="empty-hint">Cargando…</p>}
+        {loading && <SkeletonRows count={3} />}
         {loadError && <p className="form-error">{loadError}</p>}
 
         {!loading && !loadError && providers.length === 0 && (
-          <p className="empty-hint">
-            No hay proveedores todavía. Agrega uno para empezar.
-          </p>
+          <EmptyState
+            icon={<IconServer size={32} stroke={1.5} />}
+            title="No hay proveedores todavía"
+            description="Agrega un proveedor de LLM para configurar sus modelos y asignarlos a roles."
+            action={
+              <Button
+                variant="primary"
+                icon={<IconPlus size={14} />}
+                onClick={openCreate}
+              >
+                Agregar proveedor
+              </Button>
+            }
+          />
         )}
 
         <div className="provider-list">
@@ -106,10 +108,7 @@ export default function SettingsPage() {
               key={p.id}
               provider={p}
               onEdit={openEdit}
-              onDelete={(prov) => {
-                setDeleteError(null);
-                setDeleteTarget(prov);
-              }}
+              onDelete={(prov) => setDeleteTarget(prov)}
               onChanged={load}
             />
           ))}
@@ -138,31 +137,22 @@ export default function SettingsPage() {
         />
       )}
 
-      <Modal
-        open={Boolean(deleteTarget)}
-        onClose={() => setDeleteTarget(null)}
-        title={`Eliminar "${deleteTarget?.name ?? ""}"`}
-        footer={
-          <>
-            <Button
-              variant="ghost"
-              onClick={() => setDeleteTarget(null)}
-              disabled={deleting}
-            >
-              Cancelar
-            </Button>
-            <Button variant="danger" onClick={confirmDelete} disabled={deleting}>
-              {deleting ? "Eliminando…" : "Eliminar"}
-            </Button>
-          </>
-        }
-      >
-        <p className="muted" style={{ fontSize: 14 }}>
-          Se eliminará el proveedor y todos sus modelos. Esta acción no se puede
-          deshacer.
-        </p>
-        {deleteError && <p className="form-error">{deleteError}</p>}
-      </Modal>
+      {deleteTarget && (
+        <DangerConfirmModal
+          onClose={() => setDeleteTarget(null)}
+          onConfirm={() => confirmDelete(deleteTarget)}
+          warning={{
+            title: `¿Eliminar "${deleteTarget.name}"?`,
+            body: "Se eliminará el proveedor junto con su clave y todos sus modelos.",
+          }}
+          consequences={[
+            `Se eliminará el proveedor y sus ${deleteTarget.models.length} modelos.`,
+            "Tendrás que volver a pegar la clave si lo agregas de nuevo.",
+            "Esta acción no se puede deshacer.",
+          ]}
+          confirmPhrase={deleteTarget.name}
+        />
+      )}
     </div>
   );
 }

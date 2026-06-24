@@ -12,6 +12,8 @@ body[data-theme="dark"] {
   --faint: #5a5a5a;
   --accent: #ffd602;
   --danger: #e24b4a;
+  --danger-soft: #f87171; /* brighter alert red: error status, crítico severity */
+  --warn: #fbbf24; /* amber: medio severity */
 }
 
 body[data-theme="light"] {
@@ -25,6 +27,8 @@ body[data-theme="light"] {
   --faint: #a8a7a0;
   --accent: #ffd602;
   --danger: #c2342f;
+  --danger-soft: #cf4b46; /* readable on light bg */
+  --warn: #b45309;
 }
 
 *,
@@ -104,10 +108,21 @@ button {
   margin-bottom: 28px;
 }
 
-/* Placeholder nav row (non-functional until later tickets). */
+/* Right cluster of the header: nav + theme toggle. */
+.header-right {
+  display: flex;
+  align-items: center;
+  gap: 22px;
+}
+
 .app-nav {
   display: flex;
   gap: 22px;
+}
+
+/* Theme toggle reuses .icon-btn; sits inline with the accent at hover. */
+.theme-toggle {
+  flex: none;
 }
 
 .app-nav a {
@@ -128,6 +143,75 @@ button {
 @media (max-width: 600px) {
   .app-shell {
     padding: 24px 20px;
+  }
+
+  /* Header: stack the logo above a nav that scrolls horizontally instead of
+     overflowing, with the theme toggle pinned to the right. */
+  .app-header {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 14px;
+  }
+  /* Keep the logo at its natural size; only the nav row spans full width. */
+  .app-header .pill-logo {
+    align-self: flex-start;
+  }
+  .header-right {
+    gap: 12px;
+  }
+  .app-nav {
+    flex: 1;
+    min-width: 0;
+    gap: 16px;
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+  .app-nav::-webkit-scrollbar {
+    display: none;
+  }
+  .app-nav a {
+    white-space: nowrap;
+  }
+
+  /* Section headers: stack title above their action row. */
+  .library-header,
+  .detail-header {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .header-actions,
+  .detail-actions {
+    flex-wrap: wrap;
+  }
+  .detail-sub {
+    flex-wrap: wrap;
+    gap: 8px 14px;
+  }
+
+  /* Settings provider row: stack name above its actions. */
+  .provider-head {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 12px;
+  }
+  .provider-actions {
+    flex-wrap: wrap;
+  }
+  .settings-section-header {
+    flex-wrap: wrap;
+    gap: 12px;
+  }
+
+  /* Chat composer: full-width send button below the textarea. */
+  .chat-input-row {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  /* Modal footers: let crowded button rows wrap. */
+  .modal-footer,
+  .modal-footer-3 {
+    flex-wrap: wrap;
   }
 }
 
@@ -325,6 +409,14 @@ button {
   margin-top: 24px;
 }
 
+/* Icon color utilities (replace ad-hoc inline `style={{ color: … }}`). */
+.icon-accent {
+  color: var(--accent);
+}
+.icon-danger {
+  color: var(--danger);
+}
+
 /* Generic helpers */
 .row-between {
   display: flex;
@@ -453,6 +545,176 @@ button {
   color: var(--muted);
   font-size: 14px;
   padding: 24px 0;
+}
+
+/* Skeleton loading placeholders (docs/DESIGN-SYSTEM.md §Loading states). */
+@keyframes skeleton-pulse {
+  0%,
+  100% {
+    opacity: 0.4;
+  }
+  50% {
+    opacity: 0.7;
+  }
+}
+.skeleton-card,
+.skeleton-row {
+  animation: skeleton-pulse 2s ease-in-out infinite;
+}
+.skeleton-card {
+  background: var(--surface);
+  border: 0.5px solid var(--border);
+  border-radius: 14px;
+  padding: 22px;
+  min-height: 184px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.skeleton-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.skeleton-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 14px 16px;
+  border: 0.5px solid var(--border);
+  border-radius: 12px;
+}
+.skeleton-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.skeleton-bar {
+  background: var(--surface2);
+  border-radius: 6px;
+  height: 12px;
+}
+.skeleton-bar.tall {
+  height: 28px;
+}
+
+/* Animation polish (S5-T8): entrances and micro-interactions. */
+@keyframes overlay-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+@keyframes modal-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@keyframes toast-in {
+  from {
+    opacity: 0;
+    transform: translate(-50%, 12px);
+  }
+  to {
+    opacity: 1;
+    transform: translate(-50%, 0);
+  }
+}
+@keyframes caret-blink {
+  50% {
+    opacity: 0;
+  }
+}
+.modal-overlay {
+  animation: overlay-in 0.15s ease;
+}
+.modal {
+  animation: modal-in 0.18s ease;
+}
+.toast {
+  animation: toast-in 0.2s ease;
+}
+
+/* Streaming caret in chat bubbles. */
+.chat-caret {
+  display: inline-block;
+  width: 7px;
+  height: 1em;
+  margin-left: 2px;
+  background: var(--accent);
+  vertical-align: text-bottom;
+  animation: caret-blink 1s step-end infinite;
+}
+
+/* Header nav: subtle underline + color on hover. */
+.app-nav a {
+  border-bottom: 1px solid transparent;
+  transition: color 0.15s, border-color 0.15s;
+}
+.app-nav a:hover {
+  color: var(--fg);
+  border-color: var(--accent);
+}
+
+/* Buttons: subtle press feedback. */
+.btn:active:not(:disabled) {
+  transform: translateY(0.5px);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .skeleton-card,
+  .skeleton-row {
+    animation: none;
+    opacity: 0.5;
+  }
+  .modal-overlay,
+  .modal,
+  .toast,
+  .chat-caret {
+    animation: none;
+  }
+  .btn:active:not(:disabled) {
+    transform: none;
+  }
+}
+
+/* Consistent empty state (docs/DESIGN-SYSTEM.md §Empty states). */
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 10px;
+  padding: 56px 24px;
+  border: 0.5px dashed var(--border2);
+  border-radius: 14px;
+}
+.empty-state-icon {
+  color: var(--faint);
+  margin-bottom: 2px;
+}
+.empty-state-title {
+  text-transform: uppercase;
+  letter-spacing: 0.18em;
+  font-size: 11px;
+  color: var(--fg);
+}
+.empty-state-desc {
+  font-size: 14px;
+  color: var(--muted);
+  line-height: 1.6;
+  max-width: 440px;
+}
+.empty-state-action {
+  margin-top: 8px;
 }
 
 /* ===========================================================================
@@ -719,6 +981,14 @@ button {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: 8px;
+}
+.vnum-tags {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 6px;
 }
 .version-item .vmeta {
   font-size: 11px;
@@ -843,8 +1113,8 @@ button {
   color: var(--fg);
 }
 .session-status.status-error {
-  color: #f87171;
-  border-color: #f87171;
+  color: var(--danger-soft);
+  border-color: var(--danger-soft);
 }
 
 /* Editor chat */
@@ -1011,12 +1281,12 @@ button {
   flex-shrink: 0;
 }
 .severity-crítico {
-  color: #f87171;
-  border-color: #f87171;
+  color: var(--danger-soft);
+  border-color: var(--danger-soft);
 }
 .severity-medio {
-  color: #fbbf24;
-  border-color: #fbbf24;
+  color: var(--warn);
+  border-color: var(--warn);
 }
 .report-edge-cases {
   margin: 0;

@@ -7,7 +7,13 @@ import {
   IconTarget,
   IconSettings,
 } from "@tabler/icons-react";
+import { ThemeToggle } from "@/components/ui/ThemeToggle";
 import "./globals.css";
+
+// Runs synchronously before paint to apply the persisted theme, avoiding a
+// flash of the default (dark) theme when the user prefers light. Keep in sync
+// with the localStorage key used by ThemeToggle ("zebra-theme").
+const NO_FLASH_THEME_SCRIPT = `(function(){try{var t=localStorage.getItem('zebra-theme');if(t==='light'||t==='dark'){document.body.dataset.theme=t;}}catch(e){}})();`;
 
 // Two weights only, per docs/DESIGN-SYSTEM.md (never 600/700).
 const inter = Inter({
@@ -38,18 +44,22 @@ export default function RootLayout({
 }) {
   return (
     <html lang="es" className={inter.className}>
-      <body data-theme="dark">
+      <body data-theme="dark" suppressHydrationWarning>
+        <script dangerouslySetInnerHTML={{ __html: NO_FLASH_THEME_SCRIPT }} />
         <div className="app-shell">
           <header className="app-header">
             <span className="pill-logo">Zebra · Prompt Studio</span>
-            <nav className="app-nav">
-              {NAV_ITEMS.map(({ label, href, Icon }) => (
-                <a key={href} href={href}>
-                  <Icon className="nav-icon" size={14} stroke={1.5} />
-                  {label}
-                </a>
-              ))}
-            </nav>
+            <div className="header-right">
+              <nav className="app-nav">
+                {NAV_ITEMS.map(({ label, href, Icon }) => (
+                  <a key={href} href={href}>
+                    <Icon className="nav-icon" size={14} stroke={1.5} />
+                    {label}
+                  </a>
+                ))}
+              </nav>
+              <ThemeToggle />
+            </div>
           </header>
           <main>{children}</main>
         </div>

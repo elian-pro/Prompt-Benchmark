@@ -3,7 +3,8 @@
 import { useRouter } from "next/navigation";
 import { IconPencil, IconCopy, IconTrash } from "@tabler/icons-react";
 import type { ClientSummary } from "@/lib/db/clients";
-import { relativeTimeEs, daysBetween } from "@/lib/format";
+import { relativeTimeEs } from "@/lib/format";
+import { isNewClient, isNewVersion } from "@/lib/badges";
 import { Badge, type BadgeVariant } from "@/components/ui/Badge";
 
 type Props = {
@@ -16,14 +17,11 @@ type Props = {
 function computeBadge(
   client: ClientSummary,
 ): { variant: BadgeVariant; label: string } | null {
-  const ageDays = daysBetween(client.created_at);
-  if (!client.is_legacy && ageDays <= 15) {
+  if (isNewClient(client.created_at, client.is_legacy)) {
     return { variant: "new", label: "Nuevo" };
   }
   if (
-    client.latest_version_bump_type === "major" &&
-    client.latest_version_created_at &&
-    daysBetween(client.latest_version_created_at) <= 5
+    isNewVersion(client.latest_version_bump_type, client.latest_version_created_at)
   ) {
     return { variant: "new-version", label: "Nueva versión" };
   }
