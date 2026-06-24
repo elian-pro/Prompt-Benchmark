@@ -1,5 +1,9 @@
 # Sprint 5 — Visual polish
 
+> **Status: ✅ complete (closed 2026-06-24).** Archived. This was the final
+> planned sprint — the roadmap is now complete (see `docs/ROADMAP.md`
+> "Future" for next steps). This file is kept for reference.
+
 **Goal**: Apply the full Zebra design system across the app and add the polish
 intentionally deferred through Sprints 1–4: theming, badges, safer destructive
 actions, and the empty/loading/responsive/animation states that earlier
