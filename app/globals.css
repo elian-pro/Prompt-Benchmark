@@ -715,13 +715,13 @@ button {
   border-color: var(--accent);
   color: var(--accent);
 }
-.chip-group {
+.seg-chip-group {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
   padding: 6px 0;
 }
-.chip {
+.seg-chip {
   background: transparent;
   border: 0.5px solid var(--border2);
   color: var(--muted);
@@ -733,12 +733,12 @@ button {
   cursor: pointer;
   transition: border-color 0.15s, color 0.15s, background 0.15s;
 }
-.chip:hover {
+.seg-chip:hover {
   border-color: var(--fg);
   color: var(--fg);
 }
-.chip-selected,
-.chip-selected:hover {
+.seg-chip-selected,
+.seg-chip-selected:hover {
   background: var(--accent);
   border-color: var(--accent);
   color: #0a0a0a;

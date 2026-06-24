@@ -64,14 +64,14 @@ export function SegmentPicker({ value, onChange }: Props) {
 
   return (
     <div className="segment-field">
-      <div className="chip-group" role="group" aria-label="Segmento">
+      <div className="seg-chip-group" role="group" aria-label="Segmento">
         {presets.map((name) => {
           const selected = trimmed.toLowerCase() === name.toLowerCase();
           return (
             <button
               key={name}
               type="button"
-              className={`chip${selected ? " chip-selected" : ""}`}
+              className={`seg-chip${selected ? " seg-chip-selected" : ""}`}
               aria-pressed={selected}
               onClick={() => onChange(selected ? "" : name)}
             >
