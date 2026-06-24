@@ -31,10 +31,10 @@ export const metadata: Metadata = {
 // Placeholder nav row — links are non-functional until their sections land
 // in later tickets (Library S1-T9, Settings S1-T6, etc.).
 const NAV_ITEMS = [
-  { label: "Biblioteca", href: "/library", Icon: IconLibrary },
   { label: "Editor", href: "/editor", Icon: IconPencil },
   { label: "Creator", href: "/creator", Icon: IconSparkles },
   { label: "Adversarial", href: "/adversarial", Icon: IconTarget },
+  { label: "Biblioteca", href: "/library", Icon: IconLibrary },
   { label: "Settings", href: "/settings", Icon: IconSettings },
 ];
 

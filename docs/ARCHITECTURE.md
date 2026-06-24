@@ -13,7 +13,7 @@
 
 ```
 /app
-  /page.tsx                    redirect to /library
+  /page.tsx                    redirect to /editor
   /library/
     /page.tsx                  grid of clients
     /[id]/page.tsx             client detail (versions + manual editor)
