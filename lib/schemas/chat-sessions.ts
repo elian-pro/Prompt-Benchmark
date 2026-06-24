@@ -4,17 +4,15 @@ export const sessionTypeSchema = z.enum(["editor", "creator"], {
   errorMap: () => ({ message: "Tipo de sesión no válido." }),
 });
 
-// Editor sessions belong to a client from the start; creator sessions are
-// client-less until finalize (the client is created then). Both require a base
-// version: the prompt under edit (editor) or the architectural reference
-// (creator). `type` defaults to 'editor' for backward compatibility.
+// Editor sessions belong to a client from the start and edit that client's
+// prompt (base version required). Creator sessions are client-less until
+// finalize and may start from an architectural reference OR from scratch, so
+// their base version is optional. `type` defaults to 'editor'.
 export const createSessionSchema = z
   .object({
     type: sessionTypeSchema.optional().default("editor"),
     clientId: z.string().uuid("El cliente no es válido.").optional(),
-    baseVersionId: z
-      .string({ required_error: "La versión base es obligatoria." })
-      .uuid("La versión base no es válida."),
+    baseVersionId: z.string().uuid("La versión base no es válida.").optional(),
     title: z.string().trim().min(1).nullable().optional(),
   })
   .superRefine((val, ctx) => {
@@ -23,6 +21,13 @@ export const createSessionSchema = z
         code: z.ZodIssueCode.custom,
         path: ["clientId"],
         message: "El cliente es obligatorio.",
+      });
+    }
+    if (val.type === "editor" && !val.baseVersionId) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["baseVersionId"],
+        message: "La versión base es obligatoria.",
       });
     }
   });
