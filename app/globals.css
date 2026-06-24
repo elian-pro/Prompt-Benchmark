@@ -521,24 +521,162 @@ button {
   gap: 12px;
 }
 .role-row {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+.role-row-top {
   display: grid;
-  grid-template-columns: 160px 1fr 1fr 80px 80px 80px auto;
+  grid-template-columns: 160px 1fr 1fr;
   gap: 14px;
+  align-items: center;
+}
+.role-row-params {
+  display: grid;
+  grid-template-columns: 1fr 1fr 120px auto;
+  gap: 22px;
   align-items: end;
 }
 .role-label {
   font-size: 13px;
-  padding-bottom: 12px;
 }
-@media (max-width: 900px) {
-  .role-row {
+.param-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+@media (max-width: 760px) {
+  .role-row-top {
+    grid-template-columns: 1fr;
+  }
+  .role-row-params {
     grid-template-columns: 1fr 1fr;
   }
   .role-label {
-    grid-column: 1 / -1;
-    padding-bottom: 0;
     color: var(--muted);
   }
+}
+
+/* Ranged parameter sliders (temperature, top_p) */
+.range-field {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.range-field-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  min-height: 18px;
+}
+.range-field-value {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--fg);
+  font-feature-settings: "tnum";
+}
+.range-field-auto {
+  color: var(--faint);
+}
+.range-reset {
+  background: none;
+  border: none;
+  color: var(--faint);
+  font-size: 10px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  cursor: pointer;
+  padding: 0;
+  transition: color 0.15s;
+}
+.range-reset:hover {
+  color: var(--accent);
+}
+.range-input {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 100%;
+  height: 2px;
+  background: var(--border2);
+  border-radius: 2px;
+  outline: none;
+  cursor: pointer;
+}
+.range-input::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--accent);
+  border: none;
+  cursor: pointer;
+}
+.range-input::-moz-range-thumb {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--accent);
+  border: none;
+  cursor: pointer;
+}
+.range-input.unset {
+  opacity: 0.5;
+}
+.range-input.unset::-webkit-slider-thumb {
+  background: var(--faint);
+}
+.range-input.unset::-moz-range-thumb {
+  background: var(--faint);
+}
+
+/* Info hint — small "i" with a tooltip */
+.info-hint {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  color: var(--faint);
+  cursor: help;
+  transition: color 0.15s;
+}
+.info-hint:hover,
+.info-hint:focus-visible {
+  color: var(--accent);
+  outline: none;
+}
+.info-hint-tip {
+  position: absolute;
+  bottom: calc(100% + 8px);
+  left: 50%;
+  transform: translateX(-50%);
+  width: 220px;
+  background: var(--surface2);
+  border: 0.5px solid var(--border2);
+  border-radius: 10px;
+  padding: 10px 12px;
+  font-size: 12px;
+  line-height: 1.5;
+  letter-spacing: normal;
+  text-transform: none;
+  color: var(--fg);
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 0.15s;
+  z-index: 30;
+  pointer-events: none;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+}
+.info-hint:hover .info-hint-tip,
+.info-hint:focus-visible .info-hint-tip {
+  opacity: 1;
+  visibility: visible;
 }
 
 .empty-hint {

@@ -3,7 +3,10 @@
 import { useState } from "react";
 import type { MaskedProvider } from "@/lib/db/providers";
 import type { RoleDefault, RoleName } from "@/lib/db/role-defaults";
+import { catalogFor } from "@/lib/model-catalog";
 import { Button } from "@/components/ui/Button";
+import { InfoHint } from "@/components/ui/InfoHint";
+import { RangeField } from "@/components/settings/RangeField";
 
 const ROLES: { role: RoleName; label: string }[] = [
   { role: "test_bot", label: "Bot bajo prueba" },
@@ -12,6 +15,13 @@ const ROLES: { role: RoleName; label: string }[] = [
   { role: "editor", label: "Editor" },
   { role: "creator", label: "Creador" },
 ];
+
+const TEMPERATURE_HINT =
+  "Controla la aleatoriedad de las respuestas. Valores bajos (0–0.3) las hacen más predecibles y consistentes; valores altos (0.8–2) las hacen más creativas y variadas.";
+const TOP_P_HINT =
+  "Muestreo por núcleo (top-p). Limita la elección a las palabras más probables cuya probabilidad acumulada llega a este valor. 1 considera todas; valores menores (p. ej. 0.9) descartan las menos probables.";
+const MAX_TOKENS_HINT =
+  "Número máximo de tokens que el modelo puede generar en su respuesta. Un token equivale aproximadamente a 0.75 palabras. Déjalo en Auto para usar el límite por defecto.";
 
 type Props = {
   providers: MaskedProvider[];
@@ -66,6 +76,16 @@ function RoleRow({
   const selectedProvider = providers.find((p) => p.id === providerId);
   const models = selectedProvider?.models.filter((m) => m.enabled) ?? [];
 
+  // Merge the provider's configured models with the preloaded catalog for its
+  // adapter type, so a role can be assigned a known model even before it's been
+  // added to the provider manually.
+  const configuredNames = new Set(models.map((m) => m.model_name));
+  const catalogExtras = selectedProvider
+    ? catalogFor(selectedProvider.adapter_type).filter(
+        (c) => !configuredNames.has(c.model_name),
+      )
+    : [];
+
   async function save() {
     setSaving(true);
     setError(null);
@@ -99,68 +119,100 @@ function RoleRow({
   return (
     <div className="card">
       <div className="role-row">
-        <span className="role-label">{label}</span>
+        <div className="role-row-top">
+          <span className="role-label">{label}</span>
 
-        <select
-          className="select"
-          value={providerId}
-          onChange={(e) => {
-            setProviderId(e.target.value);
-            setModelName("");
-          }}
-        >
-          <option value="">— Proveedor —</option>
-          {providers.map((p) => (
-            <option key={p.id} value={p.id}>
-              {p.name}
-            </option>
-          ))}
-        </select>
+          <select
+            className="select"
+            value={providerId}
+            onChange={(e) => {
+              setProviderId(e.target.value);
+              setModelName("");
+            }}
+          >
+            <option value="">— Proveedor —</option>
+            {providers.map((p) => (
+              <option key={p.id} value={p.id}>
+                {p.name}
+              </option>
+            ))}
+          </select>
 
-        <select
-          className="select"
-          value={modelName}
-          disabled={!providerId}
-          onChange={(e) => setModelName(e.target.value)}
-        >
-          <option value="">— Modelo —</option>
-          {models.map((m) => (
-            <option key={m.id} value={m.model_name}>
-              {m.display_name ?? m.model_name}
-            </option>
-          ))}
-        </select>
+          <select
+            className="select"
+            value={modelName}
+            disabled={!providerId}
+            onChange={(e) => setModelName(e.target.value)}
+          >
+            <option value="">— Modelo —</option>
+            {models.length > 0 && (
+              <optgroup label="Configurados">
+                {models.map((m) => (
+                  <option key={m.id} value={m.model_name}>
+                    {m.display_name ?? m.model_name}
+                  </option>
+                ))}
+              </optgroup>
+            )}
+            {catalogExtras.length > 0 && (
+              <optgroup label="Disponibles">
+                {catalogExtras.map((c) => (
+                  <option key={c.model_name} value={c.model_name}>
+                    {c.display_name}
+                  </option>
+                ))}
+              </optgroup>
+            )}
+          </select>
+        </div>
 
-        <input
-          className="input"
-          value={temperature}
-          onChange={(e) => setTemperature(e.target.value)}
-          placeholder="temp"
-          inputMode="decimal"
-        />
-        <input
-          className="input"
-          value={topP}
-          onChange={(e) => setTopP(e.target.value)}
-          placeholder="top_p"
-          inputMode="decimal"
-        />
-        <input
-          className="input"
-          value={maxTokens}
-          onChange={(e) => setMaxTokens(e.target.value)}
-          placeholder="máx"
-          inputMode="numeric"
-        />
+        <div className="role-row-params">
+          <RangeField
+            label="Temperatura"
+            hint={TEMPERATURE_HINT}
+            value={temperature}
+            onChange={setTemperature}
+            min={0}
+            max={2}
+            step={0.05}
+            defaultValue={1}
+          />
+          <RangeField
+            label="Top P"
+            hint={TOP_P_HINT}
+            value={topP}
+            onChange={setTopP}
+            min={0}
+            max={1}
+            step={0.05}
+            defaultValue={1}
+          />
 
-        <Button
-          variant="primary"
-          size="sm"
-          onClick={save}
-          disabled={saving || !providerId || !modelName}
-        >
-          {saving ? "…" : saved ? "Guardado" : "Guardar"}
-        </Button>
+          <div className="range-field">
+            <div className="range-field-head">
+              <span className="param-label">
+                Máx tokens
+                <InfoHint text={MAX_TOKENS_HINT} />
+              </span>
+            </div>
+            <input
+              className="input"
+              value={maxTokens}
+              onChange={(e) => setMaxTokens(e.target.value)}
+              placeholder="Auto"
+              inputMode="numeric"
+            />
+          </div>
+
+          <Button
+            variant="primary"
+            size="sm"
+            onClick={save}
+            disabled={saving || !providerId || !modelName}
+          >
+            {saving ? "…" : saved ? "Guardado" : "Guardar"}
+          </Button>
+        </div>
       </div>
       {error && <p className="form-error">{error}</p>}
     </div>

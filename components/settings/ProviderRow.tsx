@@ -8,6 +8,7 @@ import {
   IconTrash,
 } from "@tabler/icons-react";
 import type { MaskedProvider } from "@/lib/db/providers";
+import { catalogFor } from "@/lib/model-catalog";
 import { Button } from "@/components/ui/Button";
 import { DangerConfirmModal } from "@/components/ui/DangerConfirmModal";
 
@@ -29,6 +30,12 @@ export function ProviderRow({ provider, onEdit, onDelete, onChanged }: Props) {
 
   const modelLabel = (m: ProviderModel) =>
     m.display_name ? `${m.display_name} (${m.model_name})` : m.model_name;
+
+  const datalistId = `model-suggestions-${provider.id}`;
+  const existingNames = new Set(provider.models.map((m) => m.model_name));
+  const suggestions = catalogFor(provider.adapter_type).filter(
+    (c) => !existingNames.has(c.model_name),
+  );
 
   async function deleteModel(model: ProviderModel) {
     const res = await fetch(`/api/providers/${provider.id}/models/${model.id}`, {
@@ -148,11 +155,19 @@ export function ProviderRow({ provider, onEdit, onDelete, onChanged }: Props) {
           <div className="model-add">
             <input
               className="input"
+              list={datalistId}
               value={newModel}
               onChange={(e) => setNewModel(e.target.value)}
               onKeyDown={(e) => e.key === "Enter" && addModel()}
-              placeholder="gpt-4o-mini"
+              placeholder="Elige uno sugerido o escribe el ID del modelo"
             />
+            <datalist id={datalistId}>
+              {suggestions.map((c) => (
+                <option key={c.model_name} value={c.model_name}>
+                  {c.display_name}
+                </option>
+              ))}
+            </datalist>
             <Button
               size="sm"
               variant="secondary"
