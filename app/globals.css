@@ -1000,12 +1000,20 @@ button {
   min-height: 184px;
   cursor: pointer;
 }
+/* Top row of a client card: badge (or spacer) on the left, actions right,
+   vertically centered so the icons line up with the badge. */
+.client-card-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  min-height: 28px;
+}
 .card-actions {
-  position: absolute;
-  top: 16px;
-  right: 16px;
   display: flex;
   gap: 2px;
+  /* Offset the icon-button padding so the glyphs sit flush with the card edge. */
+  margin-right: -6px;
 }
 .icon-btn {
   display: inline-flex;

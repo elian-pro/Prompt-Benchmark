@@ -60,34 +60,35 @@ export function ClientCard({ client, onDelete, onToast }: Props) {
 
   return (
     <div className="card client-card" onClick={goToDetail}>
-      <div className="card-actions" onClick={(e) => e.stopPropagation()}>
-        <button
-          className="icon-btn"
-          title="Editar"
-          onClick={goToDetail}
-          aria-label="Editar"
-        >
-          <IconPencil size={16} />
-        </button>
-        <button
-          className="icon-btn"
-          title="Copiar prompt de producción"
-          onClick={copyProduction}
-          aria-label="Copiar"
-        >
-          <IconCopy size={16} />
-        </button>
-        <button
-          className="icon-btn danger"
-          title="Eliminar"
-          onClick={() => onDelete(client)}
-          aria-label="Eliminar"
-        >
-          <IconTrash size={16} />
-        </button>
+      <div className="client-card-top">
+        {badge ? <Badge variant={badge.variant}>{badge.label}</Badge> : <span />}
+        <div className="card-actions" onClick={(e) => e.stopPropagation()}>
+          <button
+            className="icon-btn"
+            title="Editar"
+            onClick={goToDetail}
+            aria-label="Editar"
+          >
+            <IconPencil size={16} />
+          </button>
+          <button
+            className="icon-btn"
+            title="Copiar prompt de producción"
+            onClick={copyProduction}
+            aria-label="Copiar"
+          >
+            <IconCopy size={16} />
+          </button>
+          <button
+            className="icon-btn danger"
+            title="Eliminar"
+            onClick={() => onDelete(client)}
+            aria-label="Eliminar"
+          >
+            <IconTrash size={16} />
+          </button>
+        </div>
       </div>
-
-      {badge && <Badge variant={badge.variant}>{badge.label}</Badge>}
 
       <div className="client-card-name">{client.name}</div>
       <div className="client-card-meta">{client.segment || "—"}</div>
