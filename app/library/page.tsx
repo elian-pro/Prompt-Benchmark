@@ -1,7 +1,13 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { IconPlus, IconUpload, IconLibrary } from "@tabler/icons-react";
+import {
+  IconPlus,
+  IconUpload,
+  IconLibrary,
+  IconLayoutGrid,
+  IconList,
+} from "@tabler/icons-react";
 import type { ClientSummary, ClientFilter } from "@/lib/db/clients";
 import { Button } from "@/components/ui/Button";
 import { EmptyState } from "@/components/ui/EmptyState";
@@ -35,6 +41,26 @@ export default function LibraryPage() {
 
   const [filter, setFilter] = useState<ClientFilter>("all");
   const [search, setSearch] = useState("");
+  const [view, setView] = useState<"grid" | "list">("grid");
+
+  // Restore the saved view after mount (avoids an SSR/CSR mismatch).
+  useEffect(() => {
+    try {
+      const v = localStorage.getItem("zebra-library-view");
+      if (v === "grid" || v === "list") setView(v);
+    } catch {
+      // Storage disabled — keep the default.
+    }
+  }, []);
+
+  function changeView(next: "grid" | "list") {
+    setView(next);
+    try {
+      localStorage.setItem("zebra-library-view", next);
+    } catch {
+      // Storage disabled — view still applies for this session.
+    }
+  }
 
   const [newOpen, setNewOpen] = useState(false);
   const [importOpen, setImportOpen] = useState(false);
@@ -146,16 +172,38 @@ export default function LibraryPage() {
         />
       </div>
 
-      <div className="filter-chips">
-        {FILTERS.map((f) => (
+      <div className="library-toolbar">
+        <div className="filter-chips">
+          {FILTERS.map((f) => (
+            <button
+              key={f.key}
+              className={`chip${filter === f.key ? " active" : ""}`}
+              onClick={() => setFilter(f.key)}
+            >
+              {f.label} <span className="chip-count">{counts[f.key]}</span>
+            </button>
+          ))}
+        </div>
+        <div className="view-toggle" role="group" aria-label="Vista">
           <button
-            key={f.key}
-            className={`chip${filter === f.key ? " active" : ""}`}
-            onClick={() => setFilter(f.key)}
+            type="button"
+            className={`view-btn${view === "grid" ? " active" : ""}`}
+            onClick={() => changeView("grid")}
+            aria-pressed={view === "grid"}
+            title="Ver en fichas"
           >
-            {f.label} <span className="chip-count">{counts[f.key]}</span>
+            <IconLayoutGrid size={16} />
           </button>
-        ))}
+          <button
+            type="button"
+            className={`view-btn${view === "list" ? " active" : ""}`}
+            onClick={() => changeView("list")}
+            aria-pressed={view === "list"}
+            title="Ver en filas"
+          >
+            <IconList size={16} />
+          </button>
+        </div>
       </div>
 
       {loading && <SkeletonCards count={6} />}
@@ -179,11 +227,14 @@ export default function LibraryPage() {
       )}
 
       {!loading && !error && !isEmpty && (
-        <div className="client-grid">
-          {displayed.map((c) => (
+        // Re-key by view so toggling replays the staggered enter animation.
+        <div key={view} className={view === "grid" ? "client-grid" : "client-list"}>
+          {displayed.map((c, i) => (
             <ClientCard
               key={c.id}
               client={c}
+              variant={view === "grid" ? "card" : "row"}
+              index={i}
               onDelete={setDeleteTarget}
               onToast={showToast}
             />

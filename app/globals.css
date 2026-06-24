@@ -988,11 +988,47 @@ button {
   margin-bottom: 22px;
 }
 
+.library-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+  margin-bottom: 26px;
+}
 .filter-chips {
   display: flex;
   gap: 8px;
   flex-wrap: wrap;
-  margin-bottom: 26px;
+}
+/* Grid/list view toggle */
+.view-toggle {
+  display: inline-flex;
+  gap: 2px;
+  flex-shrink: 0;
+  border: 0.5px solid var(--border2);
+  border-radius: 100px;
+  padding: 2px;
+}
+.view-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 28px;
+  border: none;
+  background: transparent;
+  color: var(--muted);
+  border-radius: 100px;
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+.view-btn:hover {
+  color: var(--fg);
+}
+.view-btn.active {
+  background: var(--accent);
+  color: #0a0a0a;
 }
 .chip {
   display: inline-flex;
@@ -1029,6 +1065,86 @@ button {
 @media (max-width: 900px) {
   .client-grid {
     grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+/* List (rows) view */
+.client-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.client-row {
+  display: grid;
+  grid-template-columns: minmax(0, 2fr) minmax(0, 1fr) 70px 110px 78px auto;
+  align-items: center;
+  gap: 16px;
+  padding: 14px 18px;
+  min-height: 0;
+  cursor: pointer;
+}
+.row-name {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  font-size: 15px;
+  font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.row-segment {
+  min-width: 0;
+  font-size: 11px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.row-version {
+  font-size: 16px;
+  font-weight: 500;
+  font-feature-settings: "tnum";
+}
+.row-updated,
+.row-count {
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+@media (max-width: 720px) {
+  .client-row {
+    grid-template-columns: minmax(0, 1fr) 60px auto;
+  }
+  .row-segment,
+  .row-updated {
+    display: none;
+  }
+}
+
+/* Subtle staggered enter for cards and rows — replays on view toggle. */
+@keyframes itemIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px) scale(0.985);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+.client-grid > *,
+.client-list > * {
+  animation: itemIn 0.34s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+@media (prefers-reduced-motion: reduce) {
+  .client-grid > *,
+  .client-list > * {
+    animation: none;
   }
 }
 @media (max-width: 600px) {
