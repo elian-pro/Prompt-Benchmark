@@ -30,6 +30,9 @@ export function ImportModal({ open, onClose }: { open: boolean; onClose: () => v
         body: JSON.stringify({
           name: name.trim(),
           segment: segment.trim() || null,
+          // The imported version below is the only version this client should
+          // have — don't seed an empty v1.0.
+          seedInitialVersion: false,
         }),
       });
       if (!cRes.ok) {

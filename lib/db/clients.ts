@@ -136,14 +136,19 @@ export async function createClient(input: {
   name: string;
   segment?: string | null;
   notes?: string | null;
-  // When present, v1.0 carries this content/source instead of an empty manual
-  // seed (used by the Creator's "Finalizar" flow, source: 'creator_chat').
+  // When false, skip the auto-seeded v1.0. Used by "Importar existente", which
+  // adds the imported version itself — otherwise the client would end up with
+  // both an empty v1.0 and the imported one. Defaults to seeding.
+  seedInitialVersion?: boolean;
+  // When present, the seeded v1.0 carries this content/source instead of an
+  // empty manual seed (used by the Creator's "Finalizar" flow,
+  // source: 'creator_chat').
   initialVersion?: {
     content: string;
     source: VersionSource;
     sourceSessionId?: string | null;
   };
-}): Promise<{ client: Client; version: Version }> {
+}): Promise<{ client: Client; version: Version | null }> {
   const sb = getSupabase();
   const { data: client, error } = await sb
     .from("clients")
@@ -155,6 +160,11 @@ export async function createClient(input: {
     .select("*")
     .single();
   if (error) throw new Error(`No se pudo crear el cliente: ${error.message}`);
+
+  // Import supplies its own (imported) version next, so no empty seed.
+  if (input.seedInitialVersion === false) {
+    return { client: client as Client, version: null };
+  }
 
   // Seed v1.0 directly (not via createVersion, which always bumps). Not
   // production — a brand-new client is "en edición" until promoted.

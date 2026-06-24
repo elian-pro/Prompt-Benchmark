@@ -12,6 +12,9 @@ export const createClientSchema = z.object({
     .min(1, "El nombre es obligatorio."),
   segment: z.string().trim().min(1).nullable().optional(),
   notes: z.string().nullable().optional(),
+  // "Importar existente" adds the imported version itself, so it skips the
+  // auto-seeded empty v1.0. Defaults to seeding when omitted.
+  seedInitialVersion: z.boolean().optional(),
 });
 
 export const updateClientSchema = z

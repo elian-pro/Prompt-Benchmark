@@ -38,6 +38,8 @@ export async function POST(req: NextRequest, { params }: Params) {
         segment: input.segment ?? null,
         initialVersion: { content: draft, source: "creator_chat", sourceSessionId: id },
       });
+      // initialVersion was provided, so the seed always runs and version is set.
+      if (!version) throw new Error("No se pudo crear la versión inicial del cliente.");
       const finalized = await finalizeSession(id, version.id, client.id);
       return NextResponse.json({ session: finalized, version, client });
     }
