@@ -1851,6 +1851,56 @@ button {
   flex-direction: column;
   gap: 40px;
 }
+
+/* Dotted canvas with a cursor spotlight (Editor/Creator). Two layers: faint
+   dots everywhere (::before) and brighter accent dots revealed within a radius
+   around the pointer (::after, masked). Sits behind all content. */
+.dot-grid {
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  --dot-gap: 24px;
+  --dot-size: 1.3px;
+  --spot: 170px;
+  --mx: -1000px;
+  --my: -1000px;
+}
+.dot-grid::before,
+.dot-grid::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background-image: radial-gradient(
+    circle at center,
+    var(--dot-color) var(--dot-size),
+    transparent calc(var(--dot-size) + 0.6px)
+  );
+  background-size: var(--dot-gap) var(--dot-gap);
+}
+.dot-grid::before {
+  --dot-color: color-mix(in srgb, var(--fg) 12%, transparent);
+}
+.dot-grid::after {
+  --dot-color: color-mix(in srgb, var(--accent) 70%, transparent);
+  -webkit-mask-image: radial-gradient(
+    circle var(--spot) at var(--mx) var(--my),
+    #000 0%,
+    rgba(0, 0, 0, 0.55) 45%,
+    transparent 72%
+  );
+  mask-image: radial-gradient(
+    circle var(--spot) at var(--mx) var(--my),
+    #000 0%,
+    rgba(0, 0, 0, 0.55) 45%,
+    transparent 72%
+  );
+}
+@media (prefers-reduced-motion: reduce) {
+  .dot-grid::after {
+    display: none;
+  }
+}
 .landing-hero {
   /* Center the hero in the viewport below the header (~header + shell padding
      ≈ 200px). History flows underneath, just past the fold. */

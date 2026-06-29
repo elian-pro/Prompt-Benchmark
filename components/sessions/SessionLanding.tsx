@@ -8,6 +8,7 @@ import { relativeTimeEs } from "@/lib/format";
 import { getGreeting, TEAM_NAME } from "@/lib/greeting";
 import { SkeletonRows } from "@/components/ui/Skeleton";
 import { ClientPicker } from "@/components/sessions/ClientPicker";
+import { DotGrid } from "@/components/sessions/DotGrid";
 
 type Mode = "editor" | "creator";
 
@@ -64,6 +65,7 @@ export function SessionLanding({ mode }: { mode: Mode }) {
 
   return (
     <div className="session-landing">
+      <DotGrid />
       <section className="landing-hero">
         {/* Until the greeting is computed, a non-breaking space reserves the
             line height. The team name is emphasized (bold + accent). */}
