@@ -1860,7 +1860,7 @@ button {
   inset: 0;
   z-index: -1;
   pointer-events: none;
-  --dot-gap: 24px;
+  --dot-gap: 16px;
   --dot-size: 1.3px;
   --spot: 170px;
   --mx: -1000px;
@@ -1895,6 +1895,14 @@ button {
     rgba(0, 0, 0, 0.55) 45%,
     transparent 72%
   );
+}
+/* Light mode: the yellow glow is hard to read on the cream background, so the
+   spotlight goes black (and the base dots a touch stronger). */
+body[data-theme="light"] .dot-grid::before {
+  --dot-color: color-mix(in srgb, var(--fg) 16%, transparent);
+}
+body[data-theme="light"] .dot-grid::after {
+  --dot-color: color-mix(in srgb, #0a0a0a 62%, transparent);
 }
 @media (prefers-reduced-motion: reduce) {
   .dot-grid::after {
