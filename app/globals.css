@@ -1860,11 +1860,18 @@ button {
   inset: 0;
   z-index: -1;
   pointer-events: none;
-  --dot-gap: 16px;
-  --dot-size: 1.3px;
-  --spot: 170px;
+  --dot-gap: 13px;
+  --dot-size: 1px;
+  --spot: 180px;
   --mx: -1000px;
   --my: -1000px;
+  /* Soft radial bloom: brightest at the cursor, fading out — adds the
+     center-intense glow on top of the brightening dots. */
+  background: radial-gradient(
+    circle var(--spot) at var(--mx) var(--my),
+    color-mix(in srgb, var(--accent) 9%, transparent) 0%,
+    transparent 68%
+  );
 }
 .dot-grid::before,
 .dot-grid::after {
@@ -1882,27 +1889,37 @@ button {
   --dot-color: color-mix(in srgb, var(--fg) 12%, transparent);
 }
 .dot-grid::after {
-  --dot-color: color-mix(in srgb, var(--accent) 70%, transparent);
+  --dot-color: color-mix(in srgb, var(--accent) 90%, transparent);
+  /* Intense at the core, easing out — gives the center-bright, degrading glow. */
   -webkit-mask-image: radial-gradient(
     circle var(--spot) at var(--mx) var(--my),
     #000 0%,
-    rgba(0, 0, 0, 0.55) 45%,
-    transparent 72%
+    rgba(0, 0, 0, 0.85) 22%,
+    rgba(0, 0, 0, 0.4) 52%,
+    transparent 78%
   );
   mask-image: radial-gradient(
     circle var(--spot) at var(--mx) var(--my),
     #000 0%,
-    rgba(0, 0, 0, 0.55) 45%,
-    transparent 72%
+    rgba(0, 0, 0, 0.85) 22%,
+    rgba(0, 0, 0, 0.4) 52%,
+    transparent 78%
   );
 }
 /* Light mode: the yellow glow is hard to read on the cream background, so the
    spotlight goes black (and the base dots a touch stronger). */
+body[data-theme="light"] .dot-grid {
+  background: radial-gradient(
+    circle var(--spot) at var(--mx) var(--my),
+    color-mix(in srgb, #0a0a0a 7%, transparent) 0%,
+    transparent 68%
+  );
+}
 body[data-theme="light"] .dot-grid::before {
   --dot-color: color-mix(in srgb, var(--fg) 16%, transparent);
 }
 body[data-theme="light"] .dot-grid::after {
-  --dot-color: color-mix(in srgb, #0a0a0a 62%, transparent);
+  --dot-color: color-mix(in srgb, #0a0a0a 80%, transparent);
 }
 @media (prefers-reduced-motion: reduce) {
   .dot-grid::after {
