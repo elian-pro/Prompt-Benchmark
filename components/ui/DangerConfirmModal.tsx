@@ -120,7 +120,9 @@ export function DangerConfirmModal({
             {confirmPhrase && (
               <div className="field">
                 <label className="field-label">
-                  Escribe «{confirmPhrase}» para confirmar
+                  Escribe «
+                  <span className="confirm-phrase">{confirmPhrase}</span>» para
+                  confirmar
                 </label>
                 <input
                   className="input"
