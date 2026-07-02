@@ -45,7 +45,7 @@ function Turn({
       {state && (
         <div className="chat-state">
           <span className="chat-state-label">Estado</span>
-          <pre className="chat-state-json">{state}</pre>
+          <span className="chat-state-value">{state}</span>
         </div>
       )}
     </div>

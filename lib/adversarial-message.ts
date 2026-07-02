@@ -43,10 +43,27 @@ export function extractMessage(value: unknown): string {
   return "";
 }
 
+const STATE_KEYS = ["estado", "state", "status"];
+
+/** The lead/conversation state value (e.g. "por-perfilar"), if present. */
+export function extractState(value: unknown): string | null {
+  if (value && typeof value === "object" && !Array.isArray(value)) {
+    const obj = value as Record<string, unknown>;
+    for (const key of STATE_KEYS) {
+      if (key in obj && obj[key] != null) {
+        const v = obj[key];
+        if (typeof v === "string" && v.trim()) return v.trim();
+        if (typeof v === "number" || typeof v === "boolean") return String(v);
+      }
+    }
+  }
+  return null;
+}
+
 /**
  * Splits a turn's content into the readable message and, when the content was a
- * JSON envelope, the pretty-printed raw JSON (`state`). Non-JSON content is
- * returned as-is with no state.
+ * JSON envelope, just the `estado` value (not the whole JSON — the messages are
+ * already the bubble text). Non-JSON content is returned as-is with no state.
  */
 export function parseTurn(content: string): { message: string; state: string | null } {
   const trimmed = content.trim();
@@ -55,7 +72,7 @@ export function parseTurn(content: string): { message: string; state: string | n
   }
   try {
     const parsed: unknown = JSON.parse(trimmed);
-    return { message: extractMessage(parsed), state: JSON.stringify(parsed, null, 2) };
+    return { message: extractMessage(parsed), state: extractState(parsed) };
   } catch {
     // Not valid JSON (or still streaming) — show it as-is.
     return { message: content, state: null };

@@ -34,6 +34,17 @@ const SEED_LEAD =
 const NO_BOT_REPLY =
   "(El agente no envió ningún mensaje: derivó la conversación a un humano.)";
 
+// Pacing so the transcript is watchable: type out word by word and pause
+// between turns.
+const TYPE_DELAY_MS = 55; // between words while a turn "types"
+const TURN_GAP_MS = 1000; // pause between one turn and the next
+const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
+
+/** Splits text into word-sized pieces (each keeps its trailing whitespace). */
+function splitForTyping(text: string): string[] {
+  return text.match(/\S+\s*|\s+/g) ?? [text];
+}
+
 type Transcript = { role: RunMessageRole; content: string }[];
 
 /** The bot's turn as the lead should see it: its real message, not the JSON. */
@@ -143,8 +154,12 @@ export async function POST(_req: NextRequest, { params }: Params) {
               maxTokens: config.max_tokens ?? undefined,
             })) {
               if (chunk.type === "text") {
-                text += chunk.text;
-                send({ type: "delta", text: chunk.text });
+                // Pace the stream word by word so it's readable, not a blast.
+                for (const piece of splitForTyping(chunk.text)) {
+                  text += piece;
+                  send({ type: "delta", text: piece });
+                  await sleep(TYPE_DELAY_MS);
+                }
               }
             }
 
@@ -153,6 +168,9 @@ export async function POST(_req: NextRequest, { params }: Params) {
             send({ type: "turn_end", turn, role: current });
 
             current = isBot ? "lead" : "bot";
+
+            // Breathing room before the next turn so it's easy to follow.
+            if (turn < run.max_turns) await sleep(TURN_GAP_MS);
           }
 
           // Conversation done — judge the full transcript (non-streaming).
