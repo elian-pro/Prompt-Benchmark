@@ -8,6 +8,7 @@ import {
 } from "@/lib/db/runs";
 import { buildLeadSystemPrompt } from "@/lib/prompts/adversarial-personas";
 import { buildJudgeSystemPrompt, judgeReportSchema } from "@/lib/prompts/judge";
+import { parseTurn } from "@/lib/adversarial-message";
 import { chat, streamChat, type ChatMessage } from "@/lib/providers";
 import { handleError, jsonError } from "@/lib/http";
 
@@ -20,26 +21,44 @@ type Params = { params: Promise<{ id: string }> };
 // Priming user message for whoever starts: their own messages map to the
 // "assistant" role, which can't lead an Anthropic message list, so the starter
 // always gets a synthetic opening user turn (never persisted as a run message).
-const SEED_BOT = "(Inicia la conversación: saluda al prospecto y comienza a perfilarlo.)";
-const SEED_LEAD = "(Inicia el chat enviando tu primer mensaje al agente.)";
+// Framed as a real customer entering the chat so the bot engages instead of
+// defaulting to a human handoff.
+const SEED_BOT =
+  "Hola, buenas. Vi su información y me interesa saber más sobre lo que ofrecen. ¿Me pueden ayudar?";
+const SEED_LEAD =
+  "(Acabas de entrar al chat del negocio como cliente. Escribe tu primer mensaje para iniciar la conversación, en el papel que se te indicó.)";
+
+// Shown to the lead when the bot turn carried no readable message (e.g. it
+// returned {"estado":"humano","mensajes":[]}), so the adversary reacts to the
+// silence instead of talking into a JSON void.
+const NO_BOT_REPLY =
+  "(El agente no envió ningún mensaje: derivó la conversación a un humano.)";
 
 type Transcript = { role: RunMessageRole; content: string }[];
+
+/** The bot's turn as the lead should see it: its real message, not the JSON. */
+function botMessageForLead(content: string): string {
+  const { message } = parseTurn(content);
+  return message.trim() ? message : NO_BOT_REPLY;
+}
 
 /**
  * Builds the message list from one participant's point of view: the other
  * party's turns are `user`, its own are `assistant`. The starter's own turns
  * come first in the transcript, so a seed user message is prepended to keep the
- * list starting with `user`.
+ * list starting with `user`. When the counterpart is the bot, its structured
+ * JSON is reduced to the readable message so the lead responds to real text.
  */
 function perspective(
   transcript: Transcript,
   current: RunMessageRole,
   seed: string,
 ): ChatMessage[] {
-  const messages: ChatMessage[] = transcript.map((m) => ({
-    role: m.role === current ? "assistant" : "user",
-    content: m.content,
-  }));
+  const messages: ChatMessage[] = transcript.map((m) => {
+    const isOwn = m.role === current;
+    const content = !isOwn && m.role === "bot" ? botMessageForLead(m.content) : m.content;
+    return { role: isOwn ? "assistant" : "user", content };
+  });
   if (messages.length === 0 || messages[0].role === "assistant") {
     messages.unshift({ role: "user", content: seed });
   }
