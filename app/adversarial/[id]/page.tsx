@@ -18,6 +18,57 @@ const STATUS_LABELS: Record<string, string> = {
 
 type LiveMessage = { turn: number; role: RunMessageRole; content: string };
 
+// Bots under test often reply with a structured JSON envelope (e.g.
+// {"estado": "...", "mensajes": [...]}). Pull the human-readable message out so
+// the transcript reads as a conversation, and keep the raw JSON as a secondary
+// "estado" note so it's clearly not part of the message.
+const MESSAGE_KEYS = [
+  "mensajes",
+  "messages",
+  "mensaje",
+  "message",
+  "respuesta",
+  "reply",
+  "texto",
+  "text",
+  "content",
+];
+
+function extractMessage(value: unknown): string {
+  if (typeof value === "string") return value;
+  if (typeof value === "number" || typeof value === "boolean") return String(value);
+  if (Array.isArray(value)) {
+    return value
+      .map(extractMessage)
+      .filter((s) => s.trim())
+      .join("\n\n");
+  }
+  if (value && typeof value === "object") {
+    const obj = value as Record<string, unknown>;
+    for (const key of MESSAGE_KEYS) {
+      if (key in obj && obj[key] != null) {
+        const s = extractMessage(obj[key]);
+        if (s.trim()) return s.trim();
+      }
+    }
+  }
+  return "";
+}
+
+function parseTurn(content: string): { message: string; state: string | null } {
+  const trimmed = content.trim();
+  if (trimmed[0] !== "{" && trimmed[0] !== "[") {
+    return { message: content, state: null };
+  }
+  try {
+    const parsed: unknown = JSON.parse(trimmed);
+    return { message: extractMessage(parsed), state: JSON.stringify(parsed, null, 2) };
+  } catch {
+    // Not valid JSON (or still streaming) — show it as-is.
+    return { message: content, state: null };
+  }
+}
+
 function Turn({
   role,
   content,
@@ -29,13 +80,24 @@ function Turn({
 }) {
   // Bot under test reads like the assistant; the adversarial lead like the user.
   const cls = role === "bot" ? "chat-assistant" : "chat-user";
+  const { message, state } = parseTurn(content);
   return (
     <div className={`chat-bubble ${cls}`}>
       <span className="chat-role">{role === "bot" ? "Agente (bot)" : "Lead"}</span>
       <div className="chat-content">
-        {content}
+        {message ? (
+          message
+        ) : (
+          <span className="chat-empty">— el agente no envió mensaje —</span>
+        )}
         {streaming && <span className="chat-caret" aria-hidden />}
       </div>
+      {state && (
+        <div className="chat-state">
+          <span className="chat-state-label">Estado</span>
+          <pre className="chat-state-json">{state}</pre>
+        </div>
+      )}
     </div>
   );
 }

@@ -1665,12 +1665,25 @@ button {
   border: 0.5px solid var(--border);
   max-width: 92%;
 }
+/* Lead (adversarial) — bold inverted bubble, right-aligned. */
 .chat-bubble.chat-user {
   align-self: flex-end;
-  background: var(--surface);
+  background: var(--fg);
+  color: var(--bg);
+  border-color: var(--fg);
 }
+.chat-bubble.chat-user .chat-role {
+  color: var(--bg);
+  opacity: 0.55;
+}
+.chat-bubble.chat-user .chat-content {
+  color: var(--bg);
+}
+/* Agente (bot under test) — neutral surface bubble, left-aligned. */
 .chat-bubble.chat-assistant {
   align-self: flex-start;
+  background: var(--surface2);
+  color: var(--fg);
 }
 .chat-role {
   font-size: 9px;
@@ -1682,6 +1695,31 @@ button {
   font-size: 13px;
   line-height: 1.6;
   color: var(--fg);
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+.chat-empty {
+  color: var(--faint);
+  font-style: italic;
+}
+/* Structured "estado" JSON shown below the message as secondary metadata. */
+.chat-state {
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 0.5px dashed var(--border2);
+}
+.chat-state-label {
+  font-size: 8px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--faint);
+}
+.chat-state-json {
+  margin: 4px 0 0;
+  font-family: ui-monospace, "SFMono-Regular", Menlo, monospace;
+  font-size: 11px;
+  line-height: 1.5;
+  color: var(--muted);
   white-space: pre-wrap;
   word-break: break-word;
 }
