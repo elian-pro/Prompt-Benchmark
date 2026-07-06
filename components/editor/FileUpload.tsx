@@ -78,11 +78,11 @@ export function FileUpload({
         />
         <button
           type="button"
-          className="btn btn-ghost btn-sm"
+          className="attach-trigger"
           onClick={() => inputRef.current?.click()}
           disabled={disabled || busy}
         >
-          <IconPaperclip size={14} />
+          <IconPaperclip size={13} />
           {busy ? "Subiendo…" : "Adjuntar"}
         </button>
         {attachments.map((a) => (

@@ -257,10 +257,17 @@ button {
     gap: 12px;
   }
 
-  /* Chat composer: full-width send button below the textarea. */
-  .chat-input-row {
+  /* Session chat: stack the topbar and let its actions wrap. */
+  .chat-topbar {
     flex-direction: column;
     align-items: stretch;
+    gap: 10px;
+  }
+  .chat-topbar-actions {
+    flex-wrap: wrap;
+  }
+  .chat-shell {
+    height: calc(100vh - 230px);
   }
 
   /* Modal footers: let crowded button rows wrap. */
@@ -1666,21 +1673,72 @@ button {
 .back-link:hover {
   color: var(--fg);
 }
-.chat-layout {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 20px;
-  align-items: start;
-}
-@media (max-width: 900px) {
-  .chat-layout {
-    grid-template-columns: 1fr;
-  }
-}
-.chat-column {
+/* ============================================================
+   Session chat (Editor/Creator conversation view)
+   ============================================================
+   Continuity with the welcome screen is the whole design: the same centered
+   680px column and the same rounded composer card, over the same dot grid —
+   starting a conversation must read as the greeting giving way to messages,
+   never as landing on a different page. The old two-column layout (chat left,
+   draft panel right) is gone; the draft lives in a slide-over drawer. */
+.chat-shell {
   display: flex;
   flex-direction: column;
-  gap: 14px;
+  /* Fill the viewport under the app header so the composer sits pinned at
+     the bottom, mirroring where it rests on the welcome screen. */
+  height: calc(100vh - 160px);
+  min-height: 420px;
+}
+.chat-topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding-bottom: 14px;
+  border-bottom: 0.5px solid var(--border);
+}
+.chat-topbar-left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+.chat-topbar .back-link {
+  margin-bottom: 0;
+}
+.chat-topbar-title {
+  font-size: 15px;
+  font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.chat-topbar-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+.chat-stream {
+  flex: 1;
+  overflow-y: auto;
+  padding: 20px 4px;
+}
+.chat-stream-inner {
+  max-width: 680px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.chat-composer-zone {
+  display: flex;
+  justify-content: center;
+  padding-top: 6px;
+}
+/* Reuses .idle-composer for the card itself — same width, radius, surface. */
+.chat-composer .file-upload {
+  margin-bottom: 8px;
 }
 .chat-messages {
   display: flex;
@@ -1802,21 +1860,60 @@ button {
   color: var(--muted);
   font-feature-settings: "tnum";
 }
-.chat-input-row {
-  display: flex;
-  gap: 10px;
-  align-items: flex-end;
+/* Slide-over drawer holding the working draft (and the Creator's report). */
+.drawer-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.45);
+  /* Below modals (50) and the toast (60): the drawer is context, not a modal. */
+  z-index: 45;
+  animation: overlay-in 0.18s ease;
 }
-.chat-input {
-  flex: 1;
-  min-height: 70px;
-  resize: vertical;
-}
-.draft-panel {
-  border: 0.5px solid var(--border);
-  border-radius: 12px;
-  padding: 16px;
+.draft-drawer {
+  position: fixed;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 46;
+  width: min(540px, 92vw);
   background: var(--surface);
+  border-left: 0.5px solid var(--border2);
+  padding: 22px 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  overflow-y: auto;
+  animation: drawer-in 0.22s cubic-bezier(0.22, 1, 0.36, 1);
+}
+@keyframes drawer-in {
+  from {
+    transform: translateX(28px);
+    opacity: 0;
+  }
+  to {
+    transform: none;
+    opacity: 1;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .draft-drawer {
+    animation: none;
+  }
+}
+.draft-drawer-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+.draft-drawer-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.draft-drawer .draft-content {
+  flex: 1;
+  max-height: none;
 }
 .draft-content {
   margin: 0;

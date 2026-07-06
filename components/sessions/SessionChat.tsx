@@ -1,7 +1,13 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { IconArrowLeft, IconCopy, IconSend } from "@tabler/icons-react";
+import {
+  IconArrowLeft,
+  IconCopy,
+  IconFileText,
+  IconSend,
+  IconX,
+} from "@tabler/icons-react";
 import type { ChatSessionDetail, Attachment } from "@/lib/db/chat-sessions";
 import { relativeTimeEs } from "@/lib/format";
 import { Button } from "@/components/ui/Button";
@@ -37,8 +43,12 @@ const EMPTY_HINT: Record<Mode, string> = {
     "Sube el brief del cliente y describe el proyecto. Opus te hará un breve cuestionario con las dudas que bloquean la construcción; al responderlas, generará el prompt nuevo tomando solo la arquitectura del prompt base.",
 };
 const INPUT_PLACEHOLDER: Record<Mode, string> = {
-  editor: "Describe el cambio… (⌘/Ctrl + Enter para enviar)",
-  creator: "Describe el proyecto o responde el cuestionario… (⌘/Ctrl + Enter para enviar)",
+  editor: "Describe el cambio…",
+  creator: "Describe el proyecto o responde el cuestionario…",
+};
+const DRAFT_TOGGLE: Record<Mode, string> = {
+  editor: "Ver borrador",
+  creator: "Ver prompt",
 };
 const DRAFT_LABEL: Record<Mode, string> = {
   editor: "Borrador actual",
@@ -60,6 +70,11 @@ type PendingFirstMessage = { content: string; attachments: Attachment[] } | null
  *    user already typed there so it fires immediately as turn one — the user
  *    never has to retype it. `onBack` there just flips local state, no
  *    navigation.
+ *
+ * Layout continuity is the point: same centered 680px column and the same
+ * rounded composer card as the welcome screen, so starting a conversation
+ * reads as the greeting giving way to messages — never as a page change. The
+ * working draft lives in a slide-over drawer instead of a second column.
  */
 export function SessionChat({
   sessionId,
@@ -83,8 +98,10 @@ export function SessionChat({
   const [streamingText, setStreamingText] = useState<string | null>(null);
   const [sending, setSending] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
+  const [draftOpen, setDraftOpen] = useState(false);
 
   const scrollRef = useRef<HTMLDivElement>(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
   const autoSentRef = useRef(false);
 
   const load = useCallback(async () => {
@@ -109,6 +126,16 @@ export function SessionChat({
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight });
   }, [session?.messages.length, pendingUser, streamingText]);
+
+  // Close the draft drawer with Escape.
+  useEffect(() => {
+    if (!draftOpen) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setDraftOpen(false);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [draftOpen]);
 
   // Per-session token usage, summed across all persisted messages.
   const tokens = useMemo(() => {
@@ -141,6 +168,15 @@ export function SessionChat({
     window.setTimeout(() => setToast(null), 2500);
   }
 
+  function onInputChange(e: React.ChangeEvent<HTMLTextAreaElement>) {
+    setInput(e.target.value);
+    const el = textareaRef.current;
+    if (el) {
+      el.style.height = "auto";
+      el.style.height = Math.min(el.scrollHeight, 200) + "px";
+    }
+  }
+
   const send = useCallback(
     async (explicit?: { content: string; attachments: Attachment[] }) => {
       const content = (explicit?.content ?? input).trim();
@@ -151,6 +187,7 @@ export function SessionChat({
       if (!explicit) {
         setInput("");
         setAttachments([]);
+        if (textareaRef.current) textareaRef.current.style.height = "auto";
       }
       setPendingUser(content);
       setPendingAttachments(sent);
@@ -247,29 +284,28 @@ export function SessionChat({
       : (session.client_name ?? session.title ?? "Creación nueva");
 
   return (
-    <div>
-      <div className="detail-header">
-        <div>
+    <div className="chat-shell">
+      <div className="chat-topbar">
+        <div className="chat-topbar-left">
           <button type="button" className="back-link" onClick={handleBack}>
             <IconArrowLeft size={13} /> {mode === "editor" ? "Editor" : "Creator"}
           </button>
-          <h1 className="detail-title">{title}</h1>
-          <div className="detail-sub">
-            <span className={`session-status status-${session.status}`}>
-              {STATUS_LABELS[session.status] ?? session.status}
-            </span>
-            <span className="muted" style={{ fontSize: 12 }}>
-              {relativeTimeEs(session.updated_at)}
-            </span>
-            <span className="token-counter" title="Tokens usados en esta sesión">
-              ↑ {tokens.in.toLocaleString("es-MX")} · ↓{" "}
-              {tokens.out.toLocaleString("es-MX")} tokens
-            </span>
-          </div>
+          <span className="chat-topbar-title">{title}</span>
+          <span className={`session-status status-${session.status}`}>
+            {STATUS_LABELS[session.status] ?? session.status}
+          </span>
+          <span className="token-counter" title="Tokens usados en esta sesión">
+            ↑ {tokens.in.toLocaleString("es-MX")} · ↓{" "}
+            {tokens.out.toLocaleString("es-MX")} tokens
+          </span>
         </div>
-        <div className="detail-actions">
-          <Button variant="secondary" icon={<IconCopy size={14} />} onClick={copyDraft}>
-            {COPY_LABEL[mode]}
+        <div className="chat-topbar-actions">
+          <Button
+            variant="secondary"
+            icon={<IconFileText size={14} />}
+            onClick={() => setDraftOpen(true)}
+          >
+            {DRAFT_TOGGLE[mode]}
           </Button>
           {isActive && mode === "editor" && (
             <FinalizeButton
@@ -296,32 +332,34 @@ export function SessionChat({
         </div>
       </div>
 
-      <div className="chat-layout">
-        <section className="chat-column">
-          <div className="chat-messages" ref={scrollRef}>
-            {session.messages.length === 0 && !pendingUser && !autoSend && (
-              <p className="empty-hint">{EMPTY_HINT[mode]}</p>
-            )}
-            {session.messages.map((m) => (
-              <ChatMessage
-                key={m.id}
-                role={m.role}
-                content={m.content}
-                attachments={m.attachments}
-              />
-            ))}
-            {pendingUser && (
-              <ChatMessage
-                role="user"
-                content={pendingUser}
-                attachments={pendingAttachments}
-              />
-            )}
-            {streamingText !== null && (
-              <ChatMessage role="assistant" content={streamingText} streaming />
-            )}
-          </div>
+      <div className="chat-stream" ref={scrollRef}>
+        <div className="chat-stream-inner">
+          {session.messages.length === 0 && !pendingUser && !autoSend && (
+            <p className="empty-hint">{EMPTY_HINT[mode]}</p>
+          )}
+          {session.messages.map((m) => (
+            <ChatMessage
+              key={m.id}
+              role={m.role}
+              content={m.content}
+              attachments={m.attachments}
+            />
+          ))}
+          {pendingUser && (
+            <ChatMessage
+              role="user"
+              content={pendingUser}
+              attachments={pendingAttachments}
+            />
+          )}
+          {streamingText !== null && (
+            <ChatMessage role="assistant" content={streamingText} streaming />
+          )}
+        </div>
+      </div>
 
+      <div className="chat-composer-zone">
+        <div className="idle-composer chat-composer">
           {!isAbandoned && (
             <FileUpload
               sessionId={sessionId}
@@ -330,51 +368,76 @@ export function SessionChat({
               disabled={sending}
             />
           )}
-
-          <div className="chat-input-row">
-            <textarea
-              className="textarea chat-input"
-              value={input}
-              onChange={(e) => setInput(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
-                  e.preventDefault();
-                  send();
-                }
-              }}
-              placeholder={isAbandoned ? "Esta sesión fue descartada." : INPUT_PLACEHOLDER[mode]}
-              disabled={sending || isAbandoned}
-            />
-            <Button
-              variant="primary"
-              icon={<IconSend size={14} />}
+          <textarea
+            ref={textareaRef}
+            className="idle-composer-input"
+            rows={1}
+            value={input}
+            onChange={onInputChange}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
+                e.preventDefault();
+                send();
+              }
+            }}
+            placeholder={isAbandoned ? "Esta sesión fue descartada." : INPUT_PLACEHOLDER[mode]}
+            disabled={sending || isAbandoned}
+          />
+          <div className="idle-composer-footrow">
+            <span className="idle-composer-hint">
+              {sending ? "Enviando…" : "⌘/Ctrl + Enter para enviar"}
+            </span>
+            <button
+              type="button"
+              className="idle-send-btn"
               onClick={() => send()}
               disabled={sending || isAbandoned || !input.trim()}
+              aria-label="Enviar"
             >
-              {sending ? "Enviando…" : "Enviar"}
-            </Button>
+              <IconSend size={14} />
+            </button>
           </div>
-        </section>
-
-        <aside className="draft-panel">
-          <p className="section-label" style={{ marginBottom: 10 }}>
-            {DRAFT_LABEL[mode]}
-          </p>
-          <pre className="draft-content">
-            {session.current_draft_content?.trim()
-              ? session.current_draft_content
-              : DRAFT_EMPTY[mode]}
-          </pre>
-          {report && (
-            <>
-              <p className="section-label" style={{ margin: "16px 0 10px" }}>
-                Reporte de construcción
-              </p>
-              <div className="draft-report">{report}</div>
-            </>
-          )}
-        </aside>
+        </div>
       </div>
+
+      {draftOpen && (
+        <>
+          <div className="drawer-overlay" onClick={() => setDraftOpen(false)} />
+          <aside className="draft-drawer" role="dialog" aria-label={DRAFT_LABEL[mode]}>
+            <div className="draft-drawer-head">
+              <p className="section-label" style={{ margin: 0 }}>
+                {DRAFT_LABEL[mode]}
+              </p>
+              <div className="draft-drawer-actions">
+                <Button variant="secondary" icon={<IconCopy size={14} />} onClick={copyDraft}>
+                  {COPY_LABEL[mode]}
+                </Button>
+                <button
+                  type="button"
+                  className="icon-btn"
+                  onClick={() => setDraftOpen(false)}
+                  aria-label="Cerrar"
+                >
+                  <IconX size={16} />
+                </button>
+              </div>
+            </div>
+            <pre className="draft-content">
+              {session.current_draft_content?.trim()
+                ? session.current_draft_content
+                : DRAFT_EMPTY[mode]}
+            </pre>
+            {report && (
+              <>
+                <p className="section-label" style={{ margin: "4px 0 0" }}>
+                  Reporte de construcción
+                </p>
+                <div className="draft-report">{report}</div>
+              </>
+            )}
+          </aside>
+        </>
+      )}
 
       {toast && <div className="toast">{toast}</div>}
     </div>

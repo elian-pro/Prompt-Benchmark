@@ -1,6 +1,7 @@
 "use client";
 
 import { useParams, useRouter } from "next/navigation";
+import { DotGrid } from "@/components/sessions/DotGrid";
 import { SessionChat } from "@/components/sessions/SessionChat";
 
 /**
@@ -15,5 +16,10 @@ export default function CreatorSessionPage() {
   const router = useRouter();
   const id = Array.isArray(params.id) ? params.id[0] : (params.id as string);
 
-  return <SessionChat sessionId={id} mode="creator" onBack={() => router.push("/creator")} />;
+  return (
+    <>
+      <DotGrid />
+      <SessionChat sessionId={id} mode="creator" onBack={() => router.push("/creator")} />
+    </>
+  );
 }

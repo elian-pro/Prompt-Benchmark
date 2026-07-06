@@ -36,26 +36,27 @@ export function SessionWorkspace({ mode }: { mode: Mode }) {
     window.history.replaceState(null, "", `/${mode}`);
   }
 
-  if (activeSessionId) {
-    return (
-      <SessionChat
-        key={activeSessionId}
-        sessionId={activeSessionId}
-        mode={mode}
-        onBack={goIdle}
-        autoSend={autoSend}
-      />
-    );
-  }
-
+  // DotGrid stays mounted across both states: the background never blinks
+  // when the welcome gives way to the conversation, reinforcing that no
+  // navigation happened.
   return (
     <>
       <DotGrid />
-      <IdleComposer
-        mode={mode}
-        onStarted={(sessionId, firstMessage) => goActive(sessionId, firstMessage)}
-        onResumeHistory={(sessionId) => goActive(sessionId)}
-      />
+      {activeSessionId ? (
+        <SessionChat
+          key={activeSessionId}
+          sessionId={activeSessionId}
+          mode={mode}
+          onBack={goIdle}
+          autoSend={autoSend}
+        />
+      ) : (
+        <IdleComposer
+          mode={mode}
+          onStarted={(sessionId, firstMessage) => goActive(sessionId, firstMessage)}
+          onResumeHistory={(sessionId) => goActive(sessionId)}
+        />
+      )}
     </>
   );
 }
