@@ -100,7 +100,7 @@ export function SessionLanding({ mode }: { mode: Mode }) {
 
       <section className="landing-history">
         <div className="landing-history-head">
-          <span className="section-label">Historial · {sessions.length}</span>
+          <span className="history-chip">Historial · {sessions.length}</span>
         </div>
 
         {loading && <SkeletonRows count={3} />}
