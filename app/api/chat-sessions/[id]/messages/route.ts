@@ -5,6 +5,7 @@ import {
   updateDraft,
 } from "@/lib/db/chat-sessions";
 import { getRoleDefault } from "@/lib/db/role-defaults";
+import { getPromptOverride } from "@/lib/db/prompt-overrides";
 import { downloadUploadBytes } from "@/lib/db/uploads";
 import { getVersion } from "@/lib/db/versions";
 import { appendMessageSchema } from "@/lib/schemas/chat-sessions";
@@ -91,15 +92,17 @@ export async function POST(req: NextRequest, { params }: Params) {
       attachments: input.attachments ?? null,
     });
 
+    // The persona may be overridden from Settings; absent → code default.
+    const personaOverride = await getPromptOverride(isCreator ? "creator" : "editor");
     let systemPrompt: string;
     if (isCreator) {
       // The base version is the architectural reference (structure only).
       const reference = session.base_version_id
         ? await getVersion(session.base_version_id)
         : null;
-      systemPrompt = buildCreatorSystemPrompt(reference?.content ?? "");
+      systemPrompt = buildCreatorSystemPrompt(reference?.content ?? "", personaOverride);
     } else {
-      systemPrompt = buildEditorSystemPrompt(session.current_draft_content ?? "");
+      systemPrompt = buildEditorSystemPrompt(session.current_draft_content ?? "", personaOverride);
     }
     const modelAttachments = input.attachments?.length
       ? await loadAttachmentsForModel(input.attachments)

@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import { IconPlus, IconServer } from "@tabler/icons-react";
 import type { MaskedProvider } from "@/lib/db/providers";
 import type { RoleDefault } from "@/lib/db/role-defaults";
+import type { PromptOverride } from "@/lib/db/prompt-overrides";
 import { Button } from "@/components/ui/Button";
 import { CollapsibleCard } from "@/components/ui/CollapsibleCard";
 import { EmptyState } from "@/components/ui/EmptyState";
@@ -20,6 +21,7 @@ import { buildJudgeSystemPrompt } from "@/lib/prompts/judge";
 export default function SettingsPage() {
   const [providers, setProviders] = useState<MaskedProvider[]>([]);
   const [roleDefaults, setRoleDefaults] = useState<RoleDefault[]>([]);
+  const [overrides, setOverrides] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
 
@@ -27,19 +29,31 @@ export default function SettingsPage() {
   const [editing, setEditing] = useState<MaskedProvider | null>(null);
 
   const [deleteTarget, setDeleteTarget] = useState<MaskedProvider | null>(null);
+  const [toast, setToast] = useState<string | null>(null);
+
+  function showToast(message: string) {
+    setToast(message);
+    window.setTimeout(() => setToast(null), 2800);
+  }
 
   const load = useCallback(async () => {
     setLoading(true);
     setLoadError(null);
     try {
-      const [pRes, rRes] = await Promise.all([
+      const [pRes, rRes, oRes] = await Promise.all([
         fetch("/api/providers"),
         fetch("/api/role-defaults"),
+        fetch("/api/prompt-overrides"),
       ]);
       if (!pRes.ok) throw new Error((await pRes.json()).error ?? "Error al cargar proveedores.");
       if (!rRes.ok) throw new Error((await rRes.json()).error ?? "Error al cargar roles.");
+      if (!oRes.ok) throw new Error((await oRes.json()).error ?? "Error al cargar los prompts.");
       setProviders(await pRes.json());
       setRoleDefaults(await rRes.json());
+      const overrideRows: PromptOverride[] = await oRes.json();
+      setOverrides(
+        Object.fromEntries(overrideRows.map((o) => [o.role, o.content])),
+      );
     } catch (e) {
       setLoadError(e instanceof Error ? e.message : "Error al cargar los datos.");
     } finally {
@@ -138,21 +152,35 @@ export default function SettingsPage() {
 
       <p className="section-label settings-group-label">System prompts</p>
 
-      <SystemPromptCard
-        title="Editor — ingeniero de prompts"
-        description="Persona del chat del Editor. En tiempo real, la app le anexa al final el prompt del cliente que se está editando."
-        defaultText={EDITOR_PERSONA}
-      />
-      <SystemPromptCard
-        title="Creator — arquitecto de prompts"
-        description="Persona del chat del Creator. En tiempo real, la app le anexa al final el prompt base elegido como referencia de arquitectura."
-        defaultText={CREATOR_PERSONA}
-      />
-      <SystemPromptCard
-        title="Juez — Adversarial Lab"
-        description="Evalúa la conversación completa entre el lead simulado y el bot, y produce el reporte estructurado de fallas."
-        defaultText={buildJudgeSystemPrompt()}
-      />
+      {loading && <SkeletonRows count={3} />}
+      {!loading && !loadError && (
+        <>
+          <SystemPromptCard
+            role="editor"
+            title="Editor — ingeniero de prompts"
+            description="Persona del chat del Editor. En tiempo real, la app le anexa al final el prompt del cliente que se está editando."
+            defaultText={EDITOR_PERSONA}
+            savedContent={overrides.editor ?? null}
+            onToast={showToast}
+          />
+          <SystemPromptCard
+            role="creator"
+            title="Creator — arquitecto de prompts"
+            description="Persona del chat del Creator. En tiempo real, la app le anexa al final el prompt base elegido como referencia de arquitectura."
+            defaultText={CREATOR_PERSONA}
+            savedContent={overrides.creator ?? null}
+            onToast={showToast}
+          />
+          <SystemPromptCard
+            role="judge"
+            title="Juez — Adversarial Lab"
+            description="Evalúa la conversación completa entre el lead simulado y el bot, y produce el reporte estructurado de fallas. La app lo usa tal cual (no anexa nada más)."
+            defaultText={buildJudgeSystemPrompt()}
+            savedContent={overrides.judge ?? null}
+            onToast={showToast}
+          />
+        </>
+      )}
 
       {formOpen && (
         <ProviderFormModal
@@ -179,6 +207,8 @@ export default function SettingsPage() {
           confirmPhrase={deleteTarget.name}
         />
       )}
+
+      {toast && <div className="toast">{toast}</div>}
     </div>
   );
 }

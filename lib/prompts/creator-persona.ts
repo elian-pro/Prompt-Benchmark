@@ -76,12 +76,18 @@ Si el usuario solo hace una pregunta o pide una aclaración sin pedir construir,
 /**
  * Builds the full system prompt by appending the architectural-reference
  * prompt. `referencePrompt` is the content of the session's base version,
- * consulted for structure only (never copied as content).
+ * consulted for structure only (never copied as content). `personaOverride`,
+ * when given, replaces the code persona with the team's saved version from
+ * Settings (prompt_overrides); the reference is still appended here either way.
  */
-export function buildCreatorSystemPrompt(referencePrompt: string): string {
+export function buildCreatorSystemPrompt(
+  referencePrompt: string,
+  personaOverride?: string | null,
+): string {
   const reference =
     referencePrompt.trim().length > 0 ? referencePrompt : "(No se proporcionó prompt base.)";
-  return `${CREATOR_PERSONA}
+  const persona = personaOverride?.trim() ? personaOverride : CREATOR_PERSONA;
+  return `${persona}
 
 ---
 

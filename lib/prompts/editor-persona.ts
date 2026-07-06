@@ -56,10 +56,17 @@ Si el usuario solo hace una pregunta o pide una aclaración sin solicitar una ed
 /**
  * Builds the full system prompt by appending the prompt currently under edit.
  * `currentDraft` is the session's working draft (seeded from the base version).
+ * `personaOverride`, when given, replaces the code persona with the team's
+ * saved version from Settings (prompt_overrides); the dynamic draft is still
+ * appended here either way.
  */
-export function buildEditorSystemPrompt(currentDraft: string): string {
+export function buildEditorSystemPrompt(
+  currentDraft: string,
+  personaOverride?: string | null,
+): string {
   const draft = currentDraft.trim().length > 0 ? currentDraft : "(El prompt está vacío.)";
-  return `${EDITOR_PERSONA}
+  const persona = personaOverride?.trim() ? personaOverride : EDITOR_PERSONA;
+  return `${persona}
 
 ---
 

@@ -8,6 +8,7 @@ import {
 } from "@/lib/db/runs";
 import { buildLeadSystemPrompt } from "@/lib/prompts/adversarial-personas";
 import { buildJudgeSystemPrompt, judgeReportSchema } from "@/lib/prompts/judge";
+import { getPromptOverride } from "@/lib/db/prompt-overrides";
 import { parseTurn, stripStageDirection } from "@/lib/adversarial-message";
 import { chat, type ChatMessage } from "@/lib/providers";
 import { handleError, jsonError } from "@/lib/http";
@@ -130,6 +131,8 @@ export async function POST(_req: NextRequest, { params }: Params) {
     }
 
     const leadPrompt = buildLeadSystemPrompt(run.preset, run.intensity);
+    // The judge persona may be overridden from Settings; absent → code default.
+    const judgeOverride = await getPromptOverride("judge");
     const encoder = new TextEncoder();
 
     const stream = new ReadableStream<Uint8Array>({
@@ -186,7 +189,7 @@ export async function POST(_req: NextRequest, { params }: Params) {
           const judgeReply = await chat({
             providerId: run.judge_config.provider_id,
             modelName: run.judge_config.model_name,
-            systemPrompt: buildJudgeSystemPrompt(),
+            systemPrompt: buildJudgeSystemPrompt(judgeOverride),
             messages: [{ role: "user", content: formatTranscript(transcript) }],
             temperature: run.judge_config.temperature ?? undefined,
             topP: run.judge_config.top_p ?? undefined,

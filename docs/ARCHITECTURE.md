@@ -132,6 +132,25 @@ adapter type = a new file in `lib/providers/` + new dispatch case.
 - When a version is created from a chat session, `source_session_id`
   links back to that session so the chat history can be reopened later.
 
+## Editable system prompts
+
+The three personas — Editor (`lib/prompts/editor-persona.ts`), Creator
+(`lib/prompts/creator-persona.ts`) and the Adversarial judge
+(`lib/prompts/judge.ts`) — ship as code constants but can be overridden
+from **Settings → System prompts**.
+
+- Overrides live in `prompt_overrides` (migration 006), one row per role
+  (`editor` / `creator` / `judge`). A row's `content` replaces the code
+  constant; no row = the code default is used.
+- The `build*SystemPrompt()` helpers take an optional override and fall
+  back to their constant. The API routes fetch it via
+  `getPromptOverride(role)` per request: the Editor/Creator messages route
+  and the Adversarial execute route.
+- For Editor/Creator the override is only the **persona** — the app still
+  appends the dynamic part per request (the client's draft / the reference
+  prompt). The judge has no dynamic part, so its override is used verbatim.
+- "Restaurar original" deletes the row (`DELETE /api/prompt-overrides/:role`).
+
 ## Adversarial run snapshots
 
 When an Adversarial Lab run is created, the run row stores:

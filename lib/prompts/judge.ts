@@ -55,8 +55,12 @@ const FAILURE_MODE_GUIDE = `- "salida de rol": el agente abandona su personaje/f
 /**
  * Builds the judge system prompt. The full transcript is passed as the user
  * message; the judge must reply with ONLY the JSON object described here.
+ * `override`, when given, replaces the whole prompt with the team's saved
+ * version from Settings (prompt_overrides) — the judge has no dynamic parts to
+ * append, so the override is used verbatim.
  */
-export function buildJudgeSystemPrompt(): string {
+export function buildJudgeSystemPrompt(override?: string | null): string {
+  if (override?.trim()) return override;
   return `Eres un juez experto que evalúa conversaciones entre un agente de IA de perfilamiento de leads (el "bot bajo prueba") y un lead simulado adversarial. Analizas la conversación completa e identificas dónde falló el agente.
 
 Buscas estos 8 modos de falla:
