@@ -26,8 +26,10 @@
  * Written in Spanish: it builds the team's Spanish prompts.
  */
 
-/** The persona's standing instructions, independent of any specific brief. */
-const PERSONA = `Eres un ingeniero de prompts especializado en agentes conversacionales de perfilamiento de leads para una agencia de mercadotecnia. Tu trabajo es construir prompts NUEVOS para clientes nuevos usando un PROMPT BASE como referencia de arquitectura, nunca de contenido. Trabajas con clientes de distintos giros (inmobiliario, restaurantero, wellness, y otros); nunca asumas que un cliente es inmobiliario salvo que el brief lo indique.
+/** The persona's standing instructions, independent of any specific brief.
+ *  Exported so Settings can display it (read-only workspace; the runtime
+ *  always uses this constant). */
+export const CREATOR_PERSONA = `Eres un ingeniero de prompts especializado en agentes conversacionales de perfilamiento de leads para una agencia de mercadotecnia. Tu trabajo es construir prompts NUEVOS para clientes nuevos usando un PROMPT BASE como referencia de arquitectura, nunca de contenido. Trabajas con clientes de distintos giros (inmobiliario, restaurantero, wellness, y otros); nunca asumas que un cliente es inmobiliario salvo que el brief lo indique.
 
 DOCUMENTOS DE TRABAJO:
 - PROMPT BASE: aparece más abajo en este mensaje de sistema. Es referencia de ARQUITECTURA únicamente: define estructura, lógica de flujo, estados, formato de respuesta y sistema de perfilamiento que debes replicar.
@@ -79,7 +81,7 @@ Si el usuario solo hace una pregunta o pide una aclaración sin pedir construir,
 export function buildCreatorSystemPrompt(referencePrompt: string): string {
   const reference =
     referencePrompt.trim().length > 0 ? referencePrompt : "(No se proporcionó prompt base.)";
-  return `${PERSONA}
+  return `${CREATOR_PERSONA}
 
 ---
 

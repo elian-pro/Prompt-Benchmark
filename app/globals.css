@@ -252,9 +252,15 @@ button {
   .provider-actions {
     flex-wrap: wrap;
   }
-  .settings-section-header {
+  /* Collapsible card headers: let the toggle and actions wrap. */
+  .collapse-head {
     flex-wrap: wrap;
-    gap: 12px;
+  }
+  .prompt-card-actions {
+    flex-wrap: wrap;
+  }
+  .prompt-card-disclaimer {
+    flex-basis: 100%;
   }
 
   /* Session chat: stack the topbar and let its actions wrap. */
@@ -509,14 +515,111 @@ button {
    Settings page
    =========================================================================== */
 
-.settings-section {
-  margin-top: 40px;
+/* Collapsible cards (Settings): header always visible, body folds under it
+   via the 0fr→1fr grid-rows trick (animates height without measuring). */
+.collapse-card {
+  margin-top: 14px;
+  border: 0.5px solid var(--border);
+  border-radius: 14px;
+  background: var(--surface);
 }
-.settings-section-header {
+.collapse-head {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  margin-bottom: 18px;
+  gap: 10px;
+  padding: 4px 14px 4px 6px;
+}
+.collapse-toggle {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 14px 8px;
+  background: transparent;
+  border: none;
+  color: var(--fg);
+  font-family: inherit;
+  cursor: pointer;
+  text-align: left;
+}
+.collapse-chevron {
+  flex: none;
+  color: var(--muted);
+  transition: transform 0.2s ease;
+}
+.collapse-card.is-open .collapse-chevron {
+  transform: rotate(180deg);
+}
+.collapse-title {
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  color: var(--fg);
+}
+.collapse-hint {
+  margin-left: auto;
+  font-size: 11px;
+  color: var(--faint);
+  white-space: nowrap;
+}
+.collapse-actions {
+  flex-shrink: 0;
+}
+.collapse-body {
+  display: grid;
+  grid-template-rows: 0fr;
+  transition: grid-template-rows 0.28s cubic-bezier(0.22, 1, 0.36, 1);
+}
+.collapse-card.is-open .collapse-body {
+  grid-template-rows: 1fr;
+}
+.collapse-body-inner {
+  overflow: hidden;
+  min-height: 0;
+}
+.collapse-content {
+  padding: 4px 20px 20px;
+}
+@media (prefers-reduced-motion: reduce) {
+  .collapse-body,
+  .collapse-chevron {
+    transition: none;
+  }
+}
+
+/* Label separating the System prompts group from the config cards above. */
+.settings-group-label {
+  display: block;
+  margin-top: 40px;
+}
+
+/* System prompt cards: a working copy of each persona, never persisted. */
+.prompt-card-note {
+  margin: 0 0 12px;
+  font-size: 12px;
+  line-height: 1.55;
+  color: var(--muted);
+}
+.prompt-textarea {
+  width: 100%;
+  min-height: 340px;
+  font-family: ui-monospace, "SFMono-Regular", Menlo, monospace;
+  font-size: 12px;
+  line-height: 1.6;
+  resize: vertical;
+}
+.prompt-card-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 12px;
+}
+.prompt-card-disclaimer {
+  margin-right: auto;
+  font-size: 10.5px;
+  color: var(--faint);
 }
 
 .provider-list {

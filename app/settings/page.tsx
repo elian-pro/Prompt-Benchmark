@@ -5,12 +5,17 @@ import { IconPlus, IconServer } from "@tabler/icons-react";
 import type { MaskedProvider } from "@/lib/db/providers";
 import type { RoleDefault } from "@/lib/db/role-defaults";
 import { Button } from "@/components/ui/Button";
+import { CollapsibleCard } from "@/components/ui/CollapsibleCard";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { SkeletonRows } from "@/components/ui/Skeleton";
 import { DangerConfirmModal } from "@/components/ui/DangerConfirmModal";
 import { ProviderFormModal } from "@/components/settings/ProviderFormModal";
 import { ProviderRow } from "@/components/settings/ProviderRow";
 import { RoleAssignments } from "@/components/settings/RoleAssignments";
+import { SystemPromptCard } from "@/components/settings/SystemPromptCard";
+import { EDITOR_PERSONA } from "@/lib/prompts/editor-persona";
+import { CREATOR_PERSONA } from "@/lib/prompts/creator-persona";
+import { buildJudgeSystemPrompt } from "@/lib/prompts/judge";
 
 export default function SettingsPage() {
   const [providers, setProviders] = useState<MaskedProvider[]>([]);
@@ -70,9 +75,14 @@ export default function SettingsPage() {
     <div>
       <h1 style={{ fontSize: 24 }}>Configuración</h1>
 
-      <section className="settings-section">
-        <div className="settings-section-header">
-          <span className="section-label">Proveedores</span>
+      <CollapsibleCard
+        title="Proveedores"
+        hint={
+          loading
+            ? undefined
+            : `${providers.length} ${providers.length === 1 ? "proveedor" : "proveedores"}`
+        }
+        actions={
           <Button
             variant="secondary"
             icon={<IconPlus size={14} />}
@@ -80,8 +90,8 @@ export default function SettingsPage() {
           >
             Agregar proveedor
           </Button>
-        </div>
-
+        }
+      >
         {loading && <SkeletonRows count={3} />}
         {loadError && <p className="form-error">{loadError}</p>}
 
@@ -113,12 +123,10 @@ export default function SettingsPage() {
             />
           ))}
         </div>
-      </section>
+      </CollapsibleCard>
 
-      <section className="settings-section">
-        <div className="settings-section-header">
-          <span className="section-label">Asignación de roles</span>
-        </div>
+      <CollapsibleCard title="Asignación de roles">
+        {loading && <SkeletonRows count={3} />}
         {!loading && !loadError && (
           <RoleAssignments
             providers={providers}
@@ -126,7 +134,25 @@ export default function SettingsPage() {
             onSaved={load}
           />
         )}
-      </section>
+      </CollapsibleCard>
+
+      <p className="section-label settings-group-label">System prompts</p>
+
+      <SystemPromptCard
+        title="Editor — ingeniero de prompts"
+        description="Persona del chat del Editor. En tiempo real, la app le anexa al final el prompt del cliente que se está editando."
+        defaultText={EDITOR_PERSONA}
+      />
+      <SystemPromptCard
+        title="Creator — arquitecto de prompts"
+        description="Persona del chat del Creator. En tiempo real, la app le anexa al final el prompt base elegido como referencia de arquitectura."
+        defaultText={CREATOR_PERSONA}
+      />
+      <SystemPromptCard
+        title="Juez — Adversarial Lab"
+        description="Evalúa la conversación completa entre el lead simulado y el bot, y produce el reporte estructurado de fallas."
+        defaultText={buildJudgeSystemPrompt()}
+      />
 
       {formOpen && (
         <ProviderFormModal

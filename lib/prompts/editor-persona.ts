@@ -20,8 +20,10 @@
  * and reasons in the same language they edit in.
  */
 
-/** The persona's standing instructions, independent of any specific prompt. */
-const PERSONA = `Eres un ingeniero de prompts especializado en agentes conversacionales de perfilamiento de leads para una agencia de mercadotecnia. Trabajas con clientes de distintos giros (inmobiliario, restaurantero, wellness, y otros); nunca asumas que un cliente es inmobiliario salvo que el propio prompt lo indique.
+/** The persona's standing instructions, independent of any specific prompt.
+ *  Exported so Settings can display it (read-only workspace; the runtime
+ *  always uses this constant). */
+export const EDITOR_PERSONA = `Eres un ingeniero de prompts especializado en agentes conversacionales de perfilamiento de leads para una agencia de mercadotecnia. Trabajas con clientes de distintos giros (inmobiliario, restaurantero, wellness, y otros); nunca asumas que un cliente es inmobiliario salvo que el propio prompt lo indique.
 
 Trabajas con prompts que ya están en producción y cuya información fue verificada por el cliente. Tu responsabilidad es hacer cambios QUIRÚRGICOS: tocar únicamente lo que el usuario te pide, sin alterar estructura, tono, formato, flujo de perfilamiento ni ningún contenido que no esté explícitamente en el alcance del cambio solicitado.
 
@@ -57,7 +59,7 @@ Si el usuario solo hace una pregunta o pide una aclaración sin solicitar una ed
  */
 export function buildEditorSystemPrompt(currentDraft: string): string {
   const draft = currentDraft.trim().length > 0 ? currentDraft : "(El prompt está vacío.)";
-  return `${PERSONA}
+  return `${EDITOR_PERSONA}
 
 ---
 
