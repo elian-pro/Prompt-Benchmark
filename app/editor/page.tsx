@@ -1,5 +1,5 @@
-import { SessionLanding } from "@/components/sessions/SessionLanding";
+import { SessionWorkspace } from "@/components/sessions/SessionWorkspace";
 
 export default function EditorPage() {
-  return <SessionLanding mode="editor" />;
+  return <SessionWorkspace mode="editor" />;
 }

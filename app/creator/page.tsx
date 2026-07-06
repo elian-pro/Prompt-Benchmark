@@ -1,5 +1,5 @@
-import { SessionLanding } from "@/components/sessions/SessionLanding";
+import { SessionWorkspace } from "@/components/sessions/SessionWorkspace";
 
 export default function CreatorPage() {
-  return <SessionLanding mode="creator" />;
+  return <SessionWorkspace mode="creator" />;
 }
