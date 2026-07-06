@@ -1724,9 +1724,9 @@ button {
   overflow-y: auto;
   padding: 20px 4px;
 }
+/* Conversation and composer span the full shell width (logo → theme switch),
+   so the chat owns the screen; the welcome's 680px cap applies only there. */
 .chat-stream-inner {
-  max-width: 680px;
-  margin: 0 auto;
   display: flex;
   flex-direction: column;
   gap: 12px;
@@ -1736,7 +1736,10 @@ button {
   justify-content: center;
   padding-top: 6px;
 }
-/* Reuses .idle-composer for the card itself — same width, radius, surface. */
+/* Reuses .idle-composer for the card itself — same radius and surface. */
+.chat-composer {
+  max-width: none;
+}
 .chat-composer .file-upload {
   margin-bottom: 8px;
 }
