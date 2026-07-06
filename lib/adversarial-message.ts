@@ -78,3 +78,25 @@ export function parseTurn(content: string): { message: string; state: string | n
     return { message: content, state: null };
   }
 }
+
+// Matches a leading parenthetical paragraph — allowing one level of nested
+// parens — followed by a blank line before more content. This is the shape of
+// a stage direction some models emit despite instructions (e.g. "(espero la
+// respuesta, escribo algo casual mientras tanto)\n\nDale, sin prisa..."), as
+// opposed to a message that legitimately opens with "(algo) el resto...", which
+// has no paragraph break and is left untouched.
+const LEADING_STAGE_DIRECTION = /^\s*\((?:[^()]|\([^()]*\))*\)\s*\n\s*\n+/;
+
+/**
+ * Strips a leading stage-direction paragraph some models emit despite being
+ * told to stay in character (narrating what they're "about to write" instead
+ * of just writing it). Only applied to the adversarial lead's turns — that's
+ * the role this leaked from. Falls back to the original text if stripping
+ * would leave nothing (avoids ever showing an empty bubble).
+ */
+export function stripStageDirection(content: string): string {
+  const match = content.match(LEADING_STAGE_DIRECTION);
+  if (!match) return content;
+  const rest = content.slice(match[0].length).trim();
+  return rest || content;
+}

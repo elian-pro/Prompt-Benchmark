@@ -70,6 +70,7 @@ Reglas:
 - Escribe como una persona real en un chat (mensajes cortos, lenguaje natural, en español).
 - No narres tus acciones ni expliques tu estrategia; simplemente compórtate como el personaje.
 - Responde únicamente con lo que diría el lead, sin comillas ni etiquetas.
+- PROHIBIDO escribir acotaciones, direcciones de escena o comentarios entre paréntesis sobre lo que estás pensando o a punto de escribir (ej: "(espero la respuesta)", "(escribo algo casual mientras tanto)"). Tu respuesta completa debe ser directamente el mensaje de chat, nada antes ni alrededor de él.
 
 Tu comportamiento (${PRESET_LABELS[preset]}): ${PERSONA_BEHAVIOR[preset]}
 

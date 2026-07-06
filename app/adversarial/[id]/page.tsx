@@ -19,15 +19,7 @@ const STATUS_LABELS: Record<string, string> = {
 
 type LiveMessage = { turn: number; role: RunMessageRole; content: string };
 
-function Turn({
-  role,
-  content,
-  streaming = false,
-}: {
-  role: RunMessageRole;
-  content: string;
-  streaming?: boolean;
-}) {
+function Turn({ role, content }: { role: RunMessageRole; content: string }) {
   // Bot under test reads like the assistant; the adversarial lead like the user.
   const cls = role === "bot" ? "chat-assistant" : "chat-user";
   const { message, state } = parseTurn(content);
@@ -40,7 +32,6 @@ function Turn({
         ) : (
           <span className="chat-empty">— el agente no envió mensaje —</span>
         )}
-        {streaming && <span className="chat-caret" aria-hidden />}
       </div>
       {state && (
         <div className="chat-state">
@@ -48,6 +39,27 @@ function Turn({
           <span className="chat-state-value">{state}</span>
         </div>
       )}
+    </div>
+  );
+}
+
+// Shown for a turn in progress. Nothing is revealed until the model's full
+// reply is ready (see the run engine) — this is deliberate: it's what keeps a
+// bot's raw JSON or a lead's leaked stage direction from ever flashing on
+// screen mid-generation.
+function TypingIndicator({ role }: { role: RunMessageRole }) {
+  const cls = role === "bot" ? "chat-assistant" : "chat-user";
+  return (
+    <div className={`chat-bubble ${cls}`}>
+      <span className="chat-role">{role === "bot" ? "Agente (bot)" : "Lead"}</span>
+      <div className="chat-content chat-typing">
+        Escribiendo
+        <span className="typing-dots" aria-hidden="true">
+          <span />
+          <span />
+          <span />
+        </span>
+      </div>
     </div>
   );
 }
@@ -114,7 +126,7 @@ export default function RunDetailPage() {
   // Live execution state (used when this page kicks off a pending run).
   const [executed, setExecuted] = useState(false);
   const [liveMessages, setLiveMessages] = useState<LiveMessage[]>([]);
-  const [streaming, setStreaming] = useState<LiveMessage | null>(null);
+  const [typingRole, setTypingRole] = useState<RunMessageRole | null>(null);
   const [report, setReport] = useState<ReportRow | null>(null);
   const [phase, setPhase] = useState<"idle" | "running" | "judging" | "done" | "error">("idle");
   const startedRef = useRef(false);
@@ -147,14 +159,13 @@ export default function RunDetailPage() {
           if (!line.trim()) continue;
           const evt = JSON.parse(line);
           if (evt.type === "turn_start") {
-            setStreaming({ turn: evt.turn, role: evt.role, content: "" });
-          } else if (evt.type === "delta") {
-            setStreaming((s) => (s ? { ...s, content: s.content + evt.text } : s));
+            setTypingRole(evt.role);
           } else if (evt.type === "turn_end") {
-            setStreaming((s) => {
-              if (s) setLiveMessages((prev) => [...prev, s]);
-              return null;
-            });
+            setTypingRole(null);
+            setLiveMessages((prev) => [
+              ...prev,
+              { turn: evt.turn, role: evt.role, content: evt.content },
+            ]);
           } else if (evt.type === "judging") {
             setPhase("judging");
           } else if (evt.type === "report") {
@@ -202,7 +213,7 @@ export default function RunDetailPage() {
   // Keep scrolled to the latest turn as the conversation streams.
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight });
-  }, [liveMessages.length, streaming, report]);
+  }, [liveMessages.length, typingRole, report]);
 
   if (loading) return <p className="empty-hint">Cargando…</p>;
   if (error && !run) return <p className="form-error">{error}</p>;
@@ -236,15 +247,13 @@ export default function RunDetailPage() {
       </div>
 
       <div className="chat-messages" ref={scrollRef}>
-        {messages.length === 0 && phase === "running" && (
+        {messages.length === 0 && phase === "running" && !typingRole && (
           <p className="empty-hint">Iniciando conversación…</p>
         )}
         {messages.map((m) => (
           <Turn key={m.turn} role={m.role} content={m.content} />
         ))}
-        {streaming && (
-          <Turn role={streaming.role} content={streaming.content} streaming />
-        )}
+        {typingRole && <TypingIndicator role={typingRole} />}
       </div>
 
       {phase === "error" && error && (
