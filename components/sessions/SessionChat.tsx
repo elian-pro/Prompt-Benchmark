@@ -208,6 +208,18 @@ export function SessionChat({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [autoSend, session]);
 
+  // Leaving a session that never actually changed the prompt shouldn't clutter
+  // the history: ask the server to drop it (it decides via isSessionUnchanged;
+  // this is best-effort and silently ignored on failure) before navigating back.
+  async function handleBack() {
+    try {
+      await fetch(`/api/chat-sessions/${sessionId}?onlyIfUnchanged=true`, { method: "DELETE" });
+    } catch {
+      // Best-effort cleanup — the session just stays in history if this fails.
+    }
+    onBack();
+  }
+
   async function copyDraft() {
     const text = session?.current_draft_content;
     if (!text) {
@@ -238,7 +250,7 @@ export function SessionChat({
     <div>
       <div className="detail-header">
         <div>
-          <button type="button" className="back-link" onClick={onBack}>
+          <button type="button" className="back-link" onClick={handleBack}>
             <IconArrowLeft size={13} /> {mode === "editor" ? "Editor" : "Creator"}
           </button>
           <h1 className="detail-title">{title}</h1>

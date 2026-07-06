@@ -1,13 +1,14 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { IconPaperclip, IconSend, IconSparkles, IconX } from "@tabler/icons-react";
+import { IconPaperclip, IconSend, IconSparkles, IconTrash, IconX } from "@tabler/icons-react";
 import type { ChatSessionListItem, Attachment } from "@/lib/db/chat-sessions";
 import type { ClientDetail } from "@/lib/db/clients";
 import { relativeTimeEs } from "@/lib/format";
 import { getGreeting, TEAM_NAME } from "@/lib/greeting";
 import { SkeletonRows } from "@/components/ui/Skeleton";
 import { ClientChip, type ClientChipValue } from "@/components/sessions/ClientChip";
+import { DeleteSessionModal } from "@/components/sessions/DeleteSessionModal";
 
 type Mode = "editor" | "creator";
 
@@ -76,6 +77,7 @@ export function IdleComposer({
   const [stagedFiles, setStagedFiles] = useState<File[]>([]);
   const [starting, setStarting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<ChatSessionListItem | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
@@ -311,9 +313,8 @@ export function IdleComposer({
               const showTitle =
                 mode === "editor" ? Boolean(s.title) : Boolean(s.client_name && s.title);
               return (
-                <button
+                <div
                   key={s.id}
-                  type="button"
                   className="session-item"
                   onClick={() => onResumeHistory(s.id)}
                 >
@@ -326,13 +327,35 @@ export function IdleComposer({
                       {STATUS_LABELS[s.status] ?? s.status}
                     </span>
                     <span className="muted">{relativeTimeEs(s.updated_at)}</span>
+                    <span className="card-actions" onClick={(e) => e.stopPropagation()}>
+                      <button
+                        type="button"
+                        className="icon-btn danger"
+                        title="Eliminar"
+                        aria-label={`Eliminar sesión de ${primary}`}
+                        onClick={() => setDeleteTarget(s)}
+                      >
+                        <IconTrash size={14} />
+                      </button>
+                    </span>
                   </span>
-                </button>
+                </div>
               );
             })}
           </div>
         )}
       </section>
+
+      {deleteTarget && (
+        <DeleteSessionModal
+          session={deleteTarget}
+          onClose={() => setDeleteTarget(null)}
+          onDone={() => {
+            setSessions((prev) => prev.filter((s) => s.id !== deleteTarget.id));
+            setDeleteTarget(null);
+          }}
+        />
+      )}
     </div>
   );
 }

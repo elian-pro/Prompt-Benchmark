@@ -12,6 +12,7 @@
  */
 import { getSupabase } from "../supabase";
 import { getVersion } from "./versions";
+import { deleteUpload } from "./uploads";
 
 export type SessionType = "editor" | "creator";
 export type SessionStatus = "active" | "finalized" | "abandoned";
@@ -226,6 +227,44 @@ export async function abandonSession(sessionId: string): Promise<ChatSession> {
     .single();
   if (error) throw new Error(`No se pudo descartar la sesión: ${error.message}`);
   return data as unknown as ChatSession;
+}
+
+/**
+ * Hard-deletes a session: each attached upload's Storage object is removed
+ * explicitly first (the `uploads` row cascade only drops the DB record, per
+ * the Uploads TTL contract in docs/ARCHITECTURE.md), then the session row
+ * itself, which cascades into `chat_messages`. Safe with respect to the
+ * client's saved Versions — `versions.source_session_id` carries no FK back
+ * to `chat_sessions`.
+ */
+export async function deleteSession(sessionId: string): Promise<void> {
+  const sb = getSupabase();
+  const { data: uploads, error: upErr } = await sb
+    .from("uploads")
+    .select("id")
+    .eq("session_id", sessionId);
+  if (upErr) {
+    throw new Error(`No se pudieron listar los archivos de la sesión: ${upErr.message}`);
+  }
+  for (const upload of (uploads ?? []) as { id: string }[]) {
+    await deleteUpload(upload.id);
+  }
+
+  const { error } = await sb.from("chat_sessions").delete().eq("id", sessionId);
+  if (error) throw new Error(`No se pudo eliminar la sesión: ${error.message}`);
+}
+
+/**
+ * Whether the session's prompt is still exactly as it started: the Editor's
+ * draft never diverged from the base version it was seeded from, or the
+ * Creator's draft was never constructed. Used to silently drop no-op
+ * sessions instead of leaving an empty entry in the history.
+ */
+export async function isSessionUnchanged(session: ChatSession): Promise<boolean> {
+  if (session.type === "creator") return session.current_draft_content === null;
+  if (!session.base_version_id) return session.current_draft_content === null;
+  const base = await getVersion(session.base_version_id);
+  return (base?.content ?? null) === session.current_draft_content;
 }
 
 /**
