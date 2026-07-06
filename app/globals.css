@@ -121,11 +121,14 @@ button {
    (DotGrid sits behind the whole viewport, header included). */
 .app-nav {
   display: flex;
+  align-items: center;
   gap: 22px;
   background: var(--surface);
   border: 0.5px solid var(--border);
   border-radius: 100px;
-  padding: 10px 22px;
+  /* Same vertical padding as .pill-logo so both pills read as the same
+     thickness in the header row. */
+  padding: 8px 22px;
 }
 
 /* Light/dark theme toggle: a sliding switch with sun + moon. The knob sits
@@ -185,7 +188,6 @@ button {
   letter-spacing: 0.15em;
   text-transform: uppercase;
   color: var(--muted);
-  padding-bottom: 4px;
 }
 
 .app-nav a .nav-icon {
@@ -915,14 +917,15 @@ button {
   animation: caret-blink 1s step-end infinite;
 }
 
-/* Header nav: subtle underline + color on hover. */
+/* Header nav: color-only on hover. Enclosed in the pill now, so a bottom
+   border/underline indicator reads oddly against the rounded edge — a plain
+   color shift keeps it clean and also avoids the asymmetric bottom padding
+   that used to throw the pill's vertical centering off. */
 .app-nav a {
-  border-bottom: 1px solid transparent;
-  transition: color 0.15s, border-color 0.15s;
+  transition: color 0.15s;
 }
 .app-nav a:hover {
   color: var(--fg);
-  border-color: var(--accent);
 }
 
 /* Buttons: subtle press feedback. */
