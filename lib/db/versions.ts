@@ -3,8 +3,10 @@
  *
  * Versioning rules (see docs/ARCHITECTURE.md):
  * - version_number is text "vMAJOR.MINOR".
- * - minor bump: vX.Y → vX.(Y+1).
- * - major bump: vX.Y → v(X+1).0, marks this version production (unmarks others).
+ * - minor bump: vX.Y → vX.(Y+1); rolls over to v(X+1).0 at .9.
+ * - major bump: vX.Y → v(X+1).0, marks this version production (unmarks
+ *   others). Kept for the API/old rows; no UI triggers it anymore —
+ *   production promotion is mark-only via promoteToProduction().
  * - imported: uses an explicit version number, marks production + flags the
  *   client as legacy.
  * - Max 5 versions/client enforced by a DB trigger; the 6th insert deletes the

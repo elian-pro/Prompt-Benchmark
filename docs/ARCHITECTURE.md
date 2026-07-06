@@ -116,9 +116,14 @@ adapter type = a new file in `lib/providers/` + new dispatch case.
 - Versions stored in `versions` table, one row per version.
 - `version_number` is a text field formatted `vMAJOR.MINOR`.
 - **Minor bump** (`v3.0 → v3.1`) on every "Finalizar edición". Happens
-  whether the edit was manual or via Editor chat.
-- **Major bump** (`v3.x → v4.0`) on "Promover a producción". Marks the
-  new version with `is_production = true` and unmarks any other.
+  whether the edit was manual or via Editor chat. At `.9` the minor rolls
+  over to the next integer (`v2.9 → v3.0`), so the minor never passes one
+  digit.
+- **"Promover a producción" does not create a version.** It only moves the
+  `is_production` tag to the client's latest version (unmarking any other).
+  The old behavior (a major bump creating `v(X+1).0`) was dropped — the
+  `major` bump type survives in the API/schema for old rows, but no UI
+  triggers it anymore.
 - **Max 5 versions per client** enforced by trigger
   `enforce_version_limit()` in `001_initial.sql`. On the 6th insert, the
   oldest non-production version is deleted automatically.

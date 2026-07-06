@@ -10,7 +10,8 @@ export function parseVersion(v: string): { major: number; minor: number } {
 
 /**
  * Computes the next version number from the latest one.
- * - minor: vX.Y → vX.(Y+1)
+ * - minor: vX.Y → vX.(Y+1); at .9 it rolls over to the next integer
+ *   (v2.9 → v3.0), so the minor part never goes past one digit.
  * - major: vX.Y → v(X+1).0
  * - imported: returns the explicit override (required).
  */
@@ -24,5 +25,6 @@ export function computeNextNumber(
     return override;
   }
   const { major, minor } = parseVersion(latest ?? "v1.0");
-  return bumpType === "major" ? `v${major + 1}.0` : `v${major}.${minor + 1}`;
+  if (bumpType === "major" || minor >= 9) return `v${major + 1}.0`;
+  return `v${major}.${minor + 1}`;
 }

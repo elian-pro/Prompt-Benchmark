@@ -130,13 +130,13 @@ export default function ClientDetailPage() {
     }
   }
 
-  async function createVersion(bumpType: "minor" | "major") {
+  async function createVersion() {
     setBusy(true);
     try {
       const res = await fetch(`/api/clients/${id}/versions`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ content, bumpType, source: "manual" }),
+        body: JSON.stringify({ content, bumpType: "minor", source: "manual" }),
       });
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
@@ -151,6 +151,29 @@ export default function ClientDetailPage() {
       setFinalizeOpen(false);
       setPromoteOpen(false);
       await load();
+    } catch (e) {
+      showToast(e instanceof Error ? e.message : "Error inesperado.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  // Promotion no longer creates a version: it only moves the "Producción" tag
+  // to the client's latest version (the number stays as "Finalizar edición"
+  // left it).
+  async function promoteLatest() {
+    const latest = detail?.versions[0];
+    if (!latest) return;
+    setBusy(true);
+    try {
+      const res = await fetch(`/api/versions/${latest.id}/promote`, { method: "POST" });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.error ?? "No se pudo promover la versión.");
+      }
+      setPromoteOpen(false);
+      await load();
+      showToast(`${latest.version_number} marcada como producción.`);
     } catch (e) {
       showToast(e instanceof Error ? e.message : "Error inesperado.");
     } finally {
@@ -235,9 +258,9 @@ export default function ClientDetailPage() {
   if (error) return <p className="form-error">{error}</p>;
   if (!detail) return <p className="empty-hint">Cliente no encontrado.</p>;
 
-  const latestNumber = detail.versions[0]?.version_number ?? "v1.0";
+  const latestVersion = detail.versions[0] ?? null;
+  const latestNumber = latestVersion?.version_number ?? "v1.0";
   const nextMinor = computeNextNumber(latestNumber, "minor");
-  const nextMajor = computeNextNumber(latestNumber, "major");
   const prodLabel = detail.production_version?.version_number ?? "sin producción";
 
   return (
@@ -387,7 +410,16 @@ export default function ClientDetailPage() {
             <Button variant="primary" onClick={() => setFinalizeOpen(true)}>
               Finalizar edición
             </Button>
-            <Button variant="secondary" onClick={() => setPromoteOpen(true)}>
+            <Button
+              variant="secondary"
+              onClick={() => setPromoteOpen(true)}
+              disabled={!latestVersion || latestVersion.is_production}
+              title={
+                latestVersion?.is_production
+                  ? `${latestNumber} ya es la versión de producción.`
+                  : undefined
+              }
+            >
               Promover a producción
             </Button>
           </div>
@@ -403,7 +435,7 @@ export default function ClientDetailPage() {
             <Button variant="ghost" onClick={() => setFinalizeOpen(false)} disabled={busy}>
               Cancelar
             </Button>
-            <Button variant="primary" onClick={() => createVersion("minor")} disabled={busy}>
+            <Button variant="primary" onClick={createVersion} disabled={busy}>
               {busy ? "Creando…" : `Crear ${nextMinor}`}
             </Button>
           </>
@@ -417,21 +449,24 @@ export default function ClientDetailPage() {
       <Modal
         open={promoteOpen}
         onClose={() => !busy && setPromoteOpen(false)}
-        title={`¿Promover a producción como ${nextMajor}?`}
+        title={`¿Marcar ${latestNumber} como producción?`}
         footer={
           <>
             <Button variant="ghost" onClick={() => setPromoteOpen(false)} disabled={busy}>
               Cancelar
             </Button>
-            <Button variant="primary" onClick={() => createVersion("major")} disabled={busy}>
-              {busy ? "Promoviendo…" : `Promover ${nextMajor}`}
+            <Button variant="primary" onClick={promoteLatest} disabled={busy}>
+              {busy ? "Promoviendo…" : `Promover ${latestNumber}`}
             </Button>
           </>
         }
       >
         <p className="modal-body">
-          Se creará la versión mayor {nextMajor} y se marcará como la versión de
-          producción del cliente.
+          {latestNumber} recibirá la etiqueta de producción
+          {detail.production_version
+            ? ` (hoy la tiene ${prodLabel})`
+            : ""}
+          . El número de versión no cambia.
         </p>
       </Modal>
 

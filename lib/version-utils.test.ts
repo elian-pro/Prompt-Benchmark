@@ -20,6 +20,11 @@ test("minor bump increments the minor part", () => {
   assert.equal(computeNextNumber("v2.5", "minor"), "v2.6");
 });
 
+test("minor bump rolls over to the next integer at .9", () => {
+  assert.equal(computeNextNumber("v2.9", "minor"), "v3.0");
+  assert.equal(computeNextNumber("v1.9", "minor"), "v2.0");
+});
+
 test("major bump increments major and resets minor", () => {
   assert.equal(computeNextNumber("v2.5", "major"), "v3.0");
   assert.equal(computeNextNumber("v1.9", "major"), "v2.0");
