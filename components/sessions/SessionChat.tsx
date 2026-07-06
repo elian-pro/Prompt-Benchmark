@@ -5,10 +5,12 @@ import {
   IconArrowLeft,
   IconCopy,
   IconFileText,
+  IconPaperclip,
   IconSend,
   IconX,
 } from "@tabler/icons-react";
 import type { ChatSessionDetail, Attachment } from "@/lib/db/chat-sessions";
+import { isAcceptedFile, uploadAttachment } from "@/lib/attachments";
 import { relativeTimeEs } from "@/lib/format";
 import { Button } from "@/components/ui/Button";
 import { ChatMessage } from "@/components/editor/ChatMessage";
@@ -99,6 +101,7 @@ export function SessionChat({
   const [sending, setSending] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
   const [draftOpen, setDraftOpen] = useState(false);
+  const [dragging, setDragging] = useState(false);
 
   const scrollRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -257,6 +260,25 @@ export function SessionChat({
     onBack();
   }
 
+  // Drop files onto the composer: upload immediately and attach to the next
+  // message (the in-conversation counterpart to the "Adjuntar" button).
+  async function onDropFiles(files: File[]) {
+    if (sending) return;
+    const accepted = files.filter(isAcceptedFile);
+    if (accepted.length < files.length) {
+      showToast("Algunos archivos no son compatibles (usa texto, PDF o imagen).");
+    }
+    const added: Attachment[] = [];
+    for (const file of accepted) {
+      try {
+        added.push(await uploadAttachment(sessionId, file));
+      } catch (e) {
+        showToast(e instanceof Error ? e.message : "No se pudo subir el archivo.");
+      }
+    }
+    if (added.length > 0) setAttachments((prev) => [...prev, ...added]);
+  }
+
   async function copyDraft() {
     const text = session?.current_draft_content;
     if (!text) {
@@ -359,7 +381,24 @@ export function SessionChat({
       </div>
 
       <div className="chat-composer-zone">
-        <div className="idle-composer chat-composer">
+        <div
+          className={`idle-composer chat-composer${dragging ? " composer-dragging" : ""}`}
+          onDragOver={(e) => {
+            if (isAbandoned) return;
+            e.preventDefault();
+            if (!sending) setDragging(true);
+          }}
+          onDragLeave={(e) => {
+            if (!e.currentTarget.contains(e.relatedTarget as Node)) setDragging(false);
+          }}
+          onDrop={(e) => {
+            if (isAbandoned) return;
+            e.preventDefault();
+            setDragging(false);
+            const files = Array.from(e.dataTransfer.files);
+            if (files.length > 0) onDropFiles(files);
+          }}
+        >
           {!isAbandoned && (
             <FileUpload
               sessionId={sessionId}
@@ -397,6 +436,13 @@ export function SessionChat({
               <IconSend size={14} />
             </button>
           </div>
+
+          {dragging && (
+            <div className="composer-drop-hint">
+              <IconPaperclip size={16} />
+              Suelta para adjuntar
+            </div>
+          )}
         </div>
       </div>
 

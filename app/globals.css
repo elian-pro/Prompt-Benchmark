@@ -2312,12 +2312,36 @@ body[data-theme="light"] .dot-grid::after {
    Code); sending is the only "confirm" step, and it swaps this view for
    SessionChat in place — no navigation. */
 .idle-composer {
+  position: relative;
   width: 100%;
   max-width: 680px;
   background: var(--surface);
   border: 0.5px solid var(--border2);
   border-radius: 18px;
   padding: 12px 14px 10px;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+/* Drag-and-drop: highlight the whole composer card and show a drop hint. */
+.idle-composer.composer-dragging {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 22%, transparent);
+}
+.composer-drop-hint {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  border-radius: 18px;
+  background: color-mix(in srgb, var(--surface) 82%, transparent);
+  color: var(--fg);
+  font-size: 13px;
+  font-weight: 500;
+  pointer-events: none;
+}
+.composer-drop-hint svg {
+  color: var(--accent);
 }
 .idle-composer-toprow {
   display: flex;

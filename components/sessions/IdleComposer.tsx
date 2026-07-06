@@ -9,6 +9,7 @@ import { getGreeting, TEAM_NAME } from "@/lib/greeting";
 import { SkeletonRows } from "@/components/ui/Skeleton";
 import { ClientChip, type ClientChipValue } from "@/components/sessions/ClientChip";
 import { DeleteSessionModal } from "@/components/sessions/DeleteSessionModal";
+import { ATTACHMENT_ACCEPT, isAcceptedFile, uploadAttachment } from "@/lib/attachments";
 
 type Mode = "editor" | "creator";
 
@@ -38,9 +39,6 @@ const PLACEHOLDER: Record<Mode, string> = {
   editor: "Describe el cambio que quieres hacer al prompt…",
   creator: "Describe el proyecto o pega el brief…",
 };
-
-const ACCEPT =
-  ".txt,.md,.markdown,.pdf,.png,.jpg,.jpeg,.webp,.gif,text/plain,text/markdown,application/pdf,image/*";
 
 type FirstMessage = { content: string; attachments: Attachment[] };
 
@@ -78,6 +76,7 @@ export function IdleComposer({
   const [starting, setStarting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<ChatSessionListItem | null>(null);
+  const [dragging, setDragging] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
@@ -106,10 +105,25 @@ export function IdleComposer({
   const canStart = mode === "editor" ? clientValue?.kind === "client" : clientValue !== null;
   const canSend = canStart && text.trim().length > 0 && !starting;
 
+  function stageFiles(files: File[]) {
+    const accepted = files.filter(isAcceptedFile);
+    if (accepted.length < files.length) {
+      setError("Algunos archivos no son compatibles (usa texto, PDF o imagen).");
+    }
+    if (accepted.length > 0) setStagedFiles((prev) => [...prev, ...accepted]);
+  }
   function onFilesPicked(e: React.ChangeEvent<HTMLInputElement>) {
     const files = Array.from(e.target.files ?? []);
     if (e.target) e.target.value = "";
-    if (files.length > 0) setStagedFiles((prev) => [...prev, ...files]);
+    if (files.length > 0) stageFiles(files);
+  }
+  // Drop files anywhere on the composer card — staged like the "Adjuntar" button.
+  function onDrop(e: React.DragEvent) {
+    e.preventDefault();
+    setDragging(false);
+    if (starting) return;
+    const files = Array.from(e.dataTransfer.files);
+    if (files.length > 0) stageFiles(files);
   }
   function removeStaged(file: File) {
     setStagedFiles((prev) => prev.filter((f) => f !== file));
@@ -160,15 +174,7 @@ export function IdleComposer({
       const attachments: Attachment[] = [];
       for (const file of stagedFiles) {
         try {
-          const form = new FormData();
-          form.append("sessionId", sessionId);
-          form.append("file", file);
-          const upRes = await fetch("/api/uploads", { method: "POST", body: form });
-          if (!upRes.ok) {
-            throw new Error((await upRes.json()).error ?? "No se pudo subir el archivo.");
-          }
-          const up = await upRes.json();
-          attachments.push({ uploadId: up.id, filename: up.filename, mimeType: up.mime_type });
+          attachments.push(await uploadAttachment(sessionId, file));
         } catch (e) {
           setError(e instanceof Error ? e.message : "No se pudo subir un archivo.");
         }
@@ -201,7 +207,17 @@ export function IdleComposer({
             : " "}
         </h1>
 
-        <div className="idle-composer">
+        <div
+          className={`idle-composer${dragging ? " composer-dragging" : ""}`}
+          onDragOver={(e) => {
+            e.preventDefault();
+            if (!starting) setDragging(true);
+          }}
+          onDragLeave={(e) => {
+            if (!e.currentTarget.contains(e.relatedTarget as Node)) setDragging(false);
+          }}
+          onDrop={onDrop}
+        >
           <div className="idle-composer-toprow">
             <ClientChip mode={mode} value={clientValue} onChange={setClientValue} />
             <button
@@ -216,7 +232,7 @@ export function IdleComposer({
               ref={fileInputRef}
               type="file"
               multiple
-              accept={ACCEPT}
+              accept={ATTACHMENT_ACCEPT}
               className="visually-hidden"
               onChange={onFilesPicked}
             />
@@ -271,6 +287,13 @@ export function IdleComposer({
               <IconSend size={14} />
             </button>
           </div>
+
+          {dragging && (
+            <div className="composer-drop-hint">
+              <IconPaperclip size={16} />
+              Suelta para adjuntar
+            </div>
+          )}
         </div>
 
         {error && (
