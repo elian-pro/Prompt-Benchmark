@@ -2044,15 +2044,22 @@ body[data-theme="light"] .dot-grid::after {
   }
 }
 .landing-hero {
-  /* Center the hero in the viewport below the header (~header + shell padding
-     ≈ 200px). History flows underneath, just past the fold. */
+  /* Anchor the greeting near the page's vertical center on its own — NOT by
+     centering the whole hero block as a unit. Centering the full block (old
+     approach) means its height grows with whatever sits below the greeting,
+     which pushes the greeting itself further *up* and away from center as
+     the composer/chips grow. A fixed top offset keeps the greeting as the
+     page's focal point regardless of how much follows it; the "50px" min
+     covers short viewports where the calc() would otherwise go negative.
+     ~200px above accounts for the header + shell padding, matching the
+     min-height below. */
   min-height: calc(100vh - 200px);
   display: flex;
   flex-direction: column;
   align-items: center;
-  justify-content: center;
   text-align: center;
-  gap: 24px;
+  padding-top: max(50px, calc(50vh - 200px));
+  gap: 20px;
 }
 .landing-greeting {
   font-size: 34px;
@@ -2060,7 +2067,7 @@ body[data-theme="light"] .dot-grid::after {
   letter-spacing: -0.02em;
   line-height: 1.15;
   min-height: 40px; /* reserve height until the greeting is computed */
-  margin: 0;
+  margin: 0 0 26px; /* extra room before the composer, beyond the hero's own gap */
 }
 .greeting-team {
   color: var(--accent);
@@ -2071,7 +2078,7 @@ body[data-theme="light"] .dot-grid::after {
   flex-wrap: wrap;
   justify-content: center;
   gap: 8px;
-  max-width: 640px;
+  max-width: 680px;
 }
 .inspiration-chip {
   display: inline-flex;
@@ -2101,7 +2108,7 @@ body[data-theme="light"] .dot-grid::after {
    SessionChat in place — no navigation. */
 .idle-composer {
   width: 100%;
-  max-width: 560px;
+  max-width: 680px;
   background: var(--surface);
   border: 0.5px solid var(--border2);
   border-radius: 18px;
@@ -2321,5 +2328,6 @@ body[data-theme="light"] .dot-grid::after {
   }
   .landing-hero {
     min-height: calc(100vh - 240px);
+    padding-top: max(36px, calc(50vh - 240px));
   }
 }
