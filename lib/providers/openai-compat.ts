@@ -54,7 +54,8 @@ export async function chat(req: ChatRequest, ctx: AdapterContext): Promise<ChatR
   // TODO: some openai-compat backends omit usage; we report 0 in that case.
   const tokensIn: number = data.usage?.prompt_tokens ?? 0;
   const tokensOut: number = data.usage?.completion_tokens ?? 0;
-  return { content, tokensIn, tokensOut };
+  const truncated = data.choices?.[0]?.finish_reason === "length";
+  return { content, tokensIn, tokensOut, truncated };
 }
 
 export async function* streamChat(
@@ -76,6 +77,7 @@ export async function* streamChat(
   // 0 otherwise (some openai-compat backends omit usage entirely).
   let tokensIn = 0;
   let tokensOut = 0;
+  let finishReason: string | null = null;
   let done = false;
   while (!done) {
     const { done: streamDone, value } = await reader.read();
@@ -95,6 +97,9 @@ export async function* streamChat(
         const json = JSON.parse(payload);
         const delta: string | undefined = json.choices?.[0]?.delta?.content;
         if (delta) yield { type: "text", text: delta };
+        if (json.choices?.[0]?.finish_reason) {
+          finishReason = json.choices[0].finish_reason;
+        }
         if (json.usage) {
           tokensIn = json.usage.prompt_tokens ?? tokensIn;
           tokensOut = json.usage.completion_tokens ?? tokensOut;
@@ -104,5 +109,5 @@ export async function* streamChat(
       }
     }
   }
-  yield { type: "usage", tokensIn, tokensOut };
+  yield { type: "usage", tokensIn, tokensOut, truncated: finishReason === "length" };
 }

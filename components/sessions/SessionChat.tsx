@@ -166,9 +166,9 @@ export function SessionChat({
     return null;
   }, [mode, session?.messages]);
 
-  function showToast(message: string) {
+  function showToast(message: string, durationMs = 2500) {
     setToast(message);
-    window.setTimeout(() => setToast(null), 2500);
+    window.setTimeout(() => setToast(null), durationMs);
   }
 
   function onInputChange(e: React.ChangeEvent<HTMLTextAreaElement>) {
@@ -208,17 +208,46 @@ export function SessionChat({
           const data = await res.json().catch(() => ({}));
           throw new Error(data.error ?? "No se pudo enviar el mensaje.");
         }
+        // NDJSON stream: {type:"text", text} deltas, then one final
+        // {type:"done", truncated, draftBroken} — see the route's docstring.
         const reader = res.body.getReader();
         const decoder = new TextDecoder();
         let acc = "";
+        let buffer = "";
+        let truncated = false;
+        let draftBroken = false;
         for (;;) {
           const { done, value } = await reader.read();
           if (done) break;
-          acc += decoder.decode(value, { stream: true });
-          setStreamingText(acc);
+          buffer += decoder.decode(value, { stream: true });
+          const lines = buffer.split("\n");
+          buffer = lines.pop() ?? "";
+          for (const line of lines) {
+            if (!line.trim()) continue;
+            const evt = JSON.parse(line);
+            if (evt.type === "text") {
+              acc += evt.text;
+              setStreamingText(acc);
+            } else if (evt.type === "done") {
+              truncated = evt.truncated;
+              draftBroken = evt.draftBroken;
+            }
+          }
         }
         // Re-sync from the server: canonical messages, token usage, updated draft.
         await load();
+
+        if (draftBroken) {
+          showToast(
+            "La respuesta se cortó antes de terminar el prompt: el borrador NO se actualizó. Sube «Máx tokens» en Configuración → Asignación de roles y vuelve a intentarlo.",
+            7000,
+          );
+        } else if (truncated) {
+          showToast(
+            "La respuesta se cortó por el límite de tokens. Si falta contenido, sube «Máx tokens» en Configuración.",
+            6000,
+          );
+        }
       } catch (e) {
         if (!explicit) {
           setInput(content);

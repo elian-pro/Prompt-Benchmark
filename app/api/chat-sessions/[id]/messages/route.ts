@@ -10,7 +10,11 @@ import { downloadUploadBytes } from "@/lib/db/uploads";
 import { getVersion } from "@/lib/db/versions";
 import { appendMessageSchema } from "@/lib/schemas/chat-sessions";
 import type { Attachment } from "@/lib/db/chat-sessions";
-import { buildEditorSystemPrompt, extractPromptFromReply } from "@/lib/prompts/editor-persona";
+import {
+  buildEditorSystemPrompt,
+  extractPromptFromReply,
+  hasUnclosedFence,
+} from "@/lib/prompts/editor-persona";
 import { buildCreatorSystemPrompt } from "@/lib/prompts/creator-persona";
 import { streamChat, type ChatMessage, type MessageAttachment } from "@/lib/providers";
 import { handleError, jsonError } from "@/lib/http";
@@ -60,9 +64,21 @@ async function loadAttachmentsForModel(
 }
 
 /**
- * Sends a user message and streams Opus's reply (text/plain). On stream close,
- * persists the assistant message with token usage and, if the reply contained a
- * fenced prompt block, updates the session's working draft.
+ * Sends a user message and streams Opus's reply as NDJSON events:
+ *   {type:"text", text} — incremental content, same as the raw reply text.
+ *   {type:"done", truncated, draftBroken} — sent once at the end.
+ * On stream close, persists the assistant message with token usage and, if
+ * the reply contained a closed fenced prompt block, updates the session's
+ * working draft.
+ *
+ * `truncated` reports the provider stopped because it hit the max_tokens
+ * ceiling (the reply may be an incomplete fragment) — this can happen even
+ * when the draft extracted fine (e.g. the trailing "CAMBIOS REALIZADOS"
+ * summary got cut). `draftBroken` specifically means a fenced block was
+ * opened but never closed, so extraction failed and the draft was NOT
+ * updated even though the model clearly intended to emit one — this is
+ * never true for legitimate no-draft replies (e.g. a clarifying question),
+ * only for the actually-cut-off case. The client surfaces both distinctly.
  *
  * Editor and Creator share this endpoint, branching on `session.type`: the
  * Editor edits the seeded draft (role `editor`); the Creator builds a new
@@ -126,9 +142,13 @@ export async function POST(req: NextRequest, { params }: Params) {
     const encoder = new TextEncoder();
     const stream = new ReadableStream<Uint8Array>({
       async start(controller) {
+        const send = (evt: Record<string, unknown>) =>
+          controller.enqueue(encoder.encode(JSON.stringify(evt) + "\n"));
+
         let fullText = "";
         let tokensIn = 0;
         let tokensOut = 0;
+        let truncated = false;
         try {
           for await (const chunk of streamChat({
             providerId: role.provider_id,
@@ -141,10 +161,11 @@ export async function POST(req: NextRequest, { params }: Params) {
           })) {
             if (chunk.type === "text") {
               fullText += chunk.text;
-              controller.enqueue(encoder.encode(chunk.text));
+              send({ type: "text", text: chunk.text });
             } else {
               tokensIn = chunk.tokensIn;
               tokensOut = chunk.tokensOut;
+              truncated = chunk.truncated;
             }
           }
 
@@ -155,9 +176,11 @@ export async function POST(req: NextRequest, { params }: Params) {
             tokensIn,
             tokensOut,
           });
-          const newDraft = extractPromptFromReply(fullText);
+          const draftBroken = hasUnclosedFence(fullText);
+          const newDraft = draftBroken ? null : extractPromptFromReply(fullText);
           if (newDraft) await updateDraft(id, newDraft);
 
+          send({ type: "done", truncated, draftBroken });
           controller.close();
         } catch (err) {
           controller.error(err);
@@ -167,7 +190,7 @@ export async function POST(req: NextRequest, { params }: Params) {
 
     return new Response(stream, {
       headers: {
-        "Content-Type": "text/plain; charset=utf-8",
+        "Content-Type": "application/x-ndjson; charset=utf-8",
         "Cache-Control": "no-store",
       },
     });

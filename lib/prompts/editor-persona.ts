@@ -88,3 +88,19 @@ export function extractPromptFromReply(reply: string): string | null {
   const extracted = match[1].trim();
   return extracted.length > 0 ? extracted : null;
 }
+
+/**
+ * Whether the reply opened a fenced block that never closed — a strong
+ * signal the response was cut off mid-generation (hit max_tokens, dropped
+ * connection) rather than the assistant simply choosing not to include a
+ * prompt block. extractPromptFromReply already returns null in both cases;
+ * this distinguishes "nothing to extract" (fine — a clarifying question)
+ * from "extraction failed because the draft got cut" (needs a warning).
+ * Heuristic: counts ``` occurrences — an odd count means one never closed.
+ * False positives would require literal ``` inside the assistant's own
+ * prose, which the persona's output contract never produces.
+ */
+export function hasUnclosedFence(reply: string): boolean {
+  const matches = reply.match(/```/g);
+  return (matches?.length ?? 0) % 2 === 1;
+}

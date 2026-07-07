@@ -1444,6 +1444,12 @@ button {
   border-radius: 100px;
   font-size: 12px;
   z-index: 60;
+  /* Most toasts are a short phrase, but truncation warnings run longer —
+     wrap instead of stretching into an ever-wider single-line pill. */
+  max-width: min(480px, calc(100vw - 48px));
+  white-space: normal;
+  line-height: 1.5;
+  text-align: center;
 }
 
 /* Two-step delete modal extras */
