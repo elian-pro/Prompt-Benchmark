@@ -131,6 +131,13 @@ adapter type = a new file in `lib/providers/` + new dispatch case.
   index `unique_production_per_client`.
 - When a version is created from a chat session, `source_session_id`
   links back to that session so the chat history can be reopened later.
+- **`change_summary`** (migration 007, nullable) stores the Editor's
+  natural-language "CAMBIOS REALIZADOS" — the prose after the fenced block,
+  captured at finalize via `extractChangeSummary()` (strips bold and the
+  boilerplate "SIN CAMBIOS" tail). The Library detail page shows it per
+  version. Only Editor-chat versions have one; manual edits, imports, and
+  Creator's first version are null (the UI shows "Primera versión" for the
+  oldest, a neutral placeholder otherwise).
 - **The prompt's own text is kept in sync with its version number.**
   `syncVersionLine()` (`lib/version-utils.ts`) deterministically rewrites a
   dedicated `"Versión: X.Y"` declaration line inside `content` to match the

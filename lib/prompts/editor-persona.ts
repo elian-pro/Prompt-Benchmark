@@ -104,3 +104,20 @@ export function hasUnclosedFence(reply: string): boolean {
   const matches = reply.match(/```/g);
   return (matches?.length ?? 0) % 2 === 1;
 }
+
+/**
+ * Extracts the change summary from an assistant reply — the prose the persona
+ * writes AFTER the fenced prompt block (its "CAMBIOS REALIZADOS" report). Used
+ * when finalizing an Editor session to persist, per version, what changed.
+ * Strips `**bold**` markers so the stored text renders cleanly, and drops the
+ * boilerplate "SIN CAMBIOS" confirmation (it carries no changelog signal).
+ * Returns null when there's nothing meaningful after the block.
+ */
+export function extractChangeSummary(reply: string): string | null {
+  const withoutBlock = reply.replace(/```[^\n]*\n[\s\S]*?```/, "").trim();
+  if (!withoutBlock) return null;
+  // Cut the trailing "SIN CAMBIOS ..." confirmation, keeping only real changes.
+  const trimmed = withoutBlock.replace(/\n*\**\s*SIN CAMBIOS[\s\S]*$/i, "").trim();
+  const cleaned = (trimmed || withoutBlock).replace(/\*\*/g, "").trim();
+  return cleaned.length > 0 ? cleaned : null;
+}

@@ -408,53 +408,67 @@ export default function ClientDetailPage() {
               </div>
             </div>
 
-            {detail.versions.map((v) => (
-              <div
-                key={v.id}
-                role="button"
-                tabIndex={0}
-                className={`version-item version-item-btn${v.is_production ? " is-prod" : ""}${selectedVersionId === v.id ? " is-active" : ""}`}
-                onClick={() => setSelectedVersionId(v.id)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter" || e.key === " ") {
-                    e.preventDefault();
-                    setSelectedVersionId(v.id);
-                  }
-                }}
-              >
-                <span className="vnum">
-                  {v.version_number}
-                  <span className="vnum-tags">
-                    {isNewVersion(v.bump_type, v.created_at) && (
-                      <Badge variant="new-version">Nueva versión</Badge>
+            {detail.versions.map((v, i) => {
+              // Versions are newest-first, so the last entry is the original.
+              const isFirstVersion = i === detail.versions.length - 1;
+              return (
+                <div
+                  key={v.id}
+                  role="button"
+                  tabIndex={0}
+                  className={`version-item version-item-btn${v.is_production ? " is-prod" : ""}${selectedVersionId === v.id ? " is-active" : ""}`}
+                  onClick={() => setSelectedVersionId(v.id)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" || e.key === " ") {
+                      e.preventDefault();
+                      setSelectedVersionId(v.id);
+                    }
+                  }}
+                >
+                  <span className="vnum">
+                    {v.version_number}
+                    <span className="vnum-tags">
+                      {isNewVersion(v.bump_type, v.created_at) && (
+                        <Badge variant="new-version">Nueva versión</Badge>
+                      )}
+                      {v.is_production && <span className="prod-tag">Prod</span>}
+                    </span>
+                  </span>
+                  <div className="vfoot">
+                    <span className="vmeta">
+                      {SOURCE_LABELS[v.source ?? ""] ?? "—"} ·{" "}
+                      {new Date(v.created_at).toLocaleDateString("es-MX", {
+                        day: "2-digit",
+                        month: "short",
+                      })}
+                    </span>
+                    {!v.is_production && detail.versions.length > 1 && (
+                      <button
+                        className="icon-btn danger"
+                        title="Eliminar versión"
+                        aria-label={`Eliminar versión ${v.version_number}`}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setDeleteTarget(v);
+                        }}
+                      >
+                        <IconTrash size={14} />
+                      </button>
                     )}
-                    {v.is_production && <span className="prod-tag">Prod</span>}
-                  </span>
-                </span>
-                <div className="vfoot">
-                  <span className="vmeta">
-                    {SOURCE_LABELS[v.source ?? ""] ?? "—"} ·{" "}
-                    {new Date(v.created_at).toLocaleDateString("es-MX", {
-                      day: "2-digit",
-                      month: "short",
-                    })}
-                  </span>
-                  {!v.is_production && detail.versions.length > 1 && (
-                    <button
-                      className="icon-btn danger"
-                      title="Eliminar versión"
-                      aria-label={`Eliminar versión ${v.version_number}`}
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setDeleteTarget(v);
-                      }}
-                    >
-                      <IconTrash size={14} />
-                    </button>
+                  </div>
+
+                  {isFirstVersion ? (
+                    <p className="version-changes is-first">Primera versión</p>
+                  ) : v.change_summary ? (
+                    <pre className="version-changes">{v.change_summary}</pre>
+                  ) : (
+                    <p className="version-changes is-empty">
+                      Sin resumen de cambios
+                    </p>
                   )}
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </aside>
 

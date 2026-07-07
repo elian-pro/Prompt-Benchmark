@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getSession, finalizeSession } from "@/lib/db/chat-sessions";
 import { createVersion } from "@/lib/db/versions";
 import { createClient } from "@/lib/db/clients";
+import { extractChangeSummary } from "@/lib/prompts/editor-persona";
 import { finalizeCreatorSchema } from "@/lib/schemas/chat-sessions";
 import { handleError, jsonError } from "@/lib/http";
 
@@ -48,10 +49,21 @@ export async function POST(req: NextRequest, { params }: Params) {
     if (!session.client_id) {
       return jsonError("La sesión no tiene un cliente asociado.", 409);
     }
+    // The summary belongs to the assistant turn that produced this draft — the
+    // most recent one carrying a prompt block (later turns may be plain Q&A).
+    let changeSummary: string | null = null;
+    for (let i = session.messages.length - 1; i >= 0; i--) {
+      const m = session.messages[i];
+      if (m.role === "assistant" && /```[^\n]*\n[\s\S]*?```/.test(m.content)) {
+        changeSummary = extractChangeSummary(m.content);
+        break;
+      }
+    }
     const version = await createVersion(session.client_id, draft, {
       bumpType: "minor",
       source: "editor_chat",
       sourceSessionId: id,
+      changeSummary,
     });
     const finalized = await finalizeSession(id, version.id);
     return NextResponse.json({ session: finalized, version });

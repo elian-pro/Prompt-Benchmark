@@ -26,6 +26,9 @@ export type VersionSummary = {
   bump_type: BumpType | null;
   source: VersionSource | null;
   source_session_id: string | null;
+  /** Editor's "CAMBIOS REALIZADOS" prose, when this version came from an
+   *  Editor chat; null for manual edits, imports, and first versions. */
+  change_summary: string | null;
   created_at: string;
 };
 
@@ -33,7 +36,7 @@ export type VersionListItem = VersionSummary & { content?: string };
 export type Version = VersionSummary & { content: string };
 
 const SUMMARY_COLS =
-  "id, client_id, version_number, is_production, bump_type, source, source_session_id, created_at";
+  "id, client_id, version_number, is_production, bump_type, source, source_session_id, change_summary, created_at";
 
 export async function listVersions(
   clientId: string,
@@ -92,10 +95,11 @@ export async function createVersion(
     source: VersionSource;
     sourceSessionId?: string | null;
     versionNumberOverride?: string;
+    changeSummary?: string | null;
   },
 ): Promise<Version> {
   const sb = getSupabase();
-  const { bumpType, source, sourceSessionId, versionNumberOverride } = options;
+  const { bumpType, source, sourceSessionId, versionNumberOverride, changeSummary } = options;
 
   const latest = await latestVersionNumber(clientId);
   const versionNumber = computeNextNumber(latest, bumpType, versionNumberOverride);
@@ -119,6 +123,7 @@ export async function createVersion(
       bump_type: bumpType,
       source,
       source_session_id: sourceSessionId ?? null,
+      change_summary: changeSummary ?? null,
     })
     .select(`${SUMMARY_COLS}, content`)
     .single();
