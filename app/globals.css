@@ -390,6 +390,13 @@ button {
   text-transform: uppercase;
   color: var(--muted);
 }
+/* "(opcional)" tag inside a field label — lowercase, dimmer, not tracked. */
+.field-optional {
+  text-transform: none;
+  letter-spacing: normal;
+  color: var(--faint);
+  font-weight: 400;
+}
 /* The exact phrase to type in a danger confirm — shown verbatim (real case),
    not uppercased, so it matches the case-sensitive check. */
 .confirm-phrase {

@@ -18,6 +18,9 @@ export const createVersionSchema = z
       .string()
       .regex(/^v\d+\.\d+$/, "version_number debe tener formato vX.Y")
       .optional(),
+    // Optional user-written "what changed" for manual saves — shown per
+    // version in the Library. Empty/whitespace is treated as none.
+    changeSummary: z.string().max(4000, "El resumen es demasiado largo.").optional(),
   })
   .refine((v) => v.bumpType !== "imported" || Boolean(v.versionNumberOverride), {
     message: "Una versión importada requiere version_number (vX.Y).",

@@ -37,6 +37,8 @@ export default function ClientDetailPage() {
   const [autosavedAt, setAutosavedAt] = useState<Date | null>(null);
   const [toast, setToast] = useState<string | null>(null);
   const [finalizeOpen, setFinalizeOpen] = useState(false);
+  // What-changed note the user writes when finalizing a manual edit (optional).
+  const [changeSummaryInput, setChangeSummaryInput] = useState("");
   const [promoteOpen, setPromoteOpen] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<VersionListItem | null>(null);
   const [busy, setBusy] = useState(false);
@@ -162,7 +164,12 @@ export default function ClientDetailPage() {
       const res = await fetch(`/api/clients/${id}/versions`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ content, bumpType: "minor", source: "manual" }),
+        body: JSON.stringify({
+          content,
+          bumpType: "minor",
+          source: "manual",
+          changeSummary: changeSummaryInput.trim() || undefined,
+        }),
       });
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
@@ -176,6 +183,7 @@ export default function ClientDetailPage() {
       });
       setFinalizeOpen(false);
       setPromoteOpen(false);
+      setChangeSummaryInput("");
       await load();
     } catch (e) {
       showToast(e instanceof Error ? e.message : "Error inesperado.");
@@ -545,11 +553,22 @@ export default function ClientDetailPage() {
 
       <Modal
         open={finalizeOpen}
-        onClose={() => !busy && setFinalizeOpen(false)}
+        onClose={() => {
+          if (busy) return;
+          setFinalizeOpen(false);
+          setChangeSummaryInput("");
+        }}
         title={`¿Crear nueva versión ${nextMinor}?`}
         footer={
           <>
-            <Button variant="ghost" onClick={() => setFinalizeOpen(false)} disabled={busy}>
+            <Button
+              variant="ghost"
+              onClick={() => {
+                setFinalizeOpen(false);
+                setChangeSummaryInput("");
+              }}
+              disabled={busy}
+            >
               Cancelar
             </Button>
             <Button variant="primary" onClick={createVersion} disabled={busy}>
@@ -559,8 +578,26 @@ export default function ClientDetailPage() {
         }
       >
         <p className="modal-body">
-          Se guardará el draft actual como una nueva versión menor {nextMinor}.
+          Se guardará el borrador actual como una nueva versión menor {nextMinor}.
         </p>
+        <div className="field" style={{ marginTop: 4 }}>
+          <label className="field-label">
+            ¿Qué cambios hiciste? <span className="field-optional">(opcional)</span>
+          </label>
+          <textarea
+            className="textarea"
+            value={changeSummaryInput}
+            onChange={(e) => setChangeSummaryInput(e.target.value)}
+            rows={4}
+            placeholder={
+              "Ej:\n- Actualicé el precio mínimo a $15,000\n- Agregué la objeción sobre tiempos de entrega"
+            }
+          />
+          <p className="field-hint">
+            Aparecerá bajo esta versión en la Biblioteca, para saber en qué se
+            diferencia de la anterior.
+          </p>
+        </div>
       </Modal>
 
       <Modal
