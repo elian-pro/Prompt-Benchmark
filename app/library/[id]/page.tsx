@@ -30,6 +30,10 @@ export default function ClientDetailPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [content, setContent] = useState("");
+  // Which version is being viewed on the right. `null` = the editable draft
+  // (the manual editing surface, seeded from production). A version id = a
+  // read-only view of that snapshot.
+  const [selectedVersionId, setSelectedVersionId] = useState<string | null>(null);
   const [autosavedAt, setAutosavedAt] = useState<Date | null>(null);
   const [toast, setToast] = useState<string | null>(null);
   const [finalizeOpen, setFinalizeOpen] = useState(false);
@@ -56,6 +60,12 @@ export default function ClientDetailPage() {
       setDetail(data);
       hasEdited.current = false;
       setContent(data.draft_content ?? data.production_version?.content ?? "");
+      // Default view: the draft editor if there's work in progress, otherwise
+      // the latest version (read-only) — so opening a client shows its newest
+      // prompt, not production, and every version is one click away.
+      setSelectedVersionId(
+        data.draft_content?.trim() ? null : (data.versions[0]?.id ?? null),
+      );
       setAutosavedAt(null);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Error al cargar el cliente.");
@@ -105,9 +115,25 @@ export default function ClientDetailPage() {
     }
   }
 
-  async function openEditorSession() {
+  async function copyVersion(v: VersionListItem) {
+    if (!v.content?.trim()) {
+      showToast("Esta versión no tiene contenido.");
+      return;
+    }
+    try {
+      await navigator.clipboard.writeText(v.content);
+      showToast(`Versión ${v.version_number} copiada.`);
+    } catch {
+      showToast("No se pudo copiar el prompt.");
+    }
+  }
+
+  // Opens an "Editar con IA" session. Defaults to production (header button);
+  // the version viewer passes an explicit id to edit from that snapshot.
+  async function openEditorSession(versionId?: string) {
     if (!detail) return;
-    const baseVersionId = detail.production_version?.id ?? detail.versions[0]?.id;
+    const baseVersionId =
+      versionId ?? detail.production_version?.id ?? detail.versions[0]?.id;
     if (!baseVersionId) {
       showToast("El cliente no tiene ninguna versión base.");
       return;
@@ -262,6 +288,12 @@ export default function ClientDetailPage() {
   const latestNumber = latestVersion?.version_number ?? "v1.0";
   const nextMinor = computeNextNumber(latestNumber, "minor");
   const prodLabel = detail.production_version?.version_number ?? "sin producción";
+  const hasDraft = Boolean(detail.draft_content?.trim());
+  // The version being viewed read-only, if any (null → the draft editor).
+  const viewingVersion =
+    selectedVersionId != null
+      ? (detail.versions.find((v) => v.id === selectedVersionId) ?? null)
+      : null;
 
   return (
     <div>
@@ -332,7 +364,7 @@ export default function ClientDetailPage() {
           <Button
             variant="secondary"
             icon={<IconSparkles size={14} />}
-            onClick={openEditorSession}
+            onClick={() => openEditorSession()}
             disabled={busy}
           >
             Editar con IA
@@ -353,10 +385,42 @@ export default function ClientDetailPage() {
             Versiones
           </p>
           <div className="version-list">
+            <div
+              role="button"
+              tabIndex={0}
+              className={`version-item version-item-btn${selectedVersionId === null ? " is-active" : ""}`}
+              onClick={() => setSelectedVersionId(null)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" || e.key === " ") {
+                  e.preventDefault();
+                  setSelectedVersionId(null);
+                }
+              }}
+            >
+              <span className="vnum">
+                Borrador
+                <span className="vnum-tags">
+                  {hasDraft && <Badge variant="new-version">Sin guardar</Badge>}
+                </span>
+              </span>
+              <div className="vfoot">
+                <span className="vmeta">En edición</span>
+              </div>
+            </div>
+
             {detail.versions.map((v) => (
               <div
                 key={v.id}
-                className={`version-item${v.is_production ? " is-prod" : ""}`}
+                role="button"
+                tabIndex={0}
+                className={`version-item version-item-btn${v.is_production ? " is-prod" : ""}${selectedVersionId === v.id ? " is-active" : ""}`}
+                onClick={() => setSelectedVersionId(v.id)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" || e.key === " ") {
+                    e.preventDefault();
+                    setSelectedVersionId(v.id);
+                  }
+                }}
               >
                 <span className="vnum">
                   {v.version_number}
@@ -380,7 +444,10 @@ export default function ClientDetailPage() {
                       className="icon-btn danger"
                       title="Eliminar versión"
                       aria-label={`Eliminar versión ${v.version_number}`}
-                      onClick={() => setDeleteTarget(v)}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setDeleteTarget(v);
+                      }}
                     >
                       <IconTrash size={14} />
                     </button>
@@ -391,39 +458,75 @@ export default function ClientDetailPage() {
           </div>
         </aside>
 
-        <section>
-          <p className="editor-title">Editando draft basado en {latestNumber}</p>
-          <textarea
-            className="editor-textarea"
-            value={content}
-            onChange={(e) => {
-              hasEdited.current = true;
-              setContent(e.target.value);
-            }}
-            placeholder="Escribe o pega aquí el prompt del cliente…"
-          />
-          <div className="editor-meta">
-            {autosavedAt &&
-              `Autoguardado ${autosavedAt.toLocaleTimeString("es-MX")}`}
-          </div>
-          <div className="editor-actions">
-            <Button variant="primary" onClick={() => setFinalizeOpen(true)}>
-              Finalizar edición
-            </Button>
-            <Button
-              variant="secondary"
-              onClick={() => setPromoteOpen(true)}
-              disabled={!latestVersion || latestVersion.is_production}
-              title={
-                latestVersion?.is_production
-                  ? `${latestNumber} ya es la versión de producción.`
-                  : undefined
-              }
-            >
-              Promover a producción
-            </Button>
-          </div>
-        </section>
+        {viewingVersion ? (
+          <section>
+            <div className="version-view-head">
+              <p className="editor-title" style={{ margin: 0 }}>
+                Viendo {viewingVersion.version_number}
+                {viewingVersion.is_production ? " · producción" : ""} ·{" "}
+                {SOURCE_LABELS[viewingVersion.source ?? ""] ?? "—"}
+              </p>
+              <div className="version-view-actions">
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  icon={<IconCopy size={14} />}
+                  onClick={() => copyVersion(viewingVersion)}
+                >
+                  Copiar
+                </Button>
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  icon={<IconSparkles size={14} />}
+                  onClick={() => openEditorSession(viewingVersion.id)}
+                  disabled={busy}
+                >
+                  Editar con IA
+                </Button>
+              </div>
+            </div>
+            <pre className="version-view-content">
+              {viewingVersion.content?.trim()
+                ? viewingVersion.content
+                : "(Esta versión no tiene contenido.)"}
+            </pre>
+          </section>
+        ) : (
+          <section>
+            <p className="editor-title">Borrador en edición</p>
+            <textarea
+              className="editor-textarea"
+              value={content}
+              onChange={(e) => {
+                hasEdited.current = true;
+                setContent(e.target.value);
+              }}
+              placeholder="Escribe o pega aquí el prompt del cliente…"
+            />
+            <div className="editor-meta">
+              {autosavedAt &&
+                `Autoguardado ${autosavedAt.toLocaleTimeString("es-MX")}`}
+            </div>
+            <div className="editor-actions">
+              <Button variant="primary" onClick={() => setFinalizeOpen(true)}>
+                Finalizar edición
+              </Button>
+              <Button
+                variant="secondary"
+                onClick={() => setPromoteOpen(true)}
+                disabled={!latestVersion || latestVersion.is_production}
+                title={
+                  latestVersion?.is_production
+                    ? `${latestNumber} ya es la versión de producción.`
+                    : undefined
+                }
+              >
+                Promover a producción
+              </Button>
+            </div>
+          </section>
+        )}
       </div>
 
       <Modal

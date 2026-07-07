@@ -1602,6 +1602,57 @@ button {
 .version-item.is-prod {
   border-color: var(--accent);
 }
+/* Clickable version rows (detail page): pick one to view its prompt. */
+.version-item-btn {
+  cursor: pointer;
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+.version-item-btn:hover {
+  border-color: var(--border2);
+}
+.version-item-btn.is-active {
+  border-color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 8%, transparent);
+}
+.version-item-btn:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+/* Read-only version viewer (detail page right panel). */
+.version-view-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+.version-view-actions {
+  display: flex;
+  gap: 8px;
+  flex-shrink: 0;
+}
+.version-view-content {
+  margin: 0;
+  min-height: 420px;
+  max-height: 70vh;
+  overflow-y: auto;
+  background: var(--surface);
+  border: 0.5px solid var(--border);
+  border-radius: 12px;
+  padding: 16px;
+  font-family: ui-monospace, "SFMono-Regular", Menlo, monospace;
+  font-size: 13px;
+  line-height: 1.6;
+  color: var(--fg);
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+@media (max-width: 800px) {
+  .version-view-head {
+    flex-wrap: wrap;
+  }
+}
 .version-item .vnum {
   font-size: 14px;
   font-weight: 500;

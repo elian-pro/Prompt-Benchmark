@@ -116,7 +116,10 @@ export async function getClient(id: string): Promise<ClientDetail | null> {
   if (error) throw new Error(`No se pudo obtener el cliente: ${error.message}`);
   if (!client) return null;
 
-  const versions = await listVersions(id);
+  // Include each version's content so the detail page can show any version's
+  // prompt when selected (not just production). Max 5 versions/client, so the
+  // extra payload is bounded.
+  const versions = await listVersions(id, { includeContent: true });
 
   const { data: prod, error: pErr } = await sb
     .from("versions")
