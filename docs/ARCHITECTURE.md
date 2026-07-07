@@ -131,6 +131,19 @@ adapter type = a new file in `lib/providers/` + new dispatch case.
   index `unique_production_per_client`.
 - When a version is created from a chat session, `source_session_id`
   links back to that session so the chat history can be reopened later.
+- **The prompt's own text is kept in sync with its version number.**
+  `syncVersionLine()` (`lib/version-utils.ts`) deterministically rewrites a
+  dedicated `"Versión: X.Y"` declaration line inside `content` to match the
+  `version_number` being saved — via regex, never via the model (the Editor
+  persona is explicitly forbidden from touching version text). If no such
+  line exists, one is inserted (after a leading `# ` title if present,
+  otherwise at the very top). This runs in `createVersion()` (Editor
+  finalize, manual Library edit, imports) and in `createClient()`'s seed
+  insert when it carries real content (Creator finalize) — so a prompt
+  copied out of the app for n8n is always identifiable by version without
+  needing the Studio. A line embedded inside a longer sentence (e.g. a
+  closing "FIN DEL PROMPT ... v1.4" footer) is left alone — only a line
+  dedicated to the declaration is ever rewritten.
 
 ## Editable system prompts
 

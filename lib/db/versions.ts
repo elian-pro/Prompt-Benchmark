@@ -13,7 +13,7 @@
  *   oldest non-production version. The insert still returns the new row.
  */
 import { getSupabase } from "../supabase";
-import { computeNextNumber, type BumpType } from "../version-utils";
+import { computeNextNumber, syncVersionLine, type BumpType } from "../version-utils";
 
 export type { BumpType };
 export type VersionSource = "manual" | "editor_chat" | "creator_chat" | "imported";
@@ -105,12 +105,16 @@ export async function createVersion(
   // current one before inserting a new production version.
   if (isProduction) await unmarkProduction(clientId);
 
+  // Keep the prompt's own "Versión: X.Y" line in sync with what's actually
+  // being saved — deterministic, never left to the model.
+  const syncedContent = syncVersionLine(content, versionNumber);
+
   const { data, error } = await sb
     .from("versions")
     .insert({
       client_id: clientId,
       version_number: versionNumber,
-      content,
+      content: syncedContent,
       is_production: isProduction,
       bump_type: bumpType,
       source,
