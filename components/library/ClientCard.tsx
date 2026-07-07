@@ -44,7 +44,7 @@ export function ClientCard({
   const router = useRouter();
   const badge = computeBadge(client);
   const versionLabel =
-    client.production_version_number ?? client.latest_version_number ?? "—";
+    client.production_version_number ?? client.latest_version_number ?? "-";
 
   function goToDetail() {
     router.push(`/library/${client.id}`);
@@ -102,7 +102,7 @@ export function ClientCard({
           {client.name}
           {badge && <Badge variant={badge.variant}>{badge.label}</Badge>}
         </span>
-        <span className="row-segment">{client.segment || "—"}</span>
+        <span className="row-segment">{client.segment || "-"}</span>
         <span className="row-version">{versionLabel}</span>
         <span className="row-updated">{relativeTimeEs(client.last_update_at)}</span>
         <span className="row-count">{client.version_count} / 5</span>
@@ -119,7 +119,7 @@ export function ClientCard({
       </div>
 
       <div className="client-card-name">{client.name}</div>
-      <div className="client-card-meta">{client.segment || "—"}</div>
+      <div className="client-card-meta">{client.segment || "-"}</div>
 
       <div className="client-card-version">{versionLabel}</div>
       <div className="client-card-foot">

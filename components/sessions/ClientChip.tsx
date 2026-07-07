@@ -138,7 +138,7 @@ export function ClientChip({
                     <span className="chip-select-item-meta">
                       {[c.segment, c.production_version_number ?? c.latest_version_number]
                         .filter(Boolean)
-                        .join(" · ") || "—"}
+                        .join(" · ") || "-"}
                     </span>
                   </button>
                 ))}

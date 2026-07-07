@@ -34,12 +34,16 @@ replaces the chaotic editing process around n8n.
 
 ## The four sections
 
-### 1. Adversarial Lab
+### 1. Lab: IA vs IA
+
+> As of Sprint 6, Lab is a hub (`/lab`) with two modes: **IA vs IA**
+> (described below, unchanged) and **Playground** (the user converses with
+> the prompt themselves; see `docs/SPRINT-6.md`).
 
 Two AIs converse and a judge produces a structured report.
 
 - **Bot under test** runs the prompt selected from the Library. MUST use
-  the exact same model, temperature, and system prompt as production —
+  the exact same model, temperature, and system prompt as production;
   otherwise the test is invalid.
 - **Adversarial lead** runs one of five personas at intensity 1-3:
   `caotico` (typos, off-topic, multimensaje), `evasivo` (won't give data,
@@ -130,7 +134,7 @@ clipboard button.
 - **Multi-provider LLM.** Each role (test_bot, adversarial_lead, judge,
   editor, creator) has its own model assignment in Settings. Adding a new
   provider that uses an existing adapter type doesn't require code
-  changes — just configuration.
+  changes, just configuration.
 
 ## Honesty about scope
 

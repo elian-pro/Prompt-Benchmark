@@ -30,7 +30,7 @@ function Turn({ role, content }: { role: RunMessageRole; content: string }) {
         {message ? (
           message
         ) : (
-          <span className="chat-empty">— el agente no envió mensaje —</span>
+          <span className="chat-empty">el agente no envió mensaje</span>
         )}
       </div>
       {state && (
@@ -233,7 +233,7 @@ export default function RunDetailPage() {
       <div className="detail-header">
         <div>
           <Link href="/adversarial" className="back-link">
-            <IconArrowLeft size={13} /> Adversarial Lab
+            <IconArrowLeft size={13} /> IA vs IA
           </Link>
           <h1 className="detail-title">{run.client_name ?? "Cliente eliminado"}</h1>
           <div className="detail-sub">

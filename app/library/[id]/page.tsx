@@ -492,7 +492,7 @@ export default function ClientDetailPage() {
                   </span>
                   <div className="vfoot">
                     <span className="vmeta">
-                      {SOURCE_LABELS[v.source ?? ""] ?? "—"} ·{" "}
+                      {SOURCE_LABELS[v.source ?? ""] ?? "-"} ·{" "}
                       {new Date(v.created_at).toLocaleDateString("es-MX", {
                         day: "2-digit",
                         month: "short",
@@ -598,7 +598,7 @@ export default function ClientDetailPage() {
               <p className="editor-title" style={{ margin: 0 }}>
                 Viendo {viewingVersion.version_number}
                 {viewingVersion.is_production ? " · producción" : ""} ·{" "}
-                {SOURCE_LABELS[viewingVersion.source ?? ""] ?? "—"}
+                {SOURCE_LABELS[viewingVersion.source ?? ""] ?? "-"}
               </p>
               <div className="version-view-actions">
                 <Button

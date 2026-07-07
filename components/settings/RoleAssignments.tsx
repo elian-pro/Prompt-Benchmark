@@ -142,7 +142,7 @@ function RoleRow({
               setModelName("");
             }}
           >
-            <option value="">— Proveedor —</option>
+            <option value="">Selecciona un proveedor</option>
             {providers.map((p) => (
               <option key={p.id} value={p.id}>
                 {p.name}
@@ -156,7 +156,7 @@ function RoleRow({
             disabled={!providerId}
             onChange={(e) => setModelName(e.target.value)}
           >
-            <option value="">— Modelo —</option>
+            <option value="">Selecciona un modelo</option>
             {models.length > 0 && (
               <optgroup label="Configurados">
                 {models.map((m) => (

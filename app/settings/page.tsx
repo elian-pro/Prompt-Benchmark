@@ -157,7 +157,7 @@ export default function SettingsPage() {
         <>
           <SystemPromptCard
             role="editor"
-            title="Editor — ingeniero de prompts"
+            title="Editor · ingeniero de prompts"
             description="Persona del chat del Editor. En tiempo real, la app le anexa al final el prompt del cliente que se está editando."
             defaultText={EDITOR_PERSONA}
             savedContent={overrides.editor ?? null}
@@ -165,7 +165,7 @@ export default function SettingsPage() {
           />
           <SystemPromptCard
             role="creator"
-            title="Creator — arquitecto de prompts"
+            title="Creator · arquitecto de prompts"
             description="Persona del chat del Creator. En tiempo real, la app le anexa al final el prompt base elegido como referencia de arquitectura."
             defaultText={CREATOR_PERSONA}
             savedContent={overrides.creator ?? null}
@@ -173,7 +173,7 @@ export default function SettingsPage() {
           />
           <SystemPromptCard
             role="judge"
-            title="Juez — Adversarial Lab"
+            title="Juez · IA vs IA"
             description="Evalúa la conversación completa entre el lead simulado y el bot, y produce el reporte estructurado de fallas. La app lo usa tal cual (no anexa nada más)."
             defaultText={buildJudgeSystemPrompt()}
             savedContent={overrides.judge ?? null}

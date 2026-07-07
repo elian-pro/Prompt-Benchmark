@@ -4,7 +4,7 @@ import {
   IconLibrary,
   IconPencil,
   IconSparkles,
-  IconTarget,
+  IconFlask2,
   IconSettings,
 } from "@tabler/icons-react";
 import { ThemeToggle } from "@/components/ui/ThemeToggle";
@@ -28,12 +28,10 @@ export const metadata: Metadata = {
   description: "Herramienta interna del equipo de paid media de Zebra.",
 };
 
-// Placeholder nav row — links are non-functional until their sections land
-// in later tickets (Library S1-T9, Settings S1-T6, etc.).
 const NAV_ITEMS = [
   { label: "Editor", href: "/editor", Icon: IconPencil },
   { label: "Creator", href: "/creator", Icon: IconSparkles },
-  { label: "Adversarial", href: "/adversarial", Icon: IconTarget },
+  { label: "Lab", href: "/lab", Icon: IconFlask2 },
   { label: "Biblioteca", href: "/library", Icon: IconLibrary },
   { label: "Settings", href: "/settings", Icon: IconSettings },
 ];
