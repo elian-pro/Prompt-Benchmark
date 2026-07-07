@@ -394,6 +394,7 @@ export function SessionChat({
               role={m.role}
               content={m.content}
               attachments={m.attachments}
+              mode={mode}
             />
           ))}
           {pendingUser && (
@@ -401,10 +402,11 @@ export function SessionChat({
               role="user"
               content={pendingUser}
               attachments={pendingAttachments}
+              mode={mode}
             />
           )}
           {streamingText !== null && (
-            <ChatMessage role="assistant" content={streamingText} streaming />
+            <ChatMessage role="assistant" content={streamingText} streaming mode={mode} />
           )}
         </div>
       </div>
