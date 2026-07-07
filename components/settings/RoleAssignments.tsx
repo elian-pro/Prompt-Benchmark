@@ -21,7 +21,19 @@ const TEMPERATURE_HINT =
 const TOP_P_HINT =
   "Muestreo por núcleo (top-p). Limita la elección a las palabras más probables cuya probabilidad acumulada llega a este valor. 1 considera todas; valores menores (p. ej. 0.9) descartan las menos probables.";
 const MAX_TOKENS_HINT =
-  "Número máximo de tokens que el modelo puede generar en su respuesta. Un token equivale aproximadamente a 0.75 palabras. Déjalo en Auto para usar el límite por defecto.";
+  "Número máximo de tokens que el modelo puede generar en su respuesta. Un token equivale aproximadamente a 0.75 palabras. Si se corta antes de terminar, súbelo. Vacío = usa el valor por defecto de este rol (mostrado en el campo).";
+
+// Editor/Creator must echo the client's full prompt back on every turn, so
+// they need a much larger ceiling than a normal chat reply — see
+// EDITOR_CREATOR_MAX_TOKENS in the messages route. This only documents what
+// actually applies when the field is left blank; it isn't sent to the API.
+const ROLE_DEFAULT_MAX_TOKENS: Record<RoleName, number> = {
+  test_bot: 4096,
+  adversarial_lead: 4096,
+  judge: 4096,
+  editor: 32000,
+  creator: 32000,
+};
 
 type Props = {
   providers: MaskedProvider[];
@@ -199,7 +211,7 @@ function RoleRow({
               className="input"
               value={maxTokens}
               onChange={(e) => setMaxTokens(e.target.value)}
-              placeholder="Auto"
+              placeholder={String(ROLE_DEFAULT_MAX_TOKENS[role])}
               inputMode="numeric"
             />
           </div>

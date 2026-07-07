@@ -20,6 +20,17 @@ export const dynamic = "force-dynamic";
 type Params = { params: Promise<{ id: string }> };
 
 /**
+ * Editor/Creator must echo the FULL prompt back on every turn (see the
+ * persona's output contract), so their effective output budget needs to
+ * cover the client's entire prompt, not just a short reply. The generic
+ * adapter fallback (DEFAULT_MAX_TOKENS, 4096) was silently truncating real
+ * production prompts mid-word — extractPromptFromReply then found no closing
+ * fence, so the draft never updated. This role-specific default only applies
+ * when the operator hasn't set an explicit "Máx tokens" in Configuración.
+ */
+const EDITOR_CREATOR_MAX_TOKENS = 32000;
+
+/**
  * Downloads each attachment from Storage and shapes it for the model: images
  * and PDFs as base64, text/markdown decoded inline. Only the current turn's
  * files are sent (historical attachments may have expired).
@@ -126,7 +137,7 @@ export async function POST(req: NextRequest, { params }: Params) {
             messages,
             temperature: role.temperature ?? undefined,
             topP: role.top_p ?? undefined,
-            maxTokens: role.max_tokens ?? undefined,
+            maxTokens: role.max_tokens ?? EDITOR_CREATOR_MAX_TOKENS,
           })) {
             if (chunk.type === "text") {
               fullText += chunk.text;
