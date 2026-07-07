@@ -141,6 +141,24 @@ export async function createVersion(
   return data as Version;
 }
 
+/** Updates a version's change summary (add it after a quick save, or edit it).
+ *  Pass null to clear it. Content and version number are immutable — only the
+ *  human-facing "what changed" note can change after the fact. */
+export async function updateVersionSummary(
+  id: string,
+  summary: string | null,
+): Promise<Version> {
+  const sb = getSupabase();
+  const { data, error } = await sb
+    .from("versions")
+    .update({ change_summary: summary })
+    .eq("id", id)
+    .select(`${SUMMARY_COLS}, content`)
+    .single();
+  if (error) throw new Error(`No se pudo guardar el resumen de cambios: ${error.message}`);
+  return data as Version;
+}
+
 /**
  * Hard-deletes a single version. Callers must enforce the business rules
  * (don't delete the production version or a client's only version). FKs that

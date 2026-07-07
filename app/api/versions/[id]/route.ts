@@ -1,10 +1,20 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getVersion, listVersions, deleteVersion } from "@/lib/db/versions";
+import { z } from "zod";
+import {
+  getVersion,
+  listVersions,
+  deleteVersion,
+  updateVersionSummary,
+} from "@/lib/db/versions";
 import { handleError, jsonError } from "@/lib/http";
 
 export const dynamic = "force-dynamic";
 
 type Params = { params: Promise<{ id: string }> };
+
+const updateVersionSchema = z.object({
+  changeSummary: z.string().max(4000, "El resumen es demasiado largo.").nullable(),
+});
 
 export async function GET(_req: NextRequest, { params }: Params) {
   try {
@@ -12,6 +22,19 @@ export async function GET(_req: NextRequest, { params }: Params) {
     const version = await getVersion(id);
     if (!version) return jsonError("Versión no encontrada.", 404);
     return NextResponse.json(version);
+  } catch (err) {
+    return handleError(err);
+  }
+}
+
+export async function PATCH(req: NextRequest, { params }: Params) {
+  try {
+    const { id } = await params;
+    const version = await getVersion(id);
+    if (!version) return jsonError("Versión no encontrada.", 404);
+    const { changeSummary } = updateVersionSchema.parse(await req.json());
+    const trimmed = changeSummary?.trim() || null;
+    return NextResponse.json(await updateVersionSummary(id, trimmed));
   } catch (err) {
     return handleError(err);
   }

@@ -1714,6 +1714,57 @@ button {
   font-style: italic;
   color: var(--faint);
 }
+/* Add/edit a version's change summary after the fact. */
+.version-changes-view {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+}
+.version-changes-view .version-changes {
+  width: 100%;
+}
+.version-changes-link {
+  background: none;
+  border: none;
+  padding: 0;
+  font-family: inherit;
+  font-size: 11px;
+  color: var(--muted);
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.version-changes-link:hover {
+  color: var(--fg);
+}
+.version-changes-link.is-add {
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 0.5px dashed var(--border2);
+  width: 100%;
+  text-align: left;
+  text-decoration: none;
+  color: var(--faint);
+}
+.version-changes-link.is-add:hover {
+  color: var(--accent);
+}
+.version-changes-edit {
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 0.5px dashed var(--border2);
+}
+.version-changes-edit .textarea {
+  min-height: 64px;
+  font-size: 12px;
+}
+.version-changes-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 6px;
+  margin-top: 8px;
+}
 
 .editor-title {
   font-size: 13px;

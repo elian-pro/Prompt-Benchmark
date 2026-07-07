@@ -43,6 +43,11 @@ export default function ClientDetailPage() {
   const [deleteTarget, setDeleteTarget] = useState<VersionListItem | null>(null);
   const [busy, setBusy] = useState(false);
 
+  // Inline editing of a version's change summary (add it after a quick save).
+  const [editingSummaryId, setEditingSummaryId] = useState<string | null>(null);
+  const [summaryDraft, setSummaryDraft] = useState("");
+  const [savingSummary, setSavingSummary] = useState(false);
+
   // Inline editing of the client name and segment from the detail header.
   const [editingName, setEditingName] = useState(false);
   const [nameDraft, setNameDraft] = useState("");
@@ -212,6 +217,49 @@ export default function ClientDetailPage() {
       showToast(e instanceof Error ? e.message : "Error inesperado.");
     } finally {
       setBusy(false);
+    }
+  }
+
+  function startEditSummary(v: VersionListItem) {
+    setEditingSummaryId(v.id);
+    setSummaryDraft(v.change_summary ?? "");
+  }
+  function cancelEditSummary() {
+    setEditingSummaryId(null);
+    setSummaryDraft("");
+  }
+  // Save the change summary in place — no full reload, so the current version
+  // view and selection stay put.
+  async function saveSummary(v: VersionListItem) {
+    setSavingSummary(true);
+    try {
+      const res = await fetch(`/api/versions/${v.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ changeSummary: summaryDraft.trim() || null }),
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.error ?? "No se pudo guardar la descripción.");
+      }
+      const updated = await res.json();
+      setDetail((d) =>
+        d
+          ? {
+              ...d,
+              versions: d.versions.map((x) =>
+                x.id === v.id ? { ...x, change_summary: updated.change_summary } : x,
+              ),
+            }
+          : d,
+      );
+      setEditingSummaryId(null);
+      setSummaryDraft("");
+      showToast("Descripción guardada.");
+    } catch (e) {
+      showToast(e instanceof Error ? e.message : "Error inesperado.");
+    } finally {
+      setSavingSummary(false);
     }
   }
 
@@ -465,14 +513,78 @@ export default function ClientDetailPage() {
                     )}
                   </div>
 
-                  {isFirstVersion ? (
-                    <p className="version-changes is-first">Primera versión</p>
+                  {editingSummaryId === v.id ? (
+                    <div
+                      className="version-changes-edit"
+                      onClick={(e) => e.stopPropagation()}
+                      onKeyDown={(e) => e.stopPropagation()}
+                    >
+                      <textarea
+                        className="textarea"
+                        value={summaryDraft}
+                        autoFocus
+                        rows={4}
+                        onChange={(e) => setSummaryDraft(e.target.value)}
+                        placeholder={"Ej:\n- Actualicé el precio mínimo a $15,000"}
+                      />
+                      <div className="version-changes-actions">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={cancelEditSummary}
+                          disabled={savingSummary}
+                        >
+                          Cancelar
+                        </Button>
+                        <Button
+                          variant="primary"
+                          size="sm"
+                          onClick={() => saveSummary(v)}
+                          disabled={savingSummary}
+                        >
+                          {savingSummary ? "Guardando…" : "Guardar"}
+                        </Button>
+                      </div>
+                    </div>
                   ) : v.change_summary ? (
-                    <pre className="version-changes">{v.change_summary}</pre>
+                    <div className="version-changes-view">
+                      <pre className="version-changes">{v.change_summary}</pre>
+                      <button
+                        type="button"
+                        className="version-changes-link"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          startEditSummary(v);
+                        }}
+                      >
+                        Editar descripción
+                      </button>
+                    </div>
+                  ) : isFirstVersion ? (
+                    <div className="version-changes-view">
+                      <p className="version-changes is-first">Primera versión</p>
+                      <button
+                        type="button"
+                        className="version-changes-link"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          startEditSummary(v);
+                        }}
+                      >
+                        Agregar descripción
+                      </button>
+                    </div>
                   ) : (
-                    <p className="version-changes is-empty">
-                      Sin resumen de cambios
-                    </p>
+                    <button
+                      type="button"
+                      className="version-changes-link is-add"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        startEditSummary(v);
+                      }}
+                    >
+                      + Agregar descripción
+                    </button>
                   )}
                 </div>
               );
