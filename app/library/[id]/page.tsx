@@ -39,7 +39,8 @@ export default function ClientDetailPage() {
   const [finalizeOpen, setFinalizeOpen] = useState(false);
   // What-changed note the user writes when finalizing a manual edit (optional).
   const [changeSummaryInput, setChangeSummaryInput] = useState("");
-  const [promoteOpen, setPromoteOpen] = useState(false);
+  // The version being promoted to production (opens the confirm modal).
+  const [promoteTarget, setPromoteTarget] = useState<VersionListItem | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<VersionListItem | null>(null);
   const [busy, setBusy] = useState(false);
 
@@ -187,7 +188,7 @@ export default function ClientDetailPage() {
         body: JSON.stringify({ draft_content: null }),
       });
       setFinalizeOpen(false);
-      setPromoteOpen(false);
+      setPromoteTarget(null);
       setChangeSummaryInput("");
       await load();
     } catch (e) {
@@ -197,22 +198,21 @@ export default function ClientDetailPage() {
     }
   }
 
-  // Promotion no longer creates a version: it only moves the "Producción" tag
-  // to the client's latest version (the number stays as "Finalizar edición"
-  // left it).
-  async function promoteLatest() {
-    const latest = detail?.versions[0];
-    if (!latest) return;
+  // Promotion doesn't create a version: it only moves the "Producción" tag to
+  // the chosen version (the one being viewed). The version number is unchanged.
+  async function promoteVersion(v: VersionListItem) {
     setBusy(true);
     try {
-      const res = await fetch(`/api/versions/${latest.id}/promote`, { method: "POST" });
+      const res = await fetch(`/api/versions/${v.id}/promote`, { method: "POST" });
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
         throw new Error(data.error ?? "No se pudo promover la versión.");
       }
-      setPromoteOpen(false);
+      setPromoteTarget(null);
       await load();
-      showToast(`${latest.version_number} marcada como producción.`);
+      // Keep the just-promoted version in view (load() would default to latest).
+      setSelectedVersionId(v.id);
+      showToast(`${v.version_number} marcada como producción.`);
     } catch (e) {
       showToast(e instanceof Error ? e.message : "Error inesperado.");
     } finally {
@@ -618,6 +618,16 @@ export default function ClientDetailPage() {
                 >
                   Editar con IA
                 </Button>
+                {!viewingVersion.is_production && (
+                  <Button
+                    variant="primary"
+                    size="sm"
+                    onClick={() => setPromoteTarget(viewingVersion)}
+                    disabled={busy}
+                  >
+                    Promover a producción
+                  </Button>
+                )}
               </div>
             </div>
             <pre className="version-view-content">
@@ -646,19 +656,11 @@ export default function ClientDetailPage() {
               <Button variant="primary" onClick={() => setFinalizeOpen(true)}>
                 Finalizar edición
               </Button>
-              <Button
-                variant="secondary"
-                onClick={() => setPromoteOpen(true)}
-                disabled={!latestVersion || latestVersion.is_production}
-                title={
-                  latestVersion?.is_production
-                    ? `${latestNumber} ya es la versión de producción.`
-                    : undefined
-                }
-              >
-                Promover a producción
-              </Button>
             </div>
+            <p className="field-hint" style={{ marginTop: 10 }}>
+              Para promover una versión a producción, selecciónala en la lista y
+              usa el botón «Promover a producción».
+            </p>
           </section>
         )}
       </div>
@@ -713,22 +715,26 @@ export default function ClientDetailPage() {
       </Modal>
 
       <Modal
-        open={promoteOpen}
-        onClose={() => !busy && setPromoteOpen(false)}
-        title={`¿Marcar ${latestNumber} como producción?`}
+        open={Boolean(promoteTarget)}
+        onClose={() => !busy && setPromoteTarget(null)}
+        title={`¿Marcar ${promoteTarget?.version_number ?? ""} como producción?`}
         footer={
           <>
-            <Button variant="ghost" onClick={() => setPromoteOpen(false)} disabled={busy}>
+            <Button variant="ghost" onClick={() => setPromoteTarget(null)} disabled={busy}>
               Cancelar
             </Button>
-            <Button variant="primary" onClick={promoteLatest} disabled={busy}>
-              {busy ? "Promoviendo…" : `Promover ${latestNumber}`}
+            <Button
+              variant="primary"
+              onClick={() => promoteTarget && promoteVersion(promoteTarget)}
+              disabled={busy}
+            >
+              {busy ? "Promoviendo…" : `Promover ${promoteTarget?.version_number ?? ""}`}
             </Button>
           </>
         }
       >
         <p className="modal-body">
-          {latestNumber} recibirá la etiqueta de producción
+          {promoteTarget?.version_number} recibirá la etiqueta de producción
           {detail.production_version
             ? ` (hoy la tiene ${prodLabel})`
             : ""}
