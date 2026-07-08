@@ -2522,6 +2522,31 @@ a.lab-card:hover {
   max-height: 30vh;
   overflow-y: auto;
 }
+/* Editable draft (manual edit in the Editor drawer). Fills the drawer's
+   remaining height, monospace to match the read-only draft view. */
+.draft-edit-textarea {
+  flex: 1;
+  width: 100%;
+  min-height: 200px;
+  resize: none;
+  background: var(--surface2);
+  border: 0.5px solid var(--border);
+  border-radius: 10px;
+  padding: 14px;
+  font-family: ui-monospace, "SFMono-Regular", Menlo, monospace;
+  font-size: 12px;
+  line-height: 1.6;
+  color: var(--fg);
+  outline: none;
+}
+.draft-edit-textarea:focus {
+  border-color: var(--border2);
+}
+.draft-edit-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+}
 
 /* Adversarial Lab report */
 .report-panel {

@@ -46,6 +46,12 @@ export const appendMessageSchema = z.object({
   attachments: z.array(attachmentSchema).optional(),
 });
 
+// Manual edit of the session's working draft (no AI turn). Empty string is
+// allowed so the draft can be cleared.
+export const updateDraftSchema = z.object({
+  draftContent: z.string({ required_error: "El borrador es obligatorio." }),
+});
+
 // Creator sessions have no client until finalize: the new client's metadata is
 // collected then. Editor finalize needs no body (it already has a client).
 export const finalizeCreatorSchema = z.object({
@@ -58,4 +64,5 @@ export const finalizeCreatorSchema = z.object({
 
 export type CreateSessionInput = z.infer<typeof createSessionSchema>;
 export type AppendMessageInput = z.infer<typeof appendMessageSchema>;
+export type UpdateDraftInput = z.infer<typeof updateDraftSchema>;
 export type FinalizeCreatorInput = z.infer<typeof finalizeCreatorSchema>;

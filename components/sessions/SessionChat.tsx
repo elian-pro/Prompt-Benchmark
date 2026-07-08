@@ -7,6 +7,8 @@ import {
   IconCopy,
   IconFileText,
   IconPaperclip,
+  IconPencil,
+  IconReplace,
   IconSend,
   IconX,
 } from "@tabler/icons-react";
@@ -14,6 +16,7 @@ import type { ChatSessionDetail, Attachment } from "@/lib/db/chat-sessions";
 import { isAcceptedFile, uploadAttachment } from "@/lib/attachments";
 import { relativeTimeEs } from "@/lib/format";
 import { Button } from "@/components/ui/Button";
+import { FindReplace } from "@/components/ui/FindReplace";
 import { ChatMessage } from "@/components/editor/ChatMessage";
 import { FileUpload } from "@/components/editor/FileUpload";
 import { FinalizeButton } from "@/components/editor/FinalizeButton";
@@ -111,8 +114,17 @@ export function SessionChat({
   const [draftOpen, setDraftOpen] = useState(false);
   const [dragging, setDragging] = useState(false);
 
+  // Manual draft editing (Editor only): edit the working draft by hand, no
+  // AI turn. draftInput holds the in-progress text; findOpen toggles the
+  // find/replace bar over it.
+  const [draftEditing, setDraftEditing] = useState(false);
+  const [draftInput, setDraftInput] = useState("");
+  const [draftFindOpen, setDraftFindOpen] = useState(false);
+  const [savingDraft, setSavingDraft] = useState(false);
+
   const scrollRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const draftTextareaRef = useRef<HTMLTextAreaElement>(null);
   const autoSentRef = useRef(false);
 
   const load = useCallback(async () => {
@@ -138,15 +150,19 @@ export function SessionChat({
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight });
   }, [session?.messages.length, pendingUser, streamingText]);
 
-  // Close the draft drawer with Escape.
+  // Escape steps out one layer at a time: the find bar first (if open), then
+  // the drawer. Otherwise Escape inside find/replace would close the whole
+  // drawer instead of just the search.
   useEffect(() => {
     if (!draftOpen) return;
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") setDraftOpen(false);
+      if (e.key !== "Escape") return;
+      if (draftFindOpen) setDraftFindOpen(false);
+      else setDraftOpen(false);
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [draftOpen]);
+  }, [draftOpen, draftFindOpen]);
 
   // Per-session token usage, summed across all persisted messages.
   const tokens = useMemo(() => {
@@ -348,6 +364,47 @@ export function SessionChat({
     }
   }
 
+  // Enter manual edit mode: seed the editable text from the current draft.
+  function startDraftEdit() {
+    setDraftInput(session?.current_draft_content ?? "");
+    setDraftEditing(true);
+  }
+  function cancelDraftEdit() {
+    setDraftEditing(false);
+    setDraftFindOpen(false);
+  }
+  function closeDrawer() {
+    setDraftOpen(false);
+    setDraftEditing(false);
+    setDraftFindOpen(false);
+  }
+
+  // Persist a hand-edited draft (no AI turn). Updates the session in place so
+  // "Finalizar edición" commits exactly what's shown, then leaves edit mode.
+  async function saveDraftEdit() {
+    if (savingDraft) return;
+    setSavingDraft(true);
+    try {
+      const res = await fetch(`/api/chat-sessions/${sessionId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ draftContent: draftInput }),
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.error ?? "No se pudo guardar el borrador.");
+      }
+      setSession((s) => (s ? { ...s, current_draft_content: draftInput } : s));
+      setDraftEditing(false);
+      setDraftFindOpen(false);
+      showToast("Borrador guardado.");
+    } catch (e) {
+      showToast(e instanceof Error ? e.message : "No se pudo guardar el borrador.");
+    } finally {
+      setSavingDraft(false);
+    }
+  }
+
   if (loading) return <p className="empty-hint">Cargando…</p>;
   if (error && !session) return <p className="form-error">{error}</p>;
   if (!session) return <p className="empty-hint">Sesión no encontrada.</p>;
@@ -513,37 +570,103 @@ export function SessionChat({
 
       {draftOpen && (
         <>
-          <div className="drawer-overlay" onClick={() => setDraftOpen(false)} />
+          <div
+            className="drawer-overlay"
+            onClick={() => {
+              // Don't discard an in-progress manual edit on an accidental
+              // backdrop click — require Cancelar/Guardar.
+              if (!draftEditing) closeDrawer();
+            }}
+          />
           <aside className="draft-drawer" role="dialog" aria-label={DRAFT_LABEL[mode]}>
             <div className="draft-drawer-head">
               <p className="section-label" style={{ margin: 0 }}>
-                {DRAFT_LABEL[mode]}
+                {draftEditing ? "Editar a mano" : DRAFT_LABEL[mode]}
               </p>
               <div className="draft-drawer-actions">
-                <Button variant="secondary" icon={<IconCopy size={14} />} onClick={copyDraft}>
-                  {COPY_LABEL[mode]}
-                </Button>
-                <button
-                  type="button"
-                  className="icon-btn"
-                  onClick={() => setDraftOpen(false)}
-                  aria-label="Cerrar"
-                >
-                  <IconX size={16} />
-                </button>
+                {draftEditing ? (
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    icon={<IconReplace size={14} />}
+                    onClick={() => setDraftFindOpen((v) => !v)}
+                  >
+                    Buscar y reemplazar
+                  </Button>
+                ) : (
+                  <>
+                    <Button variant="secondary" icon={<IconCopy size={14} />} onClick={copyDraft}>
+                      {COPY_LABEL[mode]}
+                    </Button>
+                    {mode === "editor" && isActive && (
+                      <Button
+                        variant="secondary"
+                        icon={<IconPencil size={14} />}
+                        onClick={startDraftEdit}
+                      >
+                        Editar a mano
+                      </Button>
+                    )}
+                    <button
+                      type="button"
+                      className="icon-btn"
+                      onClick={closeDrawer}
+                      aria-label="Cerrar"
+                    >
+                      <IconX size={16} />
+                    </button>
+                  </>
+                )}
               </div>
             </div>
-            <pre className="draft-content">
-              {session.current_draft_content?.trim()
-                ? session.current_draft_content
-                : DRAFT_EMPTY[mode]}
-            </pre>
-            {report && (
+
+            {draftEditing ? (
               <>
-                <p className="section-label" style={{ margin: "4px 0 0" }}>
-                  Reporte de construcción
+                {draftFindOpen && (
+                  <FindReplace
+                    textareaRef={draftTextareaRef}
+                    value={draftInput}
+                    onChange={setDraftInput}
+                    onClose={() => setDraftFindOpen(false)}
+                    onReplaceAll={(count) =>
+                      showToast(`${count} ${count === 1 ? "reemplazo" : "reemplazos"} hechos.`)
+                    }
+                  />
+                )}
+                <textarea
+                  ref={draftTextareaRef}
+                  className="draft-edit-textarea"
+                  value={draftInput}
+                  onChange={(e) => setDraftInput(e.target.value)}
+                  placeholder="Escribe o pega aquí el prompt…"
+                />
+                <p className="field-hint" style={{ margin: 0 }}>
+                  Edición manual, sin IA. Guarda para actualizar el borrador.
                 </p>
-                <div className="draft-report">{report}</div>
+                <div className="draft-edit-actions">
+                  <Button variant="ghost" onClick={cancelDraftEdit} disabled={savingDraft}>
+                    Cancelar
+                  </Button>
+                  <Button variant="primary" onClick={saveDraftEdit} disabled={savingDraft}>
+                    {savingDraft ? "Guardando…" : "Guardar"}
+                  </Button>
+                </div>
+              </>
+            ) : (
+              <>
+                <pre className="draft-content">
+                  {session.current_draft_content?.trim()
+                    ? session.current_draft_content
+                    : DRAFT_EMPTY[mode]}
+                </pre>
+                {report && (
+                  <>
+                    <p className="section-label" style={{ margin: "4px 0 0" }}>
+                      Reporte de construcción
+                    </p>
+                    <div className="draft-report">{report}</div>
+                  </>
+                )}
               </>
             )}
           </aside>
