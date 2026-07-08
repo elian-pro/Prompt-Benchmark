@@ -4,7 +4,7 @@ import {
   IconLibrary,
   IconPencil,
   IconSparkles,
-  IconFlask2,
+  IconFlask,
   IconSettings,
 } from "@tabler/icons-react";
 import { ThemeToggle } from "@/components/ui/ThemeToggle";
@@ -31,7 +31,7 @@ export const metadata: Metadata = {
 const NAV_ITEMS = [
   { label: "Editor", href: "/editor", Icon: IconPencil },
   { label: "Creator", href: "/creator", Icon: IconSparkles },
-  { label: "Lab", href: "/lab", Icon: IconFlask2 },
+  { label: "Lab", href: "/lab", Icon: IconFlask },
   { label: "Biblioteca", href: "/library", Icon: IconLibrary },
   { label: "Settings", href: "/settings", Icon: IconSettings },
 ];
