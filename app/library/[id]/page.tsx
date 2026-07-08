@@ -3,7 +3,13 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
-import { IconArrowLeft, IconCopy, IconSparkles, IconTrash } from "@tabler/icons-react";
+import {
+  IconArrowLeft,
+  IconCopy,
+  IconReplace,
+  IconSparkles,
+  IconTrash,
+} from "@tabler/icons-react";
 import type { ClientDetail } from "@/lib/db/clients";
 import type { VersionListItem } from "@/lib/db/versions";
 import { computeNextNumber } from "@/lib/version-utils";
@@ -12,6 +18,7 @@ import { isNewVersion } from "@/lib/badges";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { Modal } from "@/components/ui/Modal";
+import { FindReplace } from "@/components/ui/FindReplace";
 import { SegmentPicker } from "@/components/library/SegmentPicker";
 
 const SOURCE_LABELS: Record<string, string> = {
@@ -30,6 +37,8 @@ export default function ClientDetailPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [content, setContent] = useState("");
+  const [findOpen, setFindOpen] = useState(false);
+  const editorTextareaRef = useRef<HTMLTextAreaElement>(null);
   // Which version is being viewed on the right. `null` = the editable draft
   // (the manual editing surface, seeded from production). A version id = a
   // read-only view of that snapshot.
@@ -638,8 +647,35 @@ export default function ClientDetailPage() {
           </section>
         ) : (
           <section>
-            <p className="editor-title">Borrador en edición</p>
+            <div className="version-view-head">
+              <p className="editor-title" style={{ margin: 0 }}>
+                Borrador en edición
+              </p>
+              <Button
+                variant="secondary"
+                size="sm"
+                icon={<IconReplace size={14} />}
+                onClick={() => setFindOpen((v) => !v)}
+              >
+                Buscar y reemplazar
+              </Button>
+            </div>
+            {findOpen && (
+              <FindReplace
+                textareaRef={editorTextareaRef}
+                value={content}
+                onChange={(next) => {
+                  hasEdited.current = true;
+                  setContent(next);
+                }}
+                onClose={() => setFindOpen(false)}
+                onReplaceAll={(count) =>
+                  showToast(`${count} ${count === 1 ? "reemplazo" : "reemplazos"} hechos.`)
+                }
+              />
+            )}
             <textarea
+              ref={editorTextareaRef}
               className="editor-textarea"
               value={content}
               onChange={(e) => {

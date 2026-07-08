@@ -1845,6 +1845,121 @@ a.lab-card:hover {
   margin-top: 18px;
 }
 
+/* Find / replace bar (see FindReplace.tsx) — sits above a manual editing
+   textarea, styled as a compact toolbar card. */
+.find-replace {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 12px;
+  padding: 10px;
+  background: var(--surface2);
+  border: 0.5px solid var(--border2);
+  border-radius: 12px;
+}
+.find-replace-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.find-replace-field {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: 1;
+  min-width: 0;
+  background: var(--surface);
+  border: 0.5px solid var(--border);
+  border-radius: 8px;
+  padding: 0 8px;
+}
+.find-replace-field-icon {
+  color: var(--faint);
+  flex: none;
+}
+.find-replace-input {
+  flex: 1;
+  min-width: 0;
+  background: transparent;
+  border: none;
+  outline: none;
+  color: var(--fg);
+  font-family: inherit;
+  font-size: 13px;
+  padding: 8px 0;
+}
+.find-replace-input::placeholder {
+  color: var(--faint);
+}
+.find-replace-toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 6px;
+  border: 0.5px solid transparent;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+  flex: none;
+  transition: 0.15s;
+}
+.find-replace-toggle:hover {
+  color: var(--fg);
+  background: var(--surface2);
+}
+.find-replace-toggle.is-on {
+  color: #0a0a0a;
+  background: var(--accent);
+  border-color: var(--accent);
+}
+.find-replace-word {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  text-decoration: underline;
+}
+.find-replace-counter {
+  font-size: 11px;
+  color: var(--muted);
+  font-feature-settings: "tnum";
+  white-space: nowrap;
+  min-width: 68px;
+  text-align: right;
+}
+.find-replace-nav {
+  display: flex;
+  gap: 2px;
+  flex: none;
+}
+.find-replace-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
+  border: none;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+  transition: 0.15s;
+}
+.find-replace-btn:hover:not(:disabled) {
+  color: var(--fg);
+  background: var(--surface);
+}
+.find-replace-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+.find-replace-actions {
+  display: flex;
+  gap: 8px;
+  flex: none;
+}
+
 /* Editor session list */
 .session-list {
   display: flex;
