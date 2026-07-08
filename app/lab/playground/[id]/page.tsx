@@ -1,9 +1,9 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
-import { IconArrowLeft, IconPencil, IconSend, IconTrash } from "@tabler/icons-react";
+import { IconArrowLeft, IconArrowRight, IconPencil, IconSend, IconTrash } from "@tabler/icons-react";
 import type {
   DemoSessionDetail,
   DemoMessageRole,
@@ -12,6 +12,7 @@ import type {
 import type { DemoNoteRow } from "@/lib/db/demo-notes";
 import { parseTurn } from "@/lib/adversarial-message";
 import { relativeTimeEs } from "@/lib/format";
+import { Button } from "@/components/ui/Button";
 
 /** Any special state with no readable message names itself explicitly,
  *  e.g. "El bot pasó a estado «humano» y dejó de responder." — this is
@@ -262,6 +263,7 @@ function NotesPanel({
 
 export default function PlaygroundSessionPage() {
   const params = useParams();
+  const router = useRouter();
   const id = Array.isArray(params.id) ? params.id[0] : (params.id as string);
 
   const [session, setSession] = useState<DemoSessionDetail | null>(null);
@@ -279,6 +281,8 @@ export default function PlaygroundSessionPage() {
   const [noteError, setNoteError] = useState<string | null>(null);
   const [flashMessageId, setFlashMessageId] = useState<string | null>(null);
   const [flashNoteId, setFlashNoteId] = useState<string | null>(null);
+  const [handingOff, setHandingOff] = useState(false);
+  const [handoffError, setHandoffError] = useState<string | null>(null);
 
   const scrollRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -448,6 +452,26 @@ export default function PlaygroundSessionPage() {
     }
   }
 
+  // Creates the Editor session on the tested version, composes the first
+  // message from the notes, and lands there with it pre-filled but not sent
+  // (Sprint 6, decision 6). The draft crosses the page navigation via
+  // sessionStorage — see app/editor/[id]/page.tsx, which reads and clears it.
+  async function sendToEditor() {
+    if (handingOff || notes.length === 0 || session?.status !== "active") return;
+    setHandingOff(true);
+    setHandoffError(null);
+    try {
+      const res = await fetch(`/api/demo-sessions/${id}/handoff`, { method: "POST" });
+      if (!res.ok) throw new Error((await res.json()).error ?? "No se pudo enviar al Editor.");
+      const { editorSessionId, draftMessage } = await res.json();
+      window.sessionStorage.setItem(`playground-handoff:${editorSessionId}`, draftMessage);
+      router.push(`/editor/${editorSessionId}`);
+    } catch (e) {
+      setHandoffError(e instanceof Error ? e.message : "Error al enviar al Editor.");
+      setHandingOff(false);
+    }
+  }
+
   if (loading) return <p className="empty-hint">Cargando…</p>;
   if (error && !session) return <p className="form-error">{error}</p>;
   if (!session) return <p className="empty-hint">Conversación no encontrada.</p>;
@@ -468,7 +492,34 @@ export default function PlaygroundSessionPage() {
             </span>
           </div>
         </div>
+        <div className="detail-actions">
+          {session.status === "sent_to_editor" && session.editor_session_id ? (
+            <Link
+              href={`/editor/${session.editor_session_id}`}
+              className="back-link"
+              style={{ marginBottom: 0 }}
+            >
+              Ver en Editor <IconArrowRight size={13} />
+            </Link>
+          ) : (
+            <Button
+              variant="primary"
+              icon={<IconSend size={14} />}
+              onClick={sendToEditor}
+              disabled={handingOff || notes.length === 0}
+            >
+              {handingOff
+                ? "Enviando…"
+                : `Enviar al Editor (${notes.length} ${notes.length === 1 ? "nota" : "notas"})`}
+            </Button>
+          )}
+        </div>
       </div>
+      {handoffError && (
+        <p className="form-error" style={{ marginBottom: 16 }}>
+          {handoffError}
+        </p>
+      )}
 
       <div className="playground-layout">
         <div className="playground-chat">

@@ -88,21 +88,26 @@ new migration `009` (additive, `008` was already shipped by T2):
 `demo_notes` (text, `message_ids` as a jsonb array, timestamps). A note's
 number is just its position in creation order, no separate column needed.
 
-### T4 — Handoff to Editor
+### T4 — Handoff to Editor ✅
 
 "Enviar al Editor (N notas)" button: creates an Editor session on the
-snapshot's version, composes the first message from the notes (quoted
-message references + feedback, one block per note), lands the user in that
-Editor session with the message pre-filled and editable in the composer
-(not auto-sent — decision 6). Marks the Playground session "sent to Editor"
-with a link to the created session (trace in both directions).
+snapshot's version (`POST /api/demo-sessions/[id]/handoff`), composes the
+first message from the notes (quoted message references + feedback, one
+block per note, via `lib/prompts/playground-handoff.ts`), lands the user in
+that Editor session with the message pre-filled and editable in the
+composer (not auto-sent, decision 6). Marks the Playground session
+`sent_to_editor` with `editor_session_id` pointing at the created session;
+migration `010` adds the reverse link (`chat_sessions.source_demo_session_id`)
+so the Editor session shows a "Desde Playground" back-link too (trace in
+both directions).
 
-Needs a small Editor entry point: today a session only auto-sends a first
-message when it's created from the Editor's own idle composer
-(`SessionWorkspace`'s `autoSend`). Playground's handoff needs the same
-mechanism reachable from a different page — likely via the session-create
-API accepting an initial draft message, or a query param the Editor
-session page reads once on mount. Resolve exactly at T4 planning.
+Resolved Editor entry point: `SessionChat`'s existing `autoSend` prop fires
+a message immediately, which decision 6 explicitly rules out here. Added a
+sibling `initialDraft` prop that only fills the composer. The composed text
+itself crosses the page navigation via `sessionStorage` (keyed by the new
+session's id, read once and cleared by `app/editor/[id]/page.tsx` on
+mount), not a URL param or a new DB column, since it's disposable once
+used.
 
 ## Definition of done
 

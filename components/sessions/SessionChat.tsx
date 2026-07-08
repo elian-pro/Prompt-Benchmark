@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import Link from "next/link";
 import {
   IconArrowLeft,
   IconCopy,
@@ -77,17 +78,24 @@ type PendingFirstMessage = { content: string; attachments: Attachment[] } | null
  * rounded composer card as the welcome screen, so starting a conversation
  * reads as the greeting giving way to messages — never as a page change. The
  * working draft lives in a slide-over drawer instead of a second column.
+ *
+ * `initialDraft` is the other pre-fill path (Sprint 6, T4): a Playground
+ * "Enviar al Editor" handoff lands here with a composed first message that
+ * fills the composer WITHOUT sending it — unlike `autoSend`, the user still
+ * has to review, maybe edit, and hit send themselves (decision 6).
  */
 export function SessionChat({
   sessionId,
   mode,
   onBack,
   autoSend,
+  initialDraft,
 }: {
   sessionId: string;
   mode: Mode;
   onBack: () => void;
   autoSend?: PendingFirstMessage;
+  initialDraft?: string;
 }) {
   const [session, setSession] = useState<ChatSessionDetail | null>(null);
   const [loading, setLoading] = useState(true);
@@ -277,6 +285,24 @@ export function SessionChat({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [autoSend, session]);
 
+  // Pre-fill (not send) the composer with a Playground handoff's composed
+  // message, the instant this brand-new session is ready, so the user lands
+  // looking at exactly what they need to review before sending.
+  const initialDraftAppliedRef = useRef(false);
+  useEffect(() => {
+    if (initialDraftAppliedRef.current || !initialDraft || !session) return;
+    if (session.messages.length > 0) return;
+    initialDraftAppliedRef.current = true;
+    setInput(initialDraft);
+    requestAnimationFrame(() => {
+      const el = textareaRef.current;
+      if (!el) return;
+      el.style.height = "auto";
+      el.style.height = Math.min(el.scrollHeight, 200) + "px";
+      el.focus();
+    });
+  }, [initialDraft, session]);
+
   // Leaving a session that never actually changed the prompt shouldn't clutter
   // the history: ask the server to drop it (it decides via isSessionUnchanged;
   // this is best-effort and silently ignored on failure) before navigating back.
@@ -349,6 +375,14 @@ export function SessionChat({
             ↑ {tokens.in.toLocaleString("es-MX")} · ↓{" "}
             {tokens.out.toLocaleString("es-MX")} tokens
           </span>
+          {session.source_demo_session_id && (
+            <Link
+              href={`/lab/playground/${session.source_demo_session_id}`}
+              className="playground-source-link"
+            >
+              Desde Playground
+            </Link>
+          )}
         </div>
         <div className="chat-topbar-actions">
           <Button

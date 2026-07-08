@@ -150,3 +150,20 @@ export async function appendMessage(
   if (error) throw new Error(`No se pudo guardar el mensaje: ${error.message}`);
   return data as unknown as DemoMessageRow;
 }
+
+/** Marks a Playground session as handed off, linking the Editor session it
+ *  spawned (Sprint 6, T4 — "Enviar al Editor"). */
+export async function markSentToEditor(
+  sessionId: string,
+  editorSessionId: string,
+): Promise<DemoSession> {
+  const sb = getSupabase();
+  const { data, error } = await sb
+    .from("demo_sessions")
+    .update({ status: "sent_to_editor", editor_session_id: editorSessionId })
+    .eq("id", sessionId)
+    .select(SESSION_COLS)
+    .single();
+  if (error) throw new Error(`No se pudo marcar la conversación como enviada: ${error.message}`);
+  return data as unknown as DemoSession;
+}

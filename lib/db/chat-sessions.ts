@@ -47,6 +47,9 @@ export type ChatSession = {
   final_version_id: string | null;
   model_provider_id: string | null;
   model_name: string | null;
+  /** Set when this session was created via a Playground "Enviar al Editor"
+   *  handoff (Sprint 6, T4) — traces back to that demo_sessions row. */
+  source_demo_session_id: string | null;
   created_at: string;
   updated_at: string;
   finalized_at: string | null;
@@ -60,7 +63,8 @@ export type ChatSessionDetail = ChatSessionListItem & { messages: ChatMessageRow
 
 const SESSION_COLS =
   "id, client_id, type, title, status, base_version_id, current_draft_content, " +
-  "final_version_id, model_provider_id, model_name, created_at, updated_at, finalized_at";
+  "final_version_id, model_provider_id, model_name, source_demo_session_id, " +
+  "created_at, updated_at, finalized_at";
 
 const MESSAGE_COLS =
   "id, session_id, role, content, attachments, tokens_in, tokens_out, created_at";
@@ -121,6 +125,8 @@ export async function createSession(input: {
   clientId?: string | null;
   baseVersionId?: string | null;
   title?: string | null;
+  /** Set by the Playground "Enviar al Editor" handoff (Sprint 6, T4). */
+  sourceDemoSessionId?: string | null;
 }): Promise<ChatSession> {
   const sb = getSupabase();
   const type = input.type ?? "editor";
@@ -154,6 +160,7 @@ export async function createSession(input: {
       status: "active",
       base_version_id: input.baseVersionId ?? null,
       current_draft_content: type === "editor" ? baseContent : null,
+      source_demo_session_id: input.sourceDemoSessionId ?? null,
     })
     .select(SESSION_COLS)
     .single();
