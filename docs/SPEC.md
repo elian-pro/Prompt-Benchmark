@@ -38,7 +38,7 @@ replaces the chaotic editing process around n8n.
 
 > As of Sprint 6, Lab is a hub (`/lab`) with two modes: **IA vs IA**
 > (described below, unchanged) and **Playground** (the user converses with
-> the prompt themselves; see `docs/SPRINT-6.md`).
+> the prompt themselves; see `docs/SPRINT-6-archive.md`).
 
 Two AIs converse and a judge produces a structured report.
 

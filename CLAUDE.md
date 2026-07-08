@@ -28,7 +28,7 @@ and pastes into the corresponding n8n node.
 | Tech stack, file structure, provider architecture, security model | `docs/ARCHITECTURE.md` |
 | Colors, typography, component patterns | `docs/DESIGN-SYSTEM.md` |
 | All sprints overview | `docs/ROADMAP.md` |
-| Sprint plans (all complete, archived) | `docs/SPRINT-1-archive.md` … `docs/SPRINT-5-archive.md` |
+| Sprint plans (all complete, archived) | `docs/SPRINT-1-archive.md` … `docs/SPRINT-6-archive.md` |
 | Database schema source of truth | `supabase/migrations/` |
 
 ## Rules of engagement
@@ -71,6 +71,5 @@ and pastes into the corresponding n8n node.
 
 ## Active sprint
 
-**Sprint 6 — Lab: Playground + notes-to-Editor handoff.** Plan in
-`docs/SPRINT-6.md`. Sprints 1–5 are archived at `docs/SPRINT-1-archive.md`
-through `docs/SPRINT-5-archive.md`.
+None. Sprints 1–6 are complete and archived at `docs/SPRINT-1-archive.md`
+through `docs/SPRINT-6-archive.md`.
