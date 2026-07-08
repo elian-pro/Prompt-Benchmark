@@ -2897,6 +2897,56 @@ body[data-theme="light"] .dot-grid::after {
   font-size: 12px;
   padding: 10px 12px;
 }
+/* Native <select> dressed up as a chip trigger (see SelectChip.tsx) — used
+   where a plain underline select next to empty modal whitespace read as
+   inert placeholder text instead of a clickable control. */
+.select-chip {
+  position: relative;
+  display: flex;
+  align-items: center;
+  width: 100%;
+}
+.select-chip-input {
+  width: 100%;
+  appearance: none;
+  padding: 10px 34px;
+  border-radius: 100px;
+  border: 0.5px dashed var(--border2);
+  background: transparent;
+  color: var(--muted);
+  font-size: 13.5px;
+  font-family: inherit;
+  cursor: pointer;
+  transition: border-color 0.15s ease, background 0.15s ease, color 0.15s ease;
+}
+.select-chip-input:hover:not(:disabled) {
+  border-color: var(--accent);
+}
+.select-chip-input.is-set {
+  border-style: solid;
+  background: var(--surface2);
+  color: var(--fg);
+}
+.select-chip-input:disabled {
+  cursor: default;
+  opacity: 0.7;
+}
+.select-chip-icon {
+  position: absolute;
+  left: 12px;
+  display: inline-flex;
+  color: var(--faint);
+  pointer-events: none;
+}
+.select-chip-input.is-set ~ .select-chip-icon {
+  color: var(--accent);
+}
+.select-chip-chevron {
+  position: absolute;
+  right: 12px;
+  color: var(--muted);
+  pointer-events: none;
+}
 .landing-history-head {
   margin-bottom: 14px;
 }
