@@ -4,6 +4,7 @@ import { useState } from "react";
 import { IconCircleCheck } from "@tabler/icons-react";
 import { Modal } from "@/components/ui/Modal";
 import { Button } from "@/components/ui/Button";
+import { SegmentPicker } from "@/components/library/SegmentPicker";
 
 type FinalizeResult = {
   session: unknown;
@@ -28,7 +29,6 @@ export function FinalizeCreatorButton({ sessionId, disabled, onDone, onError }: 
   const [open, setOpen] = useState(false);
   const [name, setName] = useState("");
   const [segment, setSegment] = useState("");
-  const [location, setLocation] = useState("");
   const [busy, setBusy] = useState(false);
 
   async function submit() {
@@ -41,7 +41,6 @@ export function FinalizeCreatorButton({ sessionId, disabled, onDone, onError }: 
         body: JSON.stringify({
           name: name.trim(),
           segment: segment.trim() || null,
-          location: location.trim() || null,
         }),
       });
       const data = await res.json().catch(() => ({}));
@@ -96,25 +95,9 @@ export function FinalizeCreatorButton({ sessionId, disabled, onDone, onError }: 
               autoFocus
             />
           </div>
-          <div className="field-row">
-            <div className="field">
-              <label className="field-label">Giro (opcional)</label>
-              <input
-                className="input"
-                value={segment}
-                onChange={(e) => setSegment(e.target.value)}
-                placeholder="Inmobiliario, wellness…"
-              />
-            </div>
-            <div className="field">
-              <label className="field-label">Ubicación (opcional)</label>
-              <input
-                className="input"
-                value={location}
-                onChange={(e) => setLocation(e.target.value)}
-                placeholder="CDMX, Monterrey…"
-              />
-            </div>
+          <div className="field">
+            <label className="field-label">Segmento (opcional)</label>
+            <SegmentPicker value={segment} onChange={setSegment} />
           </div>
         </Modal>
       )}

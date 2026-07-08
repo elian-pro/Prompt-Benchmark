@@ -3,8 +3,7 @@
 import { useRef, useState } from "react";
 import { IconPaperclip, IconX } from "@tabler/icons-react";
 import type { Attachment } from "@/lib/db/chat-sessions";
-
-const ACCEPT = ".txt,.md,.markdown,.pdf,.png,.jpg,.jpeg,.webp,.gif,text/plain,text/markdown,application/pdf,image/*";
+import { ATTACHMENT_ACCEPT, uploadAttachment } from "@/lib/attachments";
 
 /**
  * Attaches files to the next message: uploads each to Storage and tracks the
@@ -35,15 +34,7 @@ export function FileUpload({
     const added: Attachment[] = [];
     try {
       for (const file of files) {
-        const form = new FormData();
-        form.append("sessionId", sessionId);
-        form.append("file", file);
-        const res = await fetch("/api/uploads", { method: "POST", body: form });
-        if (!res.ok) {
-          throw new Error((await res.json()).error ?? "No se pudo subir el archivo.");
-        }
-        const up = await res.json();
-        added.push({ uploadId: up.id, filename: up.filename, mimeType: up.mime_type });
+        added.push(await uploadAttachment(sessionId, file));
       }
       onChange([...attachments, ...added]);
     } catch (err) {
@@ -71,18 +62,18 @@ export function FileUpload({
           ref={inputRef}
           type="file"
           multiple
-          accept={ACCEPT}
+          accept={ATTACHMENT_ACCEPT}
           className="visually-hidden"
           onChange={onSelect}
           disabled={disabled || busy}
         />
         <button
           type="button"
-          className="btn btn-ghost btn-sm"
+          className="attach-trigger"
           onClick={() => inputRef.current?.click()}
           disabled={disabled || busy}
         >
-          <IconPaperclip size={14} />
+          <IconPaperclip size={13} />
           {busy ? "Subiendo…" : "Adjuntar"}
         </button>
         {attachments.map((a) => (

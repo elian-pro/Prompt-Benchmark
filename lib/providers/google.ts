@@ -33,6 +33,7 @@ export async function chat(req: ChatRequest, ctx: AdapterContext): Promise<ChatR
     content: res.text ?? "",
     tokensIn: res.usageMetadata?.promptTokenCount ?? 0,
     tokensOut: res.usageMetadata?.candidatesTokenCount ?? 0,
+    truncated: res.candidates?.[0]?.finishReason === "MAX_TOKENS",
   };
 }
 
@@ -43,6 +44,7 @@ export async function* streamChat(
   const stream = await client(ctx).models.generateContentStream(buildParams(req));
   let tokensIn = 0;
   let tokensOut = 0;
+  let finishReason: string | undefined;
   for await (const chunk of stream) {
     if (chunk.text) yield { type: "text", text: chunk.text };
     // usageMetadata accumulates; the last chunk carries the final totals.
@@ -50,6 +52,9 @@ export async function* streamChat(
       tokensIn = chunk.usageMetadata.promptTokenCount ?? tokensIn;
       tokensOut = chunk.usageMetadata.candidatesTokenCount ?? tokensOut;
     }
+    if (chunk.candidates?.[0]?.finishReason) {
+      finishReason = chunk.candidates[0].finishReason;
+    }
   }
-  yield { type: "usage", tokensIn, tokensOut };
+  yield { type: "usage", tokensIn, tokensOut, truncated: finishReason === "MAX_TOKENS" };
 }

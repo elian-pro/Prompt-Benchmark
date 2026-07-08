@@ -13,7 +13,7 @@
 
 ```
 /app
-  /page.tsx                    redirect to /library
+  /page.tsx                    redirect to /editor
   /library/
     /page.tsx                  grid of clients
     /[id]/page.tsx             client detail (versions + manual editor)
@@ -116,9 +116,14 @@ adapter type = a new file in `lib/providers/` + new dispatch case.
 - Versions stored in `versions` table, one row per version.
 - `version_number` is a text field formatted `vMAJOR.MINOR`.
 - **Minor bump** (`v3.0 → v3.1`) on every "Finalizar edición". Happens
-  whether the edit was manual or via Editor chat.
-- **Major bump** (`v3.x → v4.0`) on "Promover a producción". Marks the
-  new version with `is_production = true` and unmarks any other.
+  whether the edit was manual or via Editor chat. At `.9` the minor rolls
+  over to the next integer (`v2.9 → v3.0`), so the minor never passes one
+  digit.
+- **"Promover a producción" does not create a version.** It only moves the
+  `is_production` tag to the client's latest version (unmarking any other).
+  The old behavior (a major bump creating `v(X+1).0`) was dropped — the
+  `major` bump type survives in the API/schema for old rows, but no UI
+  triggers it anymore.
 - **Max 5 versions per client** enforced by trigger
   `enforce_version_limit()` in `001_initial.sql`. On the 6th insert, the
   oldest non-production version is deleted automatically.
@@ -126,6 +131,45 @@ adapter type = a new file in `lib/providers/` + new dispatch case.
   index `unique_production_per_client`.
 - When a version is created from a chat session, `source_session_id`
   links back to that session so the chat history can be reopened later.
+- **`change_summary`** (migration 007, nullable) stores the Editor's
+  natural-language "CAMBIOS REALIZADOS" — the prose after the fenced block,
+  captured at finalize via `extractChangeSummary()` (strips bold and the
+  boilerplate "SIN CAMBIOS" tail). The Library detail page shows it per
+  version. Only Editor-chat versions have one; manual edits, imports, and
+  Creator's first version are null (the UI shows "Primera versión" for the
+  oldest, a neutral placeholder otherwise).
+- **The prompt's own text is kept in sync with its version number.**
+  `syncVersionLine()` (`lib/version-utils.ts`) deterministically rewrites a
+  dedicated `"Versión: X.Y"` declaration line inside `content` to match the
+  `version_number` being saved — via regex, never via the model (the Editor
+  persona is explicitly forbidden from touching version text). If no such
+  line exists, one is inserted (after a leading `# ` title if present,
+  otherwise at the very top). This runs in `createVersion()` (Editor
+  finalize, manual Library edit, imports) and in `createClient()`'s seed
+  insert when it carries real content (Creator finalize) — so a prompt
+  copied out of the app for n8n is always identifiable by version without
+  needing the Studio. A line embedded inside a longer sentence (e.g. a
+  closing "FIN DEL PROMPT ... v1.4" footer) is left alone — only a line
+  dedicated to the declaration is ever rewritten.
+
+## Editable system prompts
+
+The three personas — Editor (`lib/prompts/editor-persona.ts`), Creator
+(`lib/prompts/creator-persona.ts`) and the Adversarial judge
+(`lib/prompts/judge.ts`) — ship as code constants but can be overridden
+from **Settings → System prompts**.
+
+- Overrides live in `prompt_overrides` (migration 006), one row per role
+  (`editor` / `creator` / `judge`). A row's `content` replaces the code
+  constant; no row = the code default is used.
+- The `build*SystemPrompt()` helpers take an optional override and fall
+  back to their constant. The API routes fetch it via
+  `getPromptOverride(role)` per request: the Editor/Creator messages route
+  and the Adversarial execute route.
+- For Editor/Creator the override is only the **persona** — the app still
+  appends the dynamic part per request (the client's draft / the reference
+  prompt). The judge has no dynamic part, so its override is used verbatim.
+- "Restaurar original" deletes the row (`DELETE /api/prompt-overrides/:role`).
 
 ## Adversarial run snapshots
 

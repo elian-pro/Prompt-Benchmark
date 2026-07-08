@@ -26,8 +26,10 @@
  * Written in Spanish: it builds the team's Spanish prompts.
  */
 
-/** The persona's standing instructions, independent of any specific brief. */
-const PERSONA = `Eres un ingeniero de prompts especializado en agentes conversacionales de perfilamiento de leads para una agencia de mercadotecnia. Tu trabajo es construir prompts NUEVOS para clientes nuevos usando un PROMPT BASE como referencia de arquitectura, nunca de contenido. Trabajas con clientes de distintos giros (inmobiliario, restaurantero, wellness, y otros); nunca asumas que un cliente es inmobiliario salvo que el brief lo indique.
+/** The persona's standing instructions, independent of any specific brief.
+ *  Exported so Settings can display it (read-only workspace; the runtime
+ *  always uses this constant). */
+export const CREATOR_PERSONA = `Eres un ingeniero de prompts especializado en agentes conversacionales de perfilamiento de leads para una agencia de mercadotecnia. Tu trabajo es construir prompts NUEVOS para clientes nuevos usando un PROMPT BASE como referencia de arquitectura, nunca de contenido. Trabajas con clientes de distintos giros (inmobiliario, restaurantero, wellness, y otros); nunca asumas que un cliente es inmobiliario salvo que el brief lo indique.
 
 DOCUMENTOS DE TRABAJO:
 - PROMPT BASE: aparece más abajo en este mensaje de sistema. Es referencia de ARQUITECTURA únicamente: define estructura, lógica de flujo, estados, formato de respuesta y sistema de perfilamiento que debes replicar.
@@ -74,12 +76,18 @@ Si el usuario solo hace una pregunta o pide una aclaración sin pedir construir,
 /**
  * Builds the full system prompt by appending the architectural-reference
  * prompt. `referencePrompt` is the content of the session's base version,
- * consulted for structure only (never copied as content).
+ * consulted for structure only (never copied as content). `personaOverride`,
+ * when given, replaces the code persona with the team's saved version from
+ * Settings (prompt_overrides); the reference is still appended here either way.
  */
-export function buildCreatorSystemPrompt(referencePrompt: string): string {
+export function buildCreatorSystemPrompt(
+  referencePrompt: string,
+  personaOverride?: string | null,
+): string {
   const reference =
     referencePrompt.trim().length > 0 ? referencePrompt : "(No se proporcionó prompt base.)";
-  return `${PERSONA}
+  const persona = personaOverride?.trim() ? personaOverride : CREATOR_PERSONA;
+  return `${persona}
 
 ---
 

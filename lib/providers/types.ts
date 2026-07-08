@@ -33,17 +33,21 @@ export type ChatResponse = {
   content: string;
   tokensIn: number;
   tokensOut: number;
+  /** True when the provider stopped because it hit the max_tokens ceiling,
+   *  not because the reply was actually finished — the content is a cut-off
+   *  fragment. Adapters that can't report this default to false. */
+  truncated: boolean;
 };
 
 /**
  * A streamed response is a sequence of text deltas followed by exactly one
  * final `usage` chunk carrying the token counts (so callers get the same
- * tokensIn/tokensOut that chat() returns). Adapters that can't report usage
- * still emit a usage chunk with zeros.
+ * tokensIn/tokensOut/truncated that chat() returns). Adapters that can't
+ * report usage or truncation still emit a usage chunk with zeros/false.
  */
 export type StreamChunk =
   | { type: "text"; text: string }
-  | { type: "usage"; tokensIn: number; tokensOut: number };
+  | { type: "usage"; tokensIn: number; tokensOut: number; truncated: boolean };
 
 /** Per-request context an adapter needs: the decrypted key and optional base URL. */
 export type AdapterContext = {

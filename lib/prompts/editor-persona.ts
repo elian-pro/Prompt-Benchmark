@@ -20,8 +20,10 @@
  * and reasons in the same language they edit in.
  */
 
-/** The persona's standing instructions, independent of any specific prompt. */
-const PERSONA = `Eres un ingeniero de prompts especializado en agentes conversacionales de perfilamiento de leads para una agencia de mercadotecnia. Trabajas con clientes de distintos giros (inmobiliario, restaurantero, wellness, y otros); nunca asumas que un cliente es inmobiliario salvo que el propio prompt lo indique.
+/** The persona's standing instructions, independent of any specific prompt.
+ *  Exported so Settings can display it (read-only workspace; the runtime
+ *  always uses this constant). */
+export const EDITOR_PERSONA = `Eres un ingeniero de prompts especializado en agentes conversacionales de perfilamiento de leads para una agencia de mercadotecnia. Trabajas con clientes de distintos giros (inmobiliario, restaurantero, wellness, y otros); nunca asumas que un cliente es inmobiliario salvo que el propio prompt lo indique.
 
 Trabajas con prompts que ya están en producción y cuya información fue verificada por el cliente. Tu responsabilidad es hacer cambios QUIRÚRGICOS: tocar únicamente lo que el usuario te pide, sin alterar estructura, tono, formato, flujo de perfilamiento ni ningún contenido que no esté explícitamente en el alcance del cambio solicitado.
 
@@ -54,10 +56,17 @@ Si el usuario solo hace una pregunta o pide una aclaración sin solicitar una ed
 /**
  * Builds the full system prompt by appending the prompt currently under edit.
  * `currentDraft` is the session's working draft (seeded from the base version).
+ * `personaOverride`, when given, replaces the code persona with the team's
+ * saved version from Settings (prompt_overrides); the dynamic draft is still
+ * appended here either way.
  */
-export function buildEditorSystemPrompt(currentDraft: string): string {
+export function buildEditorSystemPrompt(
+  currentDraft: string,
+  personaOverride?: string | null,
+): string {
   const draft = currentDraft.trim().length > 0 ? currentDraft : "(El prompt está vacío.)";
-  return `${PERSONA}
+  const persona = personaOverride?.trim() ? personaOverride : EDITOR_PERSONA;
+  return `${persona}
 
 ---
 
@@ -78,4 +87,37 @@ export function extractPromptFromReply(reply: string): string | null {
   if (!match) return null;
   const extracted = match[1].trim();
   return extracted.length > 0 ? extracted : null;
+}
+
+/**
+ * Whether the reply opened a fenced block that never closed — a strong
+ * signal the response was cut off mid-generation (hit max_tokens, dropped
+ * connection) rather than the assistant simply choosing not to include a
+ * prompt block. extractPromptFromReply already returns null in both cases;
+ * this distinguishes "nothing to extract" (fine — a clarifying question)
+ * from "extraction failed because the draft got cut" (needs a warning).
+ * Heuristic: counts ``` occurrences — an odd count means one never closed.
+ * False positives would require literal ``` inside the assistant's own
+ * prose, which the persona's output contract never produces.
+ */
+export function hasUnclosedFence(reply: string): boolean {
+  const matches = reply.match(/```/g);
+  return (matches?.length ?? 0) % 2 === 1;
+}
+
+/**
+ * Extracts the change summary from an assistant reply — the prose the persona
+ * writes AFTER the fenced prompt block (its "CAMBIOS REALIZADOS" report). Used
+ * when finalizing an Editor session to persist, per version, what changed.
+ * Strips `**bold**` markers so the stored text renders cleanly, and drops the
+ * boilerplate "SIN CAMBIOS" confirmation (it carries no changelog signal).
+ * Returns null when there's nothing meaningful after the block.
+ */
+export function extractChangeSummary(reply: string): string | null {
+  const withoutBlock = reply.replace(/```[^\n]*\n[\s\S]*?```/, "").trim();
+  if (!withoutBlock) return null;
+  // Cut the trailing "SIN CAMBIOS ..." confirmation, keeping only real changes.
+  const trimmed = withoutBlock.replace(/\n*\**\s*SIN CAMBIOS[\s\S]*$/i, "").trim();
+  const cleaned = (trimmed || withoutBlock).replace(/\*\*/g, "").trim();
+  return cleaned.length > 0 ? cleaned : null;
 }

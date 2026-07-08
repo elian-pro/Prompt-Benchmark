@@ -4,7 +4,7 @@ import {
   IconLibrary,
   IconPencil,
   IconSparkles,
-  IconTarget,
+  IconFlask,
   IconSettings,
 } from "@tabler/icons-react";
 import { ThemeToggle } from "@/components/ui/ThemeToggle";
@@ -15,10 +15,11 @@ import "./globals.css";
 // with the localStorage key used by ThemeToggle ("zebra-theme").
 const NO_FLASH_THEME_SCRIPT = `(function(){try{var t=localStorage.getItem('zebra-theme');if(t==='light'||t==='dark'){document.body.dataset.theme=t;}}catch(e){}})();`;
 
-// Two weights only, per docs/DESIGN-SYSTEM.md (never 600/700).
+// Mostly two weights per docs/DESIGN-SYSTEM.md; 700 is loaded only for the
+// emphasized team name in the Editor/Creator welcome greeting.
 const inter = Inter({
   subsets: ["latin"],
-  weight: ["400", "500"],
+  weight: ["400", "500", "700"],
   display: "swap",
 });
 
@@ -27,13 +28,11 @@ export const metadata: Metadata = {
   description: "Herramienta interna del equipo de paid media de Zebra.",
 };
 
-// Placeholder nav row — links are non-functional until their sections land
-// in later tickets (Library S1-T9, Settings S1-T6, etc.).
 const NAV_ITEMS = [
-  { label: "Biblioteca", href: "/library", Icon: IconLibrary },
   { label: "Editor", href: "/editor", Icon: IconPencil },
   { label: "Creator", href: "/creator", Icon: IconSparkles },
-  { label: "Adversarial", href: "/adversarial", Icon: IconTarget },
+  { label: "Lab", href: "/lab", Icon: IconFlask },
+  { label: "Biblioteca", href: "/library", Icon: IconLibrary },
   { label: "Settings", href: "/settings", Icon: IconSettings },
 ];
 

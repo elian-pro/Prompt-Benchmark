@@ -8,8 +8,11 @@ replace it.
 
 An internal tool for the Zebra agency's paid media team. Four sections:
 
-- **Adversarial Lab** — red-teaming: two AIs converse, a judge produces a
-  structured failure report.
+- **Lab** — put a client's prompt to the test. Two modes: **IA vs IA**
+  (red-teaming: two AIs converse, a judge produces a structured failure
+  report) and **Playground** (chat with the prompt yourself, as a simulated
+  lead, for live demos; tag messages, write feedback notes, send them to the
+  Editor).
 - **Editor** — chat with Claude Opus to make guided edits to a prompt.
 - **Creator** — chat with Claude Opus to build a new prompt from a brief.
 - **Library** — clients, versions, import existing prompts.
@@ -25,7 +28,7 @@ and pastes into the corresponding n8n node.
 | Tech stack, file structure, provider architecture, security model | `docs/ARCHITECTURE.md` |
 | Colors, typography, component patterns | `docs/DESIGN-SYSTEM.md` |
 | All sprints overview | `docs/ROADMAP.md` |
-| Sprint plans (all complete, archived) | `docs/SPRINT-1-archive.md` … `docs/SPRINT-5-archive.md` |
+| Sprint plans (all complete, archived) | `docs/SPRINT-1-archive.md` … `docs/SPRINT-6-archive.md` |
 | Database schema source of truth | `supabase/migrations/` |
 
 ## Rules of engagement
@@ -62,10 +65,11 @@ and pastes into the corresponding n8n node.
    library decision with multiple valid options, anything that touches the
    SQL or security model.
 
+9. **No em dashes (—).** Never use one, anywhere: UI text, docs, commit
+   messages, code comments. Use a period, comma, colon, or restructure the
+   sentence instead.
+
 ## Active sprint
 
-**None — the roadmap is complete.** Sprints 1–5 are all done; their plans are
-archived at `docs/SPRINT-1-archive.md` through `docs/SPRINT-5-archive.md`.
-There is no Sprint 6 in the current plan. For next steps, see
-`docs/ROADMAP.md` "Future (not in current scope)"; once a direction is chosen,
-spin up a new sprint plan before implementing.
+None. Sprints 1–6 are complete and archived at `docs/SPRINT-1-archive.md`
+through `docs/SPRINT-6-archive.md`.

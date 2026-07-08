@@ -9,6 +9,7 @@
  * - 'archived'   → archived clients only.
  */
 import { getSupabase } from "../supabase";
+import { syncVersionLine } from "../version-utils";
 import { listVersions } from "./versions";
 import type { VersionListItem, Version, VersionSource } from "./versions";
 
@@ -18,7 +19,6 @@ export type Client = {
   id: string;
   name: string;
   segment: string | null;
-  location: string | null;
   notes: string | null;
   is_legacy: boolean;
   archived_at: string | null;
@@ -89,9 +89,7 @@ export async function listClients({
     // Strip characters that would break the PostgREST or() grammar.
     const term = search.trim().replace(/[%,()]/g, "");
     if (term) {
-      query = query.or(
-        `name.ilike.%${term}%,segment.ilike.%${term}%,location.ilike.%${term}%`,
-      );
+      query = query.or(`name.ilike.%${term}%,segment.ilike.%${term}%`);
     }
   }
   query = query.order("updated_at", { ascending: false });
@@ -118,7 +116,10 @@ export async function getClient(id: string): Promise<ClientDetail | null> {
   if (error) throw new Error(`No se pudo obtener el cliente: ${error.message}`);
   if (!client) return null;
 
-  const versions = await listVersions(id);
+  // Include each version's content so the detail page can show any version's
+  // prompt when selected (not just production). Max 5 versions/client, so the
+  // extra payload is bounded.
+  const versions = await listVersions(id, { includeContent: true });
 
   const { data: prod, error: pErr } = await sb
     .from("versions")
@@ -138,37 +139,49 @@ export async function getClient(id: string): Promise<ClientDetail | null> {
 export async function createClient(input: {
   name: string;
   segment?: string | null;
-  location?: string | null;
   notes?: string | null;
-  // When present, v1.0 carries this content/source instead of an empty manual
-  // seed (used by the Creator's "Finalizar" flow, source: 'creator_chat').
+  // When false, skip the auto-seeded v1.0. Used by "Importar existente", which
+  // adds the imported version itself — otherwise the client would end up with
+  // both an empty v1.0 and the imported one. Defaults to seeding.
+  seedInitialVersion?: boolean;
+  // When present, the seeded v1.0 carries this content/source instead of an
+  // empty manual seed (used by the Creator's "Finalizar" flow,
+  // source: 'creator_chat').
   initialVersion?: {
     content: string;
     source: VersionSource;
     sourceSessionId?: string | null;
   };
-}): Promise<{ client: Client; version: Version }> {
+}): Promise<{ client: Client; version: Version | null }> {
   const sb = getSupabase();
   const { data: client, error } = await sb
     .from("clients")
     .insert({
       name: input.name,
       segment: input.segment ?? null,
-      location: input.location ?? null,
       notes: input.notes ?? null,
     })
     .select("*")
     .single();
   if (error) throw new Error(`No se pudo crear el cliente: ${error.message}`);
 
+  // Import supplies its own (imported) version next, so no empty seed.
+  if (input.seedInitialVersion === false) {
+    return { client: client as Client, version: null };
+  }
+
   // Seed v1.0 directly (not via createVersion, which always bumps). Not
   // production — a brand-new client is "en edición" until promoted.
+  // Only sync the version line when there's real content (Creator's
+  // finalize) — leave the plain empty default seed untouched so "no draft
+  // yet" stays truly empty rather than gaining a stray "Versión: 1.0" line.
+  const seedContent = input.initialVersion?.content ?? "";
   const { data: version, error: vErr } = await sb
     .from("versions")
     .insert({
       client_id: (client as Client).id,
       version_number: "v1.0",
-      content: input.initialVersion?.content ?? "",
+      content: seedContent ? syncVersionLine(seedContent, "v1.0") : seedContent,
       is_production: false,
       bump_type: null,
       source: input.initialVersion?.source ?? "manual",
@@ -186,7 +199,6 @@ export async function updateClient(
   input: {
     name?: string;
     segment?: string | null;
-    location?: string | null;
     notes?: string | null;
     draft_content?: string | null;
   },
@@ -195,7 +207,6 @@ export async function updateClient(
   const patch: Record<string, unknown> = {};
   if (input.name !== undefined) patch.name = input.name;
   if (input.segment !== undefined) patch.segment = input.segment;
-  if (input.location !== undefined) patch.location = input.location;
   if (input.notes !== undefined) patch.notes = input.notes;
   if (input.draft_content !== undefined) patch.draft_content = input.draft_content;
 

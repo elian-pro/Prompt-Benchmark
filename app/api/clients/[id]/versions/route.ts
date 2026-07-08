@@ -21,10 +21,12 @@ export async function POST(req: NextRequest, { params }: Params) {
   try {
     const { id } = await params;
     const input = createVersionSchema.parse(await req.json());
+    const changeSummary = input.changeSummary?.trim() || null;
     const version = await createVersion(id, input.content, {
       bumpType: input.bumpType,
       source: input.source,
       versionNumberOverride: input.versionNumberOverride,
+      changeSummary,
     });
     return NextResponse.json(version, { status: 201 });
   } catch (err) {

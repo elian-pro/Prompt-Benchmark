@@ -27,19 +27,21 @@ export function ThemeToggle() {
     setTheme(next);
   }
 
+  const isLight = theme === "light";
+
   return (
     <button
       type="button"
-      className="icon-btn theme-toggle"
+      role="switch"
+      aria-checked={isLight}
+      className="theme-switch"
       onClick={toggle}
-      aria-label={theme === "dark" ? "Activar modo claro" : "Activar modo oscuro"}
-      title={theme === "dark" ? "Modo claro" : "Modo oscuro"}
+      aria-label={isLight ? "Activar modo oscuro" : "Activar modo claro"}
+      title={isLight ? "Modo oscuro" : "Modo claro"}
     >
-      {theme === "dark" ? (
-        <IconSun size={18} stroke={1.5} />
-      ) : (
-        <IconMoon size={18} stroke={1.5} />
-      )}
+      <IconMoon size={13} stroke={1.5} className="theme-switch-icon moon" />
+      <IconSun size={13} stroke={1.5} className="theme-switch-icon sun" />
+      <span className="theme-switch-knob" />
     </button>
   );
 }

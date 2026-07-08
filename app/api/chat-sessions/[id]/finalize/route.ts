@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getSession, finalizeSession } from "@/lib/db/chat-sessions";
 import { createVersion } from "@/lib/db/versions";
 import { createClient } from "@/lib/db/clients";
+import { extractChangeSummary } from "@/lib/prompts/editor-persona";
 import { finalizeCreatorSchema } from "@/lib/schemas/chat-sessions";
 import { handleError, jsonError } from "@/lib/http";
 
@@ -14,7 +15,7 @@ type Params = { params: Promise<{ id: string }> };
  * finalized. Branches by session type:
  *  - editor:  a new MINOR version on the existing client (`editor_chat`).
  *  - creator: a brand-new client at v1.0 carrying the prompt (`creator_chat`),
- *             with metadata (name, segment, location) from the request body.
+ *             with metadata (name, segment) from the request body.
  * Idempotency is not attempted: a finalized or abandoned session is rejected.
  */
 export async function POST(req: NextRequest, { params }: Params) {
@@ -36,9 +37,10 @@ export async function POST(req: NextRequest, { params }: Params) {
       const { client, version } = await createClient({
         name: input.name,
         segment: input.segment ?? null,
-        location: input.location ?? null,
         initialVersion: { content: draft, source: "creator_chat", sourceSessionId: id },
       });
+      // initialVersion was provided, so the seed always runs and version is set.
+      if (!version) throw new Error("No se pudo crear la versión inicial del cliente.");
       const finalized = await finalizeSession(id, version.id, client.id);
       return NextResponse.json({ session: finalized, version, client });
     }
@@ -47,10 +49,21 @@ export async function POST(req: NextRequest, { params }: Params) {
     if (!session.client_id) {
       return jsonError("La sesión no tiene un cliente asociado.", 409);
     }
+    // The summary belongs to the assistant turn that produced this draft — the
+    // most recent one carrying a prompt block (later turns may be plain Q&A).
+    let changeSummary: string | null = null;
+    for (let i = session.messages.length - 1; i >= 0; i--) {
+      const m = session.messages[i];
+      if (m.role === "assistant" && /```[^\n]*\n[\s\S]*?```/.test(m.content)) {
+        changeSummary = extractChangeSummary(m.content);
+        break;
+      }
+    }
     const version = await createVersion(session.client_id, draft, {
       bumpType: "minor",
       source: "editor_chat",
       sourceSessionId: id,
+      changeSummary,
     });
     const finalized = await finalizeSession(id, version.id);
     return NextResponse.json({ session: finalized, version });

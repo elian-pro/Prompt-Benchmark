@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Modal } from "@/components/ui/Modal";
 import { Button } from "@/components/ui/Button";
+import { SegmentPicker } from "@/components/library/SegmentPicker";
 
 const VERSION_RE = /^v\d+\.\d+$/;
 
@@ -11,7 +12,6 @@ export function ImportModal({ open, onClose }: { open: boolean; onClose: () => v
   const router = useRouter();
   const [name, setName] = useState("");
   const [segment, setSegment] = useState("");
-  const [location, setLocation] = useState("");
   const [content, setContent] = useState("");
   const [versionNumber, setVersionNumber] = useState("v1.0");
   const [saving, setSaving] = useState(false);
@@ -30,7 +30,9 @@ export function ImportModal({ open, onClose }: { open: boolean; onClose: () => v
         body: JSON.stringify({
           name: name.trim(),
           segment: segment.trim() || null,
-          location: location.trim() || null,
+          // The imported version below is the only version this client should
+          // have — don't seed an empty v1.0.
+          seedInitialVersion: false,
         }),
       });
       if (!cRes.ok) {
@@ -80,23 +82,9 @@ export function ImportModal({ open, onClose }: { open: boolean; onClose: () => v
         <label className="field-label">Nombre</label>
         <input className="input" value={name} onChange={(e) => setName(e.target.value)} />
       </div>
-      <div className="field-row">
-        <div className="field">
-          <label className="field-label">Segmento</label>
-          <input
-            className="input"
-            value={segment}
-            onChange={(e) => setSegment(e.target.value)}
-          />
-        </div>
-        <div className="field">
-          <label className="field-label">Ubicación</label>
-          <input
-            className="input"
-            value={location}
-            onChange={(e) => setLocation(e.target.value)}
-          />
-        </div>
+      <div className="field">
+        <label className="field-label">Segmento</label>
+        <SegmentPicker value={segment} onChange={setSegment} />
       </div>
       <div className="field">
         <label className="field-label">Número de versión</label>

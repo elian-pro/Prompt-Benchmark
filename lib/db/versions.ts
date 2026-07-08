@@ -3,15 +3,17 @@
  *
  * Versioning rules (see docs/ARCHITECTURE.md):
  * - version_number is text "vMAJOR.MINOR".
- * - minor bump: vX.Y → vX.(Y+1).
- * - major bump: vX.Y → v(X+1).0, marks this version production (unmarks others).
+ * - minor bump: vX.Y → vX.(Y+1); rolls over to v(X+1).0 at .9.
+ * - major bump: vX.Y → v(X+1).0, marks this version production (unmarks
+ *   others). Kept for the API/old rows; no UI triggers it anymore —
+ *   production promotion is mark-only via promoteToProduction().
  * - imported: uses an explicit version number, marks production + flags the
  *   client as legacy.
  * - Max 5 versions/client enforced by a DB trigger; the 6th insert deletes the
  *   oldest non-production version. The insert still returns the new row.
  */
 import { getSupabase } from "../supabase";
-import { computeNextNumber, type BumpType } from "../version-utils";
+import { computeNextNumber, syncVersionLine, type BumpType } from "../version-utils";
 
 export type { BumpType };
 export type VersionSource = "manual" | "editor_chat" | "creator_chat" | "imported";
@@ -24,6 +26,9 @@ export type VersionSummary = {
   bump_type: BumpType | null;
   source: VersionSource | null;
   source_session_id: string | null;
+  /** Editor's "CAMBIOS REALIZADOS" prose, when this version came from an
+   *  Editor chat; null for manual edits, imports, and first versions. */
+  change_summary: string | null;
   created_at: string;
 };
 
@@ -31,7 +36,7 @@ export type VersionListItem = VersionSummary & { content?: string };
 export type Version = VersionSummary & { content: string };
 
 const SUMMARY_COLS =
-  "id, client_id, version_number, is_production, bump_type, source, source_session_id, created_at";
+  "id, client_id, version_number, is_production, bump_type, source, source_session_id, change_summary, created_at";
 
 export async function listVersions(
   clientId: string,
@@ -90,10 +95,11 @@ export async function createVersion(
     source: VersionSource;
     sourceSessionId?: string | null;
     versionNumberOverride?: string;
+    changeSummary?: string | null;
   },
 ): Promise<Version> {
   const sb = getSupabase();
-  const { bumpType, source, sourceSessionId, versionNumberOverride } = options;
+  const { bumpType, source, sourceSessionId, versionNumberOverride, changeSummary } = options;
 
   const latest = await latestVersionNumber(clientId);
   const versionNumber = computeNextNumber(latest, bumpType, versionNumberOverride);
@@ -103,16 +109,21 @@ export async function createVersion(
   // current one before inserting a new production version.
   if (isProduction) await unmarkProduction(clientId);
 
+  // Keep the prompt's own "Versión: X.Y" line in sync with what's actually
+  // being saved — deterministic, never left to the model.
+  const syncedContent = syncVersionLine(content, versionNumber);
+
   const { data, error } = await sb
     .from("versions")
     .insert({
       client_id: clientId,
       version_number: versionNumber,
-      content,
+      content: syncedContent,
       is_production: isProduction,
       bump_type: bumpType,
       source,
       source_session_id: sourceSessionId ?? null,
+      change_summary: changeSummary ?? null,
     })
     .select(`${SUMMARY_COLS}, content`)
     .single();
@@ -128,6 +139,36 @@ export async function createVersion(
   }
 
   return data as Version;
+}
+
+/** Updates a version's change summary (add it after a quick save, or edit it).
+ *  Pass null to clear it. Content and version number are immutable — only the
+ *  human-facing "what changed" note can change after the fact. */
+export async function updateVersionSummary(
+  id: string,
+  summary: string | null,
+): Promise<Version> {
+  const sb = getSupabase();
+  const { data, error } = await sb
+    .from("versions")
+    .update({ change_summary: summary })
+    .eq("id", id)
+    .select(`${SUMMARY_COLS}, content`)
+    .single();
+  if (error) throw new Error(`No se pudo guardar el resumen de cambios: ${error.message}`);
+  return data as Version;
+}
+
+/**
+ * Hard-deletes a single version. Callers must enforce the business rules
+ * (don't delete the production version or a client's only version). FKs that
+ * point at this version (chat_sessions.base_version_id / final_version_id,
+ * runs.version_id) are ON DELETE SET NULL, so this never cascades.
+ */
+export async function deleteVersion(id: string): Promise<void> {
+  const sb = getSupabase();
+  const { error } = await sb.from("versions").delete().eq("id", id);
+  if (error) throw new Error(`No se pudo eliminar la versión: ${error.message}`);
 }
 
 export async function promoteToProduction(versionId: string): Promise<Version> {

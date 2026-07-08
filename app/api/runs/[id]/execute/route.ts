@@ -8,7 +8,9 @@ import {
 } from "@/lib/db/runs";
 import { buildLeadSystemPrompt } from "@/lib/prompts/adversarial-personas";
 import { buildJudgeSystemPrompt, judgeReportSchema } from "@/lib/prompts/judge";
-import { chat, streamChat, type ChatMessage } from "@/lib/providers";
+import { getPromptOverride } from "@/lib/db/prompt-overrides";
+import { parseTurn, stripStageDirection } from "@/lib/adversarial-message";
+import { chat, type ChatMessage } from "@/lib/providers";
 import { handleError, jsonError } from "@/lib/http";
 
 export const dynamic = "force-dynamic";
@@ -20,26 +22,61 @@ type Params = { params: Promise<{ id: string }> };
 // Priming user message for whoever starts: their own messages map to the
 // "assistant" role, which can't lead an Anthropic message list, so the starter
 // always gets a synthetic opening user turn (never persisted as a run message).
-const SEED_BOT = "(Inicia la conversación: saluda al prospecto y comienza a perfilarlo.)";
-const SEED_LEAD = "(Inicia el chat enviando tu primer mensaje al agente.)";
+// Framed as a real customer entering the chat so the bot engages instead of
+// defaulting to a human handoff.
+const SEED_BOT =
+  "Hola, buenas. Vi su información y me interesa saber más sobre lo que ofrecen. ¿Me pueden ayudar?";
+const SEED_LEAD =
+  "(Acabas de entrar al chat del negocio como cliente. Escribe tu primer mensaje para iniciar la conversación, en el papel que se te indicó.)";
+
+// Shown to the lead when the bot turn carried no readable message (e.g. it
+// returned {"estado":"humano","mensajes":[]}), so the adversary reacts to the
+// silence instead of talking into a JSON void.
+const NO_BOT_REPLY =
+  "(El agente no envió ningún mensaje: derivó la conversación a un humano.)";
+
+// Pacing so the transcript is watchable. Each turn is generated in full
+// server-side (no partial content is ever sent to the client — that's what let
+// a bot's raw JSON or a lead's leaked stage direction flash on screen before
+// being replaced). The client only sees turn_start ("Escribiendo…") and
+// turn_end with the final, already-clean text. The artificial pause between
+// the two scales with message length so longer replies still read as typed.
+const MIN_TYPING_MS = 500;
+const MAX_TYPING_MS = 3500;
+const MS_PER_WORD = 45;
+const TURN_GAP_MS = 1000; // pause between one turn and the next
+const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
+
+function typingDelayFor(text: string): number {
+  const wordCount = text.trim() ? text.trim().split(/\s+/).length : 0;
+  return Math.min(MAX_TYPING_MS, Math.max(MIN_TYPING_MS, wordCount * MS_PER_WORD));
+}
 
 type Transcript = { role: RunMessageRole; content: string }[];
+
+/** The bot's turn as the lead should see it: its real message, not the JSON. */
+function botMessageForLead(content: string): string {
+  const { message } = parseTurn(content);
+  return message.trim() ? message : NO_BOT_REPLY;
+}
 
 /**
  * Builds the message list from one participant's point of view: the other
  * party's turns are `user`, its own are `assistant`. The starter's own turns
  * come first in the transcript, so a seed user message is prepended to keep the
- * list starting with `user`.
+ * list starting with `user`. When the counterpart is the bot, its structured
+ * JSON is reduced to the readable message so the lead responds to real text.
  */
 function perspective(
   transcript: Transcript,
   current: RunMessageRole,
   seed: string,
 ): ChatMessage[] {
-  const messages: ChatMessage[] = transcript.map((m) => ({
-    role: m.role === current ? "assistant" : "user",
-    content: m.content,
-  }));
+  const messages: ChatMessage[] = transcript.map((m) => {
+    const isOwn = m.role === current;
+    const content = !isOwn && m.role === "bot" ? botMessageForLead(m.content) : m.content;
+    return { role: isOwn ? "assistant" : "user", content };
+  });
   if (messages.length === 0 || messages[0].role === "assistant") {
     messages.unshift({ role: "user", content: seed });
   }
@@ -74,12 +111,15 @@ function parseJudgeReply(reply: string): unknown {
 /**
  * Orchestrates the bot↔lead conversation for a run and streams it turn by turn
  * as NDJSON events. Each event is a JSON object on its own line:
- *   {type:'turn_start', turn, role} · {type:'delta', text} ·
- *   {type:'turn_end', turn, role} · {type:'judging'} ·
+ *   {type:'turn_start', turn, role} ·
+ *   {type:'turn_end', turn, role, content} · {type:'judging'} ·
  *   {type:'report', report} · {type:'status', status} · {type:'error', message}
- * Each turn is persisted to `run_messages`. When the conversation ends the
- * judge analyzes the transcript, its validated report is saved to `reports`,
- * and the run status moves running → completed (or error if anything throws).
+ * A turn's text is generated in full server-side and never streamed
+ * partially — the client only learns a turn is in progress (turn_start) and
+ * then gets the final, already-clean content (turn_end). Each turn is
+ * persisted to `run_messages`. When the conversation ends the judge analyzes
+ * the transcript, its validated report is saved to `reports`, and the run
+ * status moves running → completed (or error if anything throws).
  */
 export async function POST(_req: NextRequest, { params }: Params) {
   try {
@@ -91,6 +131,8 @@ export async function POST(_req: NextRequest, { params }: Params) {
     }
 
     const leadPrompt = buildLeadSystemPrompt(run.preset, run.intensity);
+    // The judge persona may be overridden from Settings; absent → code default.
+    const judgeOverride = await getPromptOverride("judge");
     const encoder = new TextEncoder();
 
     const stream = new ReadableStream<Uint8Array>({
@@ -113,8 +155,7 @@ export async function POST(_req: NextRequest, { params }: Params) {
 
             send({ type: "turn_start", turn, role: current });
 
-            let text = "";
-            for await (const chunk of streamChat({
+            const reply = await chat({
               providerId: config.provider_id,
               modelName: config.model_name,
               systemPrompt,
@@ -122,18 +163,25 @@ export async function POST(_req: NextRequest, { params }: Params) {
               temperature: config.temperature ?? undefined,
               topP: config.top_p ?? undefined,
               maxTokens: config.max_tokens ?? undefined,
-            })) {
-              if (chunk.type === "text") {
-                text += chunk.text;
-                send({ type: "delta", text: chunk.text });
-              }
-            }
+            });
+            // The lead occasionally narrates a stage direction despite being
+            // told not to (e.g. "(espero la respuesta, escribo algo
+            // casual)\n\n...") — strip it before it's ever shown, persisted, or
+            // fed back into either participant's context.
+            const text = isBot ? reply.content : stripStageDirection(reply.content);
+
+            // Hold on the "Escribiendo…" indicator a bit, scaled to length, so
+            // the turn reads as typed rather than appearing instantly.
+            await sleep(typingDelayFor(text));
 
             await appendRunMessage(id, { turnNumber: turn, role: current, content: text });
             transcript.push({ role: current, content: text });
-            send({ type: "turn_end", turn, role: current });
+            send({ type: "turn_end", turn, role: current, content: text });
 
             current = isBot ? "lead" : "bot";
+
+            // Breathing room before the next turn so it's easy to follow.
+            if (turn < run.max_turns) await sleep(TURN_GAP_MS);
           }
 
           // Conversation done — judge the full transcript (non-streaming).
@@ -141,7 +189,7 @@ export async function POST(_req: NextRequest, { params }: Params) {
           const judgeReply = await chat({
             providerId: run.judge_config.provider_id,
             modelName: run.judge_config.model_name,
-            systemPrompt: buildJudgeSystemPrompt(),
+            systemPrompt: buildJudgeSystemPrompt(judgeOverride),
             messages: [{ role: "user", content: formatTranscript(transcript) }],
             temperature: run.judge_config.temperature ?? undefined,
             topP: run.judge_config.top_p ?? undefined,

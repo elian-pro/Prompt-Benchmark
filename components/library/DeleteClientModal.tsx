@@ -41,7 +41,9 @@ export function DeleteClientModal({ client, onClose, onDone }: Props) {
         },
       }}
       consequences={[
-        `Se perderán las ${client.version_count} versiones.`,
+        client.version_count === 1
+          ? "Se perderá 1 versión."
+          : `Se perderán ${client.version_count} versiones.`,
         "Se borrarán los chats y el historial asociado.",
         "Esta acción no se puede deshacer.",
       ]}

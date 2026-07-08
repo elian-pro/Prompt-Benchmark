@@ -12,6 +12,7 @@
  */
 import { getSupabase } from "../supabase";
 import { getVersion } from "./versions";
+import { deleteUpload } from "./uploads";
 
 export type SessionType = "editor" | "creator";
 export type SessionStatus = "active" | "finalized" | "abandoned";
@@ -46,6 +47,9 @@ export type ChatSession = {
   final_version_id: string | null;
   model_provider_id: string | null;
   model_name: string | null;
+  /** Set when this session was created via a Playground "Enviar al Editor"
+   *  handoff (Sprint 6, T4) — traces back to that demo_sessions row. */
+  source_demo_session_id: string | null;
   created_at: string;
   updated_at: string;
   finalized_at: string | null;
@@ -59,7 +63,8 @@ export type ChatSessionDetail = ChatSessionListItem & { messages: ChatMessageRow
 
 const SESSION_COLS =
   "id, client_id, type, title, status, base_version_id, current_draft_content, " +
-  "final_version_id, model_provider_id, model_name, created_at, updated_at, finalized_at";
+  "final_version_id, model_provider_id, model_name, source_demo_session_id, " +
+  "created_at, updated_at, finalized_at";
 
 const MESSAGE_COLS =
   "id, session_id, role, content, attachments, tokens_in, tokens_out, created_at";
@@ -118,24 +123,32 @@ export async function getSession(id: string): Promise<ChatSessionDetail | null> 
 export async function createSession(input: {
   type?: SessionType;
   clientId?: string | null;
-  baseVersionId: string;
+  baseVersionId?: string | null;
   title?: string | null;
+  /** Set by the Playground "Enviar al Editor" handoff (Sprint 6, T4). */
+  sourceDemoSessionId?: string | null;
 }): Promise<ChatSession> {
   const sb = getSupabase();
   const type = input.type ?? "editor";
 
-  // The base version is the prompt under edit (editor) or the architectural
-  // reference (creator); it must exist either way.
-  const baseVersion = await getVersion(input.baseVersionId);
-  if (!baseVersion) throw new Error("La versión base no existe.");
-
-  // Editor: seed the working draft from the base version so the first edit
-  // starts from the real prompt, and the session belongs to that client from
-  // the start. Creator: the client doesn't exist yet (created at finalize) and
-  // the draft is built through the conversation — the reference is consulted
-  // for structure only, never seeded as content.
+  // Editor sessions edit a real client's prompt: both the client and the base
+  // version are required.
   if (type === "editor" && !input.clientId) {
     throw new Error("Una sesión de edición requiere un cliente.");
+  }
+  if (type === "editor" && !input.baseVersionId) {
+    throw new Error("Una sesión de edición requiere una versión base.");
+  }
+
+  // Resolve the base version when one is given. Editor seeds its working draft
+  // from it (the prompt under edit). Creator may have a reference (structure
+  // only, never seeded) or none at all (from scratch); its draft is always
+  // built through the conversation.
+  let baseContent: string | null = null;
+  if (input.baseVersionId) {
+    const baseVersion = await getVersion(input.baseVersionId);
+    if (!baseVersion) throw new Error("La versión base no existe.");
+    baseContent = baseVersion.content;
   }
 
   const { data, error } = await sb
@@ -145,8 +158,9 @@ export async function createSession(input: {
       type,
       title: input.title ?? null,
       status: "active",
-      base_version_id: input.baseVersionId,
-      current_draft_content: type === "editor" ? baseVersion.content : null,
+      base_version_id: input.baseVersionId ?? null,
+      current_draft_content: type === "editor" ? baseContent : null,
+      source_demo_session_id: input.sourceDemoSessionId ?? null,
     })
     .select(SESSION_COLS)
     .single();
@@ -220,6 +234,44 @@ export async function abandonSession(sessionId: string): Promise<ChatSession> {
     .single();
   if (error) throw new Error(`No se pudo descartar la sesión: ${error.message}`);
   return data as unknown as ChatSession;
+}
+
+/**
+ * Hard-deletes a session: each attached upload's Storage object is removed
+ * explicitly first (the `uploads` row cascade only drops the DB record, per
+ * the Uploads TTL contract in docs/ARCHITECTURE.md), then the session row
+ * itself, which cascades into `chat_messages`. Safe with respect to the
+ * client's saved Versions — `versions.source_session_id` carries no FK back
+ * to `chat_sessions`.
+ */
+export async function deleteSession(sessionId: string): Promise<void> {
+  const sb = getSupabase();
+  const { data: uploads, error: upErr } = await sb
+    .from("uploads")
+    .select("id")
+    .eq("session_id", sessionId);
+  if (upErr) {
+    throw new Error(`No se pudieron listar los archivos de la sesión: ${upErr.message}`);
+  }
+  for (const upload of (uploads ?? []) as { id: string }[]) {
+    await deleteUpload(upload.id);
+  }
+
+  const { error } = await sb.from("chat_sessions").delete().eq("id", sessionId);
+  if (error) throw new Error(`No se pudo eliminar la sesión: ${error.message}`);
+}
+
+/**
+ * Whether the session's prompt is still exactly as it started: the Editor's
+ * draft never diverged from the base version it was seeded from, or the
+ * Creator's draft was never constructed. Used to silently drop no-op
+ * sessions instead of leaving an empty entry in the history.
+ */
+export async function isSessionUnchanged(session: ChatSession): Promise<boolean> {
+  if (session.type === "creator") return session.current_draft_content === null;
+  if (!session.base_version_id) return session.current_draft_content === null;
+  const base = await getVersion(session.base_version_id);
+  return (base?.content ?? null) === session.current_draft_content;
 }
 
 /**

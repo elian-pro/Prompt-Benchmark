@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
-import { IconPlus, IconTarget } from "@tabler/icons-react";
+import { IconArrowLeft, IconPlus, IconTarget } from "@tabler/icons-react";
 import type { RunListItem } from "@/lib/db/runs";
 import { PRESET_LABELS } from "@/lib/prompts/adversarial-personas";
 import { relativeTimeEs } from "@/lib/format";
@@ -49,7 +49,10 @@ export default function AdversarialPage() {
     <div>
       <div className="library-header">
         <div>
-          <h1 className="library-title">Adversarial Lab</h1>
+          <Link href="/lab" className="back-link">
+            <IconArrowLeft size={13} /> Lab
+          </Link>
+          <h1 className="library-title">IA vs IA</h1>
           <p className="section-label library-subtitle">
             {runs.length} {runs.length === 1 ? "prueba" : "pruebas"}
           </p>

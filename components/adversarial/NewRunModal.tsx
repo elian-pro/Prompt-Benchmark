@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import { IconTargetArrow } from "@tabler/icons-react";
 import type { ClientSummary, ClientDetail } from "@/lib/db/clients";
 import type { VersionListItem } from "@/lib/db/versions";
 import {
@@ -13,6 +14,7 @@ import {
 } from "@/lib/prompts/adversarial-personas";
 import { Modal } from "@/components/ui/Modal";
 import { Button } from "@/components/ui/Button";
+import { SelectChip } from "@/components/ui/SelectChip";
 
 const INTENSITIES: Intensity[] = [1, 2, 3];
 
@@ -109,22 +111,19 @@ export function NewRunModal({ open, onClose }: { open: boolean; onClose: () => v
     >
       <div className="field">
         <label className="field-label">Cliente</label>
-        {loading ? (
-          <p className="empty-hint">Cargando clientes…</p>
-        ) : (
-          <select
-            className="select"
-            value={clientId}
-            onChange={(e) => setClientId(e.target.value)}
-          >
-            <option value="">Selecciona un cliente…</option>
-            {clients.map((c) => (
-              <option key={c.id} value={c.id}>
-                {c.name}
-              </option>
-            ))}
-          </select>
-        )}
+        <SelectChip
+          icon={<IconTargetArrow size={13} />}
+          value={clientId}
+          onChange={(e) => setClientId(e.target.value)}
+          disabled={loading}
+        >
+          <option value="">{loading ? "Cargando clientes…" : "Selecciona un cliente…"}</option>
+          {clients.map((c) => (
+            <option key={c.id} value={c.id}>
+              {c.name}
+            </option>
+          ))}
+        </SelectChip>
       </div>
 
       {clientId && (

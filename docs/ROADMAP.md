@@ -65,10 +65,14 @@ NEW VERSION badges. Two-step delete with typed-confirmation. Empty
 states. Loading states. Mobile responsive. Animation polish. Tickets
 archived in `docs/SPRINT-5-archive.md`.
 
----
+## Sprint 6 — Lab: Playground + notes-to-Editor handoff ✅
 
-**Roadmap complete (2026-06-24).** Sprints 1–5 are all done. There is no
-Sprint 6 in the current plan; the items below are the candidate next steps.
+The Adversarial-only Lab becomes a hub with two modes: the existing IA vs IA
+run, and a new Playground where the user converses with a client's prompt
+themselves, tags messages, writes feedback notes, and sends them straight
+into an Editor session. Plan and tickets in `docs/SPRINT-6-archive.md`.
+
+---
 
 ## Future (not in current scope)
 
@@ -79,3 +83,5 @@ Sprint 6 in the current plan; the items below are the candidate next steps.
 - Diff view between any two arbitrary versions (currently only sequential
   diffs are easy).
 - Bulk import (paste a JSON / upload a zip with one prompt per client).
+- A judge/report step over Playground conversations (deferred at Sprint 6
+  planning, see `docs/SPRINT-6-archive.md`).

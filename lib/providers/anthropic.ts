@@ -62,6 +62,7 @@ export async function chat(req: ChatRequest, ctx: AdapterContext): Promise<ChatR
     content,
     tokensIn: res.usage.input_tokens,
     tokensOut: res.usage.output_tokens,
+    truncated: res.stop_reason === "max_tokens",
   };
 }
 
@@ -72,6 +73,7 @@ export async function* streamChat(
   const stream = await client(ctx).messages.create({ ...baseParams(req), stream: true });
   let tokensIn = 0;
   let tokensOut = 0;
+  let stopReason: string | null = null;
   for await (const event of stream) {
     if (event.type === "message_start") {
       tokensIn = event.message.usage.input_tokens;
@@ -80,7 +82,8 @@ export async function* streamChat(
     } else if (event.type === "message_delta") {
       // output_tokens on message_delta is the cumulative final count.
       tokensOut = event.usage.output_tokens;
+      stopReason = event.delta.stop_reason;
     }
   }
-  yield { type: "usage", tokensIn, tokensOut };
+  yield { type: "usage", tokensIn, tokensOut, truncated: stopReason === "max_tokens" };
 }

@@ -1,0 +1,13 @@
+-- ============================================================
+-- Per-version change summary (the Editor's "CAMBIOS REALIZADOS").
+--
+-- When a version is created from an Editor chat, the assistant's reply carries
+-- a natural-language summary of what changed (the prose after the fenced prompt
+-- block). We persist it here so the Library detail page can show, per version,
+-- what differs from the previous one — without recomputing a diff.
+--
+-- Nullable: manual edits, imports, and Creator's first version have no
+-- Editor-authored summary (the UI shows "Primera versión" for the oldest and
+-- a neutral placeholder for the rest). Run once in the Supabase SQL Editor.
+-- ============================================================
+alter table versions add column if not exists change_summary text;
