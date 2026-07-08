@@ -9,6 +9,7 @@ import { getSupabase } from "../supabase";
 import { getVersion } from "./versions";
 import { getRoleDefault } from "./role-defaults";
 import { RoleNotConfiguredError } from "./runs";
+import { listNotes, type DemoNoteRow } from "./demo-notes";
 
 export type DemoSessionStatus = "active" | "sent_to_editor";
 export type DemoMessageRole = "human" | "bot";
@@ -38,7 +39,10 @@ export type DemoSessionListItem = DemoSession & {
   client_name: string | null;
   message_count: number;
 };
-export type DemoSessionDetail = DemoSessionListItem & { messages: DemoMessageRow[] };
+export type DemoSessionDetail = DemoSessionListItem & {
+  messages: DemoMessageRow[];
+  notes: DemoNoteRow[];
+};
 
 const SESSION_COLS =
   "id, client_id, version_id, version_number_snapshot, prompt_snapshot, status, " +
@@ -119,9 +123,12 @@ export async function getSession(id: string): Promise<DemoSessionDetail | null> 
     .order("turn_number", { ascending: true });
   if (mErr) throw new Error(`No se pudieron obtener los mensajes: ${mErr.message}`);
 
+  const notes = await listNotes(id);
+
   return {
     ...flattenListItem({ ...session, demo_messages: messages ?? [] }),
     messages: (messages ?? []) as unknown as DemoMessageRow[],
+    notes,
   };
 }
 

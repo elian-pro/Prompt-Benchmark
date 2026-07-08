@@ -79,12 +79,14 @@ session created by the handoff), `demo_messages` (role, content, order). The
 `content` via the same `parseTurn` helper the Adversarial detail page
 already uses, mirroring how `run_messages` does it too.
 
-### T3 — Notes panel
+### T3 — Notes panel ✅
 
-Right-side panel in the Playground chat: multi-select messages, write a
-note (tagged or general), numbered pins linking message ↔ note, edit/delete
-a note. Persisted immediately (`demo_notes`: text, referenced message ids,
-order) — added in the same migration `008` as T2 if not already there.
+Right-side panel in the Playground chat: click one or more messages to tag
+them, write a note (tagged or general), numbered pins linking message ↔
+note in both directions, edit/delete a note. Persisted immediately via a
+new migration `009` (additive, `008` was already shipped by T2):
+`demo_notes` (text, `message_ids` as a jsonb array, timestamps). A note's
+number is just its position in creation order, no separate column needed.
 
 ### T4 — Handoff to Editor
 

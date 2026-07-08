@@ -1,10 +1,15 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
-import { IconArrowLeft, IconSend } from "@tabler/icons-react";
-import type { DemoSessionDetail, DemoMessageRole } from "@/lib/db/demo-sessions";
+import { IconArrowLeft, IconPencil, IconSend, IconTrash } from "@tabler/icons-react";
+import type {
+  DemoSessionDetail,
+  DemoMessageRole,
+  DemoMessageRow,
+} from "@/lib/db/demo-sessions";
+import type { DemoNoteRow } from "@/lib/db/demo-notes";
 import { parseTurn } from "@/lib/adversarial-message";
 import { relativeTimeEs } from "@/lib/format";
 
@@ -15,12 +20,63 @@ function emptyBotMessage(state: string | null): string {
   return state ? `El bot pasó a estado «${state}» y dejó de responder.` : "El bot no envió mensaje.";
 }
 
-function Turn({ role, content }: { role: DemoMessageRole; content: string }) {
-  // The bot under test reads like the assistant; you (the lead) like the user.
+/** A persisted turn: clickable to tag it into the note being composed, and
+ *  carries numbered pins for whichever notes already reference it. */
+function Turn({
+  id,
+  role,
+  content,
+  selected,
+  pins,
+  flashed,
+  onToggleSelect,
+  onJumpToNote,
+  registerRef,
+}: {
+  id: string;
+  role: DemoMessageRole;
+  content: string;
+  selected: boolean;
+  pins: number[];
+  flashed: boolean;
+  onToggleSelect: (id: string) => void;
+  onJumpToNote: (noteIndex: number) => void;
+  registerRef: (id: string, el: HTMLDivElement | null) => void;
+}) {
   const cls = role === "bot" ? "chat-assistant" : "chat-user";
   const { message, state } = parseTurn(content);
   return (
-    <div className={`chat-bubble ${cls}`}>
+    <div
+      ref={(el) => registerRef(id, el)}
+      className={`chat-bubble ${cls}${selected ? " is-selected" : ""}${flashed ? " is-flashed" : ""}`}
+      onClick={() => onToggleSelect(id)}
+      role="button"
+      tabIndex={0}
+      onKeyDown={(e) => {
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          onToggleSelect(id);
+        }
+      }}
+    >
+      {pins.length > 0 && (
+        <div className="chat-pins">
+          {pins.map((p) => (
+            <button
+              key={p}
+              type="button"
+              className="chat-pin"
+              onClick={(e) => {
+                e.stopPropagation();
+                onJumpToNote(p - 1);
+              }}
+              aria-label={`Ir a la nota ${p}`}
+            >
+              {p}
+            </button>
+          ))}
+        </div>
+      )}
       <span className="chat-role">{role === "bot" ? "Bot del cliente" : "Tú (lead)"}</span>
       <div className="chat-content">
         {message ? message : <span className="chat-empty">{emptyBotMessage(state)}</span>}
@@ -31,6 +87,17 @@ function Turn({ role, content }: { role: DemoMessageRole; content: string }) {
           <span className="chat-state-value">{state}</span>
         </div>
       )}
+    </div>
+  );
+}
+
+/** The optimistic bubble shown right after sending, before the reload —
+ *  never persisted yet, so it has no id and can't be tagged. */
+function PendingTurn({ content }: { content: string }) {
+  return (
+    <div className="chat-bubble chat-user">
+      <span className="chat-role">Tú (lead)</span>
+      <div className="chat-content">{content}</div>
     </div>
   );
 }
@@ -51,6 +118,148 @@ function TypingIndicator() {
   );
 }
 
+function NotesPanel({
+  notes,
+  selectedIds,
+  draftText,
+  onDraftChange,
+  editingNoteId,
+  savingNote,
+  noteError,
+  messagesById,
+  onStartEdit,
+  onCancelCompose,
+  onSaveNote,
+  onDeleteNote,
+  onJumpToMessage,
+  registerNoteRef,
+  flashNoteId,
+}: {
+  notes: DemoNoteRow[];
+  selectedIds: string[];
+  draftText: string;
+  onDraftChange: (v: string) => void;
+  editingNoteId: string | null;
+  savingNote: boolean;
+  noteError: string | null;
+  messagesById: Map<string, DemoMessageRow>;
+  onStartEdit: (note: DemoNoteRow) => void;
+  onCancelCompose: () => void;
+  onSaveNote: () => void;
+  onDeleteNote: (id: string) => void;
+  onJumpToMessage: (id: string) => void;
+  registerNoteRef: (id: string, el: HTMLDivElement | null) => void;
+  flashNoteId: string | null;
+}) {
+  const isComposing = editingNoteId !== null || selectedIds.length > 0 || draftText.trim().length > 0;
+
+  return (
+    <aside className="notes-panel">
+      <p className="section-label" style={{ marginBottom: 0 }}>
+        Notas
+      </p>
+
+      <div className="notes-list">
+        {notes.length === 0 && (
+          <p className="empty-hint">
+            Haz clic en uno o más mensajes para taggearlos, o escribe una nota general sin
+            seleccionar nada.
+          </p>
+        )}
+        {notes.map((note, i) => (
+          <div
+            key={note.id}
+            ref={(el) => registerNoteRef(note.id, el)}
+            className={`note-card${flashNoteId === note.id ? " is-flashed" : ""}`}
+          >
+            <div className="note-head">
+              <span className="chat-pin note-index">{i + 1}</span>
+              {note.message_ids.length === 0 && <span className="note-general">General</span>}
+              <div className="note-actions">
+                <button
+                  type="button"
+                  className="icon-btn"
+                  onClick={() => onStartEdit(note)}
+                  aria-label="Editar nota"
+                >
+                  <IconPencil size={14} />
+                </button>
+                <button
+                  type="button"
+                  className="icon-btn"
+                  onClick={() => onDeleteNote(note.id)}
+                  aria-label="Eliminar nota"
+                >
+                  <IconTrash size={14} />
+                </button>
+              </div>
+            </div>
+
+            {note.message_ids.length > 0 && (
+              <div className="note-refs">
+                {note.message_ids.map((mid) => {
+                  const m = messagesById.get(mid);
+                  if (!m) return null;
+                  const { message } = parseTurn(m.content);
+                  const text = message || "(sin mensaje)";
+                  const preview = text.length > 60 ? `${text.slice(0, 60)}…` : text;
+                  return (
+                    <button
+                      key={mid}
+                      type="button"
+                      className="note-ref"
+                      onClick={() => onJumpToMessage(mid)}
+                    >
+                      “{preview}”
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+
+            <p className="note-text">{note.text}</p>
+          </div>
+        ))}
+      </div>
+
+      <div className="note-composer">
+        {selectedIds.length > 0 && (
+          <p className="note-composer-hint">
+            {selectedIds.length} {selectedIds.length === 1 ? "mensaje seleccionado" : "mensajes seleccionados"}
+          </p>
+        )}
+        <textarea
+          className="textarea"
+          rows={3}
+          value={draftText}
+          onChange={(e) => onDraftChange(e.target.value)}
+          placeholder={
+            selectedIds.length > 0
+              ? "Escribe tu feedback sobre lo seleccionado…"
+              : "Escribe una nota general, o selecciona mensajes para taggearlos…"
+          }
+        />
+        {noteError && <p className="form-error">{noteError}</p>}
+        <div className="note-composer-actions">
+          {isComposing && (
+            <button type="button" className="btn btn-ghost btn-sm" onClick={onCancelCompose}>
+              Cancelar
+            </button>
+          )}
+          <button
+            type="button"
+            className="btn btn-primary btn-sm"
+            onClick={onSaveNote}
+            disabled={savingNote || !draftText.trim()}
+          >
+            {savingNote ? "Guardando…" : editingNoteId ? "Guardar cambios" : "Guardar nota"}
+          </button>
+        </div>
+      </div>
+    </aside>
+  );
+}
+
 export default function PlaygroundSessionPage() {
   const params = useParams();
   const id = Array.isArray(params.id) ? params.id[0] : (params.id as string);
@@ -62,8 +271,19 @@ export default function PlaygroundSessionPage() {
   const [pendingHuman, setPendingHuman] = useState<string | null>(null);
   const [sending, setSending] = useState(false);
 
+  const [notes, setNotes] = useState<DemoNoteRow[]>([]);
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [draftText, setDraftText] = useState("");
+  const [editingNoteId, setEditingNoteId] = useState<string | null>(null);
+  const [savingNote, setSavingNote] = useState(false);
+  const [noteError, setNoteError] = useState<string | null>(null);
+  const [flashMessageId, setFlashMessageId] = useState<string | null>(null);
+  const [flashNoteId, setFlashNoteId] = useState<string | null>(null);
+
   const scrollRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const messageRefs = useRef<Record<string, HTMLDivElement | null>>({});
+  const noteRefs = useRef<Record<string, HTMLDivElement | null>>({});
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -71,7 +291,9 @@ export default function PlaygroundSessionPage() {
     try {
       const res = await fetch(`/api/demo-sessions/${id}`);
       if (!res.ok) throw new Error((await res.json()).error ?? "Error al cargar.");
-      setSession(await res.json());
+      const data: DemoSessionDetail = await res.json();
+      setSession(data);
+      setNotes(data.notes);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Error al cargar la conversación.");
     } finally {
@@ -86,6 +308,111 @@ export default function PlaygroundSessionPage() {
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight });
   }, [session?.messages.length, pendingHuman, sending]);
+
+  const messagesById = useMemo(() => {
+    const map = new Map<string, DemoMessageRow>();
+    session?.messages.forEach((m) => map.set(m.id, m));
+    return map;
+  }, [session?.messages]);
+
+  // Every message's pin numbers: which notes (1-indexed, in creation order)
+  // reference it. A message can carry more than one pin.
+  const pinsByMessageId = useMemo(() => {
+    const map = new Map<string, number[]>();
+    notes.forEach((note, i) => {
+      note.message_ids.forEach((mid) => {
+        const arr = map.get(mid) ?? [];
+        arr.push(i + 1);
+        map.set(mid, arr);
+      });
+    });
+    return map;
+  }, [notes]);
+
+  function registerMessageRef(messageId: string, el: HTMLDivElement | null) {
+    messageRefs.current[messageId] = el;
+  }
+  function registerNoteRef(noteId: string, el: HTMLDivElement | null) {
+    noteRefs.current[noteId] = el;
+  }
+
+  function toggleSelect(messageId: string) {
+    setSelectedIds((prev) =>
+      prev.includes(messageId) ? prev.filter((x) => x !== messageId) : [...prev, messageId],
+    );
+  }
+
+  function startEditNote(note: DemoNoteRow) {
+    setEditingNoteId(note.id);
+    setDraftText(note.text);
+    setSelectedIds(note.message_ids);
+    setNoteError(null);
+  }
+
+  function cancelCompose() {
+    setEditingNoteId(null);
+    setDraftText("");
+    setSelectedIds([]);
+    setNoteError(null);
+  }
+
+  async function saveNote() {
+    const text = draftText.trim();
+    if (!text || savingNote) return;
+    setSavingNote(true);
+    setNoteError(null);
+    try {
+      if (editingNoteId) {
+        const res = await fetch(`/api/demo-sessions/${id}/notes/${editingNoteId}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ text, messageIds: selectedIds }),
+        });
+        if (!res.ok) throw new Error((await res.json()).error ?? "No se pudo actualizar la nota.");
+        const updated: DemoNoteRow = await res.json();
+        setNotes((prev) => prev.map((n) => (n.id === updated.id ? updated : n)));
+      } else {
+        const res = await fetch(`/api/demo-sessions/${id}/notes`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ text, messageIds: selectedIds }),
+        });
+        if (!res.ok) throw new Error((await res.json()).error ?? "No se pudo guardar la nota.");
+        const created: DemoNoteRow = await res.json();
+        setNotes((prev) => [...prev, created]);
+      }
+      cancelCompose();
+    } catch (e) {
+      setNoteError(e instanceof Error ? e.message : "Error al guardar la nota.");
+    } finally {
+      setSavingNote(false);
+    }
+  }
+
+  async function removeNote(noteId: string) {
+    try {
+      const res = await fetch(`/api/demo-sessions/${id}/notes/${noteId}`, { method: "DELETE" });
+      if (!res.ok) throw new Error((await res.json()).error ?? "No se pudo eliminar la nota.");
+      setNotes((prev) => prev.filter((n) => n.id !== noteId));
+      if (editingNoteId === noteId) cancelCompose();
+    } catch (e) {
+      setNoteError(e instanceof Error ? e.message : "Error al eliminar la nota.");
+    }
+  }
+
+  function jumpToMessage(messageId: string) {
+    messageRefs.current[messageId]?.scrollIntoView({ behavior: "smooth", block: "center" });
+    setFlashMessageId(messageId);
+    window.setTimeout(() => setFlashMessageId((cur) => (cur === messageId ? null : cur)), 1600);
+  }
+
+  function jumpToNote(noteIndex: number) {
+    const note = notes[noteIndex];
+    if (!note) return;
+    noteRefs.current[note.id]?.scrollIntoView({ behavior: "smooth", block: "center" });
+    setFlashNoteId(note.id);
+    window.setTimeout(() => setFlashNoteId((cur) => (cur === note.id ? null : cur)), 1600);
+  }
 
   function onInputChange(e: React.ChangeEvent<HTMLTextAreaElement>) {
     setInput(e.target.value);
@@ -143,59 +470,95 @@ export default function PlaygroundSessionPage() {
         </div>
       </div>
 
-      <div className="chat-messages" ref={scrollRef}>
-        {session.messages.length === 0 && !pendingHuman && (
-          <p className="empty-hint">
-            Escribe el primer mensaje, como si fueras un lead real, para empezar la conversación.
-          </p>
-        )}
-        {session.messages.map((m) => (
-          <Turn key={m.id} role={m.role} content={m.content} />
-        ))}
-        {pendingHuman && <Turn role="human" content={pendingHuman} />}
-        {sending && <TypingIndicator />}
-      </div>
+      <div className="playground-layout">
+        <div className="playground-chat">
+          <div className="chat-messages" ref={scrollRef}>
+            {session.messages.length === 0 && !pendingHuman && (
+              <p className="empty-hint">
+                Escribe el primer mensaje, como si fueras un lead real, para empezar la
+                conversación.
+              </p>
+            )}
+            {session.messages.map((m) => (
+              <Turn
+                key={m.id}
+                id={m.id}
+                role={m.role}
+                content={m.content}
+                selected={selectedIds.includes(m.id)}
+                pins={pinsByMessageId.get(m.id) ?? []}
+                flashed={flashMessageId === m.id}
+                onToggleSelect={toggleSelect}
+                onJumpToNote={jumpToNote}
+                registerRef={registerMessageRef}
+              />
+            ))}
+            {pendingHuman && <PendingTurn content={pendingHuman} />}
+            {sending && <TypingIndicator />}
+          </div>
 
-      {error && (
-        <p className="form-error" style={{ marginTop: 12 }}>
-          {error}
-        </p>
-      )}
+          {error && (
+            <p className="form-error" style={{ marginTop: 12 }}>
+              {error}
+            </p>
+          )}
 
-      <div className="chat-composer-zone">
-        <div className="idle-composer chat-composer">
-          <textarea
-            ref={textareaRef}
-            className="idle-composer-input"
-            rows={1}
-            value={input}
-            onChange={onInputChange}
-            onKeyDown={(e) => {
-              if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
-                e.preventDefault();
-                send();
-              }
-            }}
-            placeholder={
-              isActive ? "Escribe como un lead real…" : "Esta conversación ya no admite mensajes."
-            }
-            disabled={sending || !isActive}
-          />
-          <div className="idle-composer-footrow">
-            <span className="idle-composer-hint">
-              {sending ? "Enviando…" : "⌘/Ctrl + Enter para enviar"}
-            </span>
-            <button
-              type="button"
-              className="idle-send-btn"
-              onClick={send}
-              disabled={sending || !isActive || !input.trim()}
-              aria-label="Enviar"
-            >
-              <IconSend size={14} />
-            </button>
+          <div className="chat-composer-zone">
+            <div className="idle-composer chat-composer">
+              <textarea
+                ref={textareaRef}
+                className="idle-composer-input"
+                rows={1}
+                value={input}
+                onChange={onInputChange}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
+                    e.preventDefault();
+                    send();
+                  }
+                }}
+                placeholder={
+                  isActive
+                    ? "Escribe como un lead real…"
+                    : "Esta conversación ya no admite mensajes."
+                }
+                disabled={sending || !isActive}
+              />
+              <div className="idle-composer-footrow">
+                <span className="idle-composer-hint">
+                  {sending ? "Enviando…" : "⌘/Ctrl + Enter para enviar"}
+                </span>
+                <button
+                  type="button"
+                  className="idle-send-btn"
+                  onClick={send}
+                  disabled={sending || !isActive || !input.trim()}
+                  aria-label="Enviar"
+                >
+                  <IconSend size={14} />
+                </button>
+              </div>
+            </div>
           </div>
         </div>
+
+        <NotesPanel
+          notes={notes}
+          selectedIds={selectedIds}
+          draftText={draftText}
+          onDraftChange={setDraftText}
+          editingNoteId={editingNoteId}
+          savingNote={savingNote}
+          noteError={noteError}
+          messagesById={messagesById}
+          onStartEdit={startEditNote}
+          onCancelCompose={cancelCompose}
+          onSaveNote={saveNote}
+          onDeleteNote={removeNote}
+          onJumpToMessage={jumpToMessage}
+          registerNoteRef={registerNoteRef}
+          flashNoteId={flashNoteId}
+        />
       </div>
     </div>
   );
