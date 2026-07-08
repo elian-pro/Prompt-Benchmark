@@ -64,18 +64,20 @@ page title and back-link label to "IA vs IA" for consistency with the new
 naming (`app/adversarial/page.tsx`, `app/adversarial/[id]/page.tsx`,
 Settings' judge system-prompt card title).
 
-### T2 — Playground conversation
+### T2 — Playground conversation ✅
 
-New route (`/lab/playground` or similar), enabling the hub card. Pick
-client + version (defaults to production), start a session, converse in
-WhatsApp-style bubbles with the JSON parsing/state handling from decision 2,
-"Escribiendo…" indicator while the bot replies. Session history (list past
-Playground sessions: client, version, date, note count), reopenable.
+New route (`/lab/playground`), enabling the hub card. Pick client + version
+(defaults to production), start a session, converse in WhatsApp-style
+bubbles with the JSON parsing/state handling from decision 2, "Escribiendo…"
+indicator while the bot replies. Session history (list past Playground
+sessions: client, version, message count, date), reopenable.
 
-Needs migration `008` (new, additive): `demo_sessions` (client, version
-tested, `prompt_snapshot`, `version_number_snapshot`, status, link to the
-Editor session created by the handoff), `demo_messages` (role, content,
-`estado`, order).
+Migration `008` (new, additive): `demo_sessions` (client, version tested,
+`prompt_snapshot`, `version_number_snapshot`, status, link to the Editor
+session created by the handoff), `demo_messages` (role, content, order). The
+`estado` metadata isn't its own column: it's derived at render time from
+`content` via the same `parseTurn` helper the Adversarial detail page
+already uses, mirroring how `run_messages` does it too.
 
 ### T3 — Notes panel
 

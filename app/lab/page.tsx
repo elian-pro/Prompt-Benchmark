@@ -4,9 +4,9 @@ import { IconMessage2, IconTarget } from "@tabler/icons-react";
 /**
  * Lab hub: two ways to put a client's prompt to the test before publishing.
  * "IA vs IA" is the existing Adversarial run (lives at /adversarial,
- * untouched). "Playground" (you converse with the prompt yourself, tag
- * messages, send feedback to the Editor) lands across the rest of this
- * sprint. The card is disabled until then.
+ * untouched). "Playground" (you converse with the prompt yourself) lives at
+ * /lab/playground. Tagging messages and sending feedback notes to the
+ * Editor land later this sprint (T3-T4).
  */
 export default function LabPage() {
   return (
@@ -31,15 +31,14 @@ export default function LabPage() {
           </p>
         </Link>
 
-        <div className="lab-card is-disabled" aria-disabled="true">
-          <span className="lab-card-badge">Próximamente</span>
+        <Link href="/lab/playground" className="lab-card">
           <IconMessage2 size={28} stroke={1.5} className="lab-card-icon" />
           <span className="lab-card-title">Playground</span>
           <p className="lab-card-desc">
             Conversa tú mismo con el prompt, como un lead real. Ideal para
             demos en vivo.
           </p>
-        </div>
+        </Link>
       </div>
     </div>
   );

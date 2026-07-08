@@ -1149,10 +1149,6 @@ a.lab-card:hover {
   border-color: var(--accent);
   transform: translateY(-2px);
 }
-.lab-card.is-disabled {
-  opacity: 0.55;
-  cursor: not-allowed;
-}
 .lab-card-icon {
   color: var(--accent);
 }
@@ -1165,19 +1161,6 @@ a.lab-card:hover {
   line-height: 1.5;
   color: var(--muted);
   margin: 0;
-}
-.lab-card-badge {
-  position: absolute;
-  top: 20px;
-  right: 20px;
-  font-size: 9px;
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
-  color: var(--muted);
-  background: var(--surface2);
-  border: 0.5px solid var(--border2);
-  border-radius: 100px;
-  padding: 3px 9px;
 }
 
 .library-search {
