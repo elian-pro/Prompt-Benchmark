@@ -142,8 +142,30 @@ export async function POST(req: NextRequest, { params }: Params) {
     const encoder = new TextEncoder();
     const stream = new ReadableStream<Uint8Array>({
       async start(controller) {
-        const send = (evt: Record<string, unknown>) =>
+        let closed = false;
+        const send = (evt: Record<string, unknown>) => {
+          if (closed) return;
           controller.enqueue(encoder.encode(JSON.stringify(evt) + "\n"));
+        };
+
+        // Flush a byte immediately, and keep flushing every 15s, so a reverse
+        // proxy in front of the app doesn't 502 the connection while Opus is
+        // still producing its first token (time-to-first-token can be several
+        // seconds on a large prompt, and this route otherwise sends nothing
+        // until then). The client ignores unknown event types, so pings are
+        // harmless. Same resilience the adversarial run route gets for free
+        // from its immediate turn_start.
+        send({ type: "ping" });
+        const heartbeat = setInterval(() => {
+          try {
+            send({ type: "ping" });
+          } catch {
+            // Stream already gone — nothing to keep alive.
+          }
+        }, 15000);
+        const stopHeartbeat = () => {
+          clearInterval(heartbeat);
+        };
 
         let fullText = "";
         let tokensIn = 0;
@@ -181,8 +203,12 @@ export async function POST(req: NextRequest, { params }: Params) {
           if (newDraft) await updateDraft(id, newDraft);
 
           send({ type: "done", truncated, draftBroken });
+          stopHeartbeat();
+          closed = true;
           controller.close();
         } catch (err) {
+          stopHeartbeat();
+          closed = true;
           controller.error(err);
         }
       },
@@ -192,6 +218,9 @@ export async function POST(req: NextRequest, { params }: Params) {
       headers: {
         "Content-Type": "application/x-ndjson; charset=utf-8",
         "Cache-Control": "no-store",
+        // Disable proxy buffering (nginx and friends) so bytes stream through
+        // immediately instead of being held back until the response ends.
+        "X-Accel-Buffering": "no",
       },
     });
   } catch (err) {
