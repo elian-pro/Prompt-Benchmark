@@ -1,6 +1,6 @@
 # Plan: sincronización de prompts con n8n ("Promover" actualiza el nodo)
 
-> Estado: PROPUESTA, revisión 3. Nada de esto está implementado. Este
+> Estado: PROPUESTA, revisión 4. Nada de esto está implementado. Este
 > documento existe para pulirse antes de escribir código. Cuando se
 > apruebe, se convertirá en el Sprint 7 y las decisiones finales se
 > integrarán a `docs/ARCHITECTURE.md` y `docs/SPEC.md`.
@@ -8,12 +8,19 @@
 ## 1. Objetivo
 
 Hoy el flujo termina en un paso manual: el usuario copia el prompt al
-portapapeles y lo pega en el nodo de n8n. La meta es que al presionar
-**"Promover a producción"** en la Library, el Studio también escriba ese
-prompt directamente en el nodo de n8n donde vive en producción.
+portapapeles y lo pega en el nodo de n8n. La meta:
+
+- Para flujos alojados en **n8n con acceso** (el de Zebra, o el de un
+  cliente que comparta credenciales): al presionar **"Promover a
+  producción"**, el Studio escribe el prompt directamente en el nodo.
+- Para flujos alojados en **n8n de clientes sin acceso**: el update sigue
+  siendo manual (copiar y pegar), pero el Studio lleva el registro de qué
+  versión está desplegada y avisa cuando producción cambió y el nodo del
+  cliente todavía no.
 
 El Studio pasa de ser "el lugar donde se edita" a ser la **fuente de
-verdad** del prompt, y n8n pasa a ser un destino de despliegue.
+verdad** del prompt. n8n es el destino de despliegue: a veces alcanzable
+por API, a veces no.
 
 Fuera de alcance (por ahora): crear o modificar flujos de n8n más allá del
 system prompt del nodo vinculado, activar/desactivar workflows, y
@@ -26,148 +33,181 @@ sincronizar en sentido n8n → Studio de forma automática (eso sigue siendo
    (`@n8n/n8n-nodes-langchain.agent`). El prompt es siempre el campo
    `parameters.options.systemMessage`. El Studio no necesita soportar
    otros tipos de nodo en v1.
-2. **Un workflow puede tener VARIOS nodos AI Agent.** Por lo tanto el
-   Studio nunca adivina cuál es el correcto: el usuario selecciona
-   manualmente el flujo Y el nodo, idealmente en el momento de dar de
-   alta al cliente (sección 8.2).
+2. **Un workflow puede tener VARIOS nodos AI Agent.** El Studio nunca
+   adivina cuál es el correcto: el usuario selecciona manualmente el
+   flujo Y el nodo, idealmente al dar de alta al cliente (sección 8.3).
+3. **No todos los flujos viven en el n8n de Zebra.** Muchos están en la
+   instancia n8n del propio cliente, sin credenciales para el Studio.
+   Esos destinos existen igual en el sistema, pero en **modo manual**:
+   sin push, sin drift check, con confirmación humana de despliegue.
 
-Consecuencias de diseño:
+## 3. Los dos modos de despliegue
 
-- El binding guarda una referencia explícita al nodo elegido (`node_id`,
-  el id interno estable que n8n asigna a cada nodo, más `node_name` como
-  cache legible).
-- En cada push o verificación, el nodo se localiza por `node_id`. Si no
-  aparece (flujo reconstruido), se intenta por `node_name` como fallback
-  y se pide re-confirmación; si tampoco, el binding queda en error claro
-  ("El nodo vinculado ya no existe en el flujo, vuelve a vincular") y no
-  se escribe nada.
-- Un cliente puede tener varios bindings, incluso dos nodos del mismo
-  workflow (por ejemplo un agente para comentarios y otro para DMs dentro
-  del mismo flujo).
+Cada vínculo cliente ↔ destino n8n (un "binding") tiene un modo:
 
-## 3. Contexto verificado en la app
+| | **Modo API** | **Modo manual** |
+|---|---|---|
+| Dónde vive el flujo | n8n de Zebra, o n8n de cliente que compartió API key | n8n del cliente, sin acceso |
+| Qué guarda el binding | Conexión + workflow + nodo AI Agent concretos | Una etiqueta descriptiva ("n8n de Kuyabeh, flujo WhatsApp") |
+| Al promover | El Studio empuja el prompt vía API (con diff y confirmación) | El Studio ofrece copiar al portapapeles y el usuario confirma "ya lo pegué" |
+| Qué versión está desplegada | Verificable: hash del texto en el nodo | Declarada: la última que el usuario confirmó |
+| Drift | Detectable (comparación real contra n8n) | No detectable; el estado es de confianza |
+| Recordatorio pendiente | Automático si el push falló | Automático si producción avanzó y no se ha confirmado el pegado |
+
+La pieza más valiosa del modo manual es el **estado "pendiente de
+actualizar"**: hoy, cuando promueves una versión, nada te recuerda qué
+nodos de clientes siguen corriendo la anterior. Con esto, el client detail
+(y la tarjeta en la Library) muestran "Producción es v3.3, el n8n del
+cliente sigue en v3.2 confirmada el 2 jul" hasta que confirmes el pegado.
+
+Un cliente puede mezclar modos (un flujo en tu n8n y otro en el suyo). Y
+si un cliente algún día comparte su API key, su instancia se agrega como
+una conexión más y sus bindings manuales se pueden convertir a modo API.
+
+## 4. Contexto verificado en la app
 
 - "Promover a producción" es `POST /api/versions/[id]/promote` →
   `promoteToProduction()` en `lib/db/versions.ts`. Solo mueve el tag
   `is_production` entre versiones del cliente, no crea versión nueva.
-  Este es el punto de enganche natural para el push a n8n.
+  Este es el punto de enganche natural para el push y los recordatorios.
 - Cada prompt lleva una línea `Versión: X.Y` que `syncVersionLine()`
   mantiene sincronizada con `version_number`. Fue diseñada justo para
-  identificar la versión de un prompt viviendo en n8n; aquí la usamos
-  para verificación y detección de drift.
+  identificar la versión de un prompt viviendo en n8n. En modo API sirve
+  para verificación y drift; en modo manual le sirve al humano para ver
+  en el nodo del cliente qué versión quedó pegada.
 - El import desde n8n ya existe (`bump_type: 'imported'`, marca
   `is_legacy`). El vínculo cliente ↔ nodo hoy solo existe en la cabeza
   del equipo; este plan lo vuelve dato.
 - Los secretos ya tienen patrón establecido: cifrado AES-256-GCM en
   `lib/crypto.ts`, almacenados en DB (como `providers`), usados solo
-  server-side desde API routes. La API key de n8n seguirá ese patrón.
-- La instancia de n8n es self-hosted en EasyPanel
-  (`https://n8n-n8n.9qd6cz.easypanel.host`), misma infra que la app.
-  El Studio hablará con su **API pública REST** usando una API key propia.
+  server-side desde API routes. Las API keys de n8n siguen ese patrón.
+- El n8n propio de Zebra es self-hosted en EasyPanel
+  (`https://n8n-n8n.9qd6cz.easypanel.host`), misma infra que la app. Será
+  la primera conexión configurada.
 
-## 4. Decisión de arquitectura: push vs pull
-
-Hay dos formas de lograr "lo que está en producción en el Studio es lo que
-corre en n8n":
+## 5. Decisión de arquitectura: push vs pull (solo aplica al modo API)
 
 | | **Opción A: Push (recomendada)** | Opción B: Pull en runtime |
 |---|---|---|
 | Cómo funciona | Al promover, el Studio escribe el systemMessage del nodo vinculado vía API REST de n8n | Cada workflow arranca pidiendo el prompt de producción al Studio (o a Supabase) |
 | Cambios en n8n | Ninguno | Editar todos los flujos una vez para agregar el fetch |
 | Dependencia en runtime | n8n sigue autocontenido; si el Studio se cae, producción no se entera | Si el Studio o Supabase se caen, los bots de los clientes fallan |
-| Latencia por ejecución | Cero | Una llamada HTTP extra por ejecución |
-| Drift posible | Sí, si alguien edita el nodo a mano (se detecta, sección 8.5) | No, imposible por diseño |
+| Flujos en n8n de clientes | Mismo modelo (modo manual cuando no hay acceso) | Inviable: no vas a apuntar el flujo de un cliente a tu tool interno |
+| Drift posible | Sí, se detecta (sección 8.6) | No, imposible por diseño |
 | Riesgo principal | El PUT de n8n reemplaza el workflow completo (sección 7.2) | Acoplar producción de clientes a un tool interno |
 
-**Recomendación: Opción A (push).** Los flujos atienden leads de clientes
-reales; meterles una dependencia en runtime hacia una herramienta interna
-es un riesgo desproporcionado. El push mantiene n8n exactamente como está
-y solo automatiza el copiar y pegar. La opción B queda documentada como
-evolución futura si algún día se quiere drift cero.
+**Recomendación: Opción A (push).** Además de los argumentos de siempre
+(no meter dependencia en runtime a flujos que atienden leads reales), el
+contexto multi-instancia la vuelve la única opción coherente: el pull ni
+siquiera es planteable en el n8n de un cliente.
 
-## 5. Arquitectura propuesta (opción A)
+## 6. Arquitectura propuesta
 
 ```
 Library (alta de cliente o client detail)
   │
-  │  vincular: elegir workflow → elegir nodo AI Agent → confirmar
-  │  (guardado en n8n_bindings)
+  │  vincular destino:
+  │    modo API:    conexión → workflow → nodo AI Agent → confirmar
+  │    modo manual: etiqueta descriptiva ("n8n de Kuyabeh, flujo X")
   │
   │  "Promover a producción" (cliente con bindings)
   ▼
-POST /api/versions/[id]/promote        ──► marca is_production (igual que hoy)
-  │                                        y si hay bindings:
-  ▼
-lib/n8n/sync.ts  (motor de sincronización)
-  │  1. GET workflow completo a la API de n8n
-  │  2. localiza el nodo por node_id (fallback: node_name; si no: error)
-  │  3. verifica que siga siendo un AI Agent
-  │  4. lee parameters.options.systemMessage actual
-  │  5. guarda snapshot del texto anterior (rollback)
-  │  6. reemplaza SOLO ese string en el JSON
-  │  7. PUT workflow completo de vuelta
-  │  8. registra el evento en n8n_sync_events
-  ▼
-n8n REST API  (X-N8N-API-KEY, cifrada en DB con lib/crypto.ts)
+POST /api/versions/[id]/promote      ──► marca is_production (igual que hoy)
+  │
+  ├── bindings modo API ──► lib/n8n/sync.ts
+  │     1. GET workflow completo (API de la conexión del binding)
+  │     2. localiza el nodo por node_id (fallback: node_name; si no: error)
+  │     3. verifica que siga siendo un AI Agent
+  │     4. lee parameters.options.systemMessage actual
+  │     5. guarda snapshot del texto anterior (rollback)
+  │     6. reemplaza SOLO ese string en el JSON
+  │     7. PUT workflow completo de vuelta
+  │     8. registra el evento en n8n_sync_events
+  │
+  └── bindings modo manual ──► quedan "Pendiente de actualizar";
+        el modal ofrece copiar al portapapeles y el botón
+        "Marcar como actualizado" registra la confirmación
 ```
 
 Componentes nuevos:
 
 | Componente | Ubicación | Responsabilidad |
 |---|---|---|
-| Conexión n8n | Settings + tabla `integration_settings` | URL base + API key cifrada + "Probar conexión" |
-| Bindings | Tabla `n8n_bindings` + UI en alta de cliente y client detail | Vincular un cliente con nodos AI Agent concretos |
-| Cliente REST | `lib/n8n/client.ts` | `listWorkflows()`, `getWorkflow(id)`, `updateWorkflow(id, body)`, con timeouts y errores en español para la UI |
+| Conexiones n8n | Settings + tabla `n8n_connections` | N instancias: nombre, URL base, API key cifrada, "Probar conexión" |
+| Bindings | Tabla `n8n_bindings` + UI en alta de cliente y client detail | Destinos de despliegue por cliente, modo API o manual |
+| Cliente REST | `lib/n8n/client.ts` | `listWorkflows()`, `getWorkflow(id)`, `updateWorkflow(id, body)` contra la conexión que se le pase; timeouts y errores en español |
 | Acceso al nodo | `lib/n8n/agent-node.ts` | Listar los AI Agent de un workflow, localizar el vinculado, leer y escribir su `systemMessage` respetando expresiones |
-| Motor de sync | `lib/n8n/sync.ts` | Orquestar push, drift check, rollback |
-| Bitácora | Tabla `n8n_sync_events` | Auditoría + snapshots para revertir |
+| Motor de sync | `lib/n8n/sync.ts` | Orquestar push, drift check, rollback, y el estado pendiente de los manuales |
+| Bitácora | Tabla `n8n_sync_events` | Auditoría de pushes, confirmaciones manuales y rollbacks; snapshots para revertir |
 
 Todo server-side (regla 5 de CLAUDE.md). El navegador solo habla con
-`/api/...` del Studio; jamás ve la API key de n8n.
+`/api/...` del Studio; jamás ve una API key de n8n.
 
-## 6. Modelo de datos (nueva migración `011_n8n_sync.sql`)
+## 7. Modelo de datos (nueva migración `011_n8n_sync.sql`)
 
 `001_initial.sql` no se toca. Tres tablas nuevas:
 
 ```sql
--- Conexión (una sola instancia de n8n hoy; la tabla lo deja abierto)
-create table integration_settings (
+-- Instancias de n8n alcanzables por API. La de Zebra es la primera;
+-- si un cliente comparte credenciales, la suya se agrega como otra fila.
+create table n8n_connections (
   id uuid primary key default uuid_generate_v4(),
-  kind text not null unique check (kind in ('n8n')),
+  name text not null,                     -- "Zebra", "Kuyabeh (cliente)"
   base_url text not null,
   api_key_encrypted text not null,        -- mismo formato que providers
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
 
--- Vínculo cliente ↔ nodo AI Agent concreto, elegido manualmente.
--- Un cliente puede tener varios (multi-flujo, o dos agentes en el mismo
--- flujo). El nodo se guarda por id estable de n8n + nombre como cache.
+-- Destino de despliegue de un cliente. Modo 'api': conexión + workflow +
+-- nodo concretos. Modo 'manual': solo una etiqueta; el update lo hace un
+-- humano y aquí se registra qué versión confirmó.
 create table n8n_bindings (
   id uuid primary key default uuid_generate_v4(),
   client_id uuid not null references clients(id) on delete cascade,
-  workflow_id text not null,              -- id de n8n
-  workflow_name text not null,            -- cache para mostrar en UI
-  node_id text not null,                  -- id interno del nodo en n8n
-  node_name text not null,                -- cache para UI y fallback
+  mode text not null check (mode in ('api', 'manual')),
+
+  -- modo api (null en manual)
+  connection_id uuid references n8n_connections(id) on delete restrict,
+  workflow_id text,                       -- id de n8n
+  workflow_name text,                     -- cache para mostrar en UI
+  node_id text,                           -- id interno del nodo en n8n
+  node_name text,                         -- cache para UI y fallback
   expression_prefix boolean not null default false,  -- el systemMessage
                                           -- original traía "=" (expresión)
-  sync_enabled boolean not null default true,
-  last_pushed_version_id uuid references versions(id) on delete set null,
   last_pushed_hash text,                  -- sha256 del texto empujado (drift)
-  last_pushed_at timestamptz,
+
+  -- modo manual (null en api)
+  manual_label text,                      -- "n8n de Kuyabeh, flujo WhatsApp"
+
+  -- comunes
+  sync_enabled boolean not null default true,
+  last_deployed_version_id uuid references versions(id) on delete set null,
+  last_deployed_at timestamptz,
   created_at timestamptz not null default now(),
-  unique (client_id, workflow_id, node_id)
+
+  check (
+    (mode = 'api' and connection_id is not null and workflow_id is not null
+      and node_id is not null and manual_label is null)
+    or
+    (mode = 'manual' and manual_label is not null and connection_id is null
+      and workflow_id is null and node_id is null)
+  )
 );
 
--- Bitácora de sincronizaciones. También es el mecanismo de rollback:
+create unique index unique_api_binding
+  on n8n_bindings (client_id, connection_id, workflow_id, node_id)
+  where mode = 'api';
+
+-- Bitácora. En modo api también es el mecanismo de rollback:
 -- previous_content guarda lo que había en el nodo antes de sobreescribir.
 create table n8n_sync_events (
   id uuid primary key default uuid_generate_v4(),
   binding_id uuid references n8n_bindings(id) on delete set null,
   client_id uuid references clients(id) on delete set null,
   version_id uuid references versions(id) on delete set null,
-  action text not null check (action in ('push', 'rollback', 'drift_detected')),
+  action text not null check (action in
+    ('push', 'rollback', 'drift_detected', 'manual_confirm')),
   status text not null check (status in ('success', 'error')),
   previous_content text,
   pushed_content text,
@@ -177,173 +217,143 @@ create table n8n_sync_events (
 ```
 
 Notas:
+- `last_deployed_version_id` es el corazón del estado unificado: en modo
+  API lo escribe el push exitoso; en modo manual lo escribe el botón
+  "Marcar como actualizado". El recordatorio "pendiente" es simplemente
+  `last_deployed_version_id != versión de producción actual`.
 - El historial de workflows de n8n es feature enterprise; por eso el
   snapshot para rollback vive de nuestro lado (`previous_content`).
-- Sin unicidad global sobre `(workflow_id, node_id)` a propósito: dos
-  clientes no deberían compartir nodo, pero bloquearlo a nivel DB estorba
-  en migraciones o duplicados temporales. La UI sí advierte si el nodo ya
-  está vinculado a otro cliente.
+- `connection_id` usa `on delete restrict`: no se puede borrar una
+  conexión con bindings vivos (primero convertirlos a manual o
+  desvincular).
 - RLS permisivo `to authenticated`, como el resto del esquema.
 
-## 7. La API de n8n y sus trampas
+## 8. Flujos de usuario (UI en español)
 
-### 7.1 Endpoints
+### 8.1 Conectar instancias de n8n (Settings)
+
+Settings → nueva sección "Conexiones n8n": lista de conexiones (nombre,
+URL, key enmascarada `••••` + últimos 4, "Probar conexión", eliminar), y
+"Agregar conexión". La primera será la de Zebra; las de clientes que
+compartan credenciales se agregan igual.
+
+### 8.2 La API de n8n (modo API)
 
 | Uso | Endpoint |
 |---|---|
 | Listar workflows para el picker | `GET /api/v1/workflows?limit=100` |
 | Leer un workflow completo (picker de nodos, push, drift) | `GET /api/v1/workflows/{id}` |
 | Escribir el prompt | `PUT /api/v1/workflows/{id}` |
-| Probar conexión en Settings | `GET /api/v1/workflows?limit=1` |
+| Probar conexión | `GET /api/v1/workflows?limit=1` |
 
-Autenticación: header `X-N8N-API-KEY`. La key se genera en n8n en
-Settings → n8n API (prerequisito humano del sprint). n8n recarga los
-workflows activos al recibir el PUT: el cambio queda vivo de inmediato,
-sin reiniciar nada.
+Autenticación: header `X-N8N-API-KEY`, generada en cada instancia en
+Settings → n8n API. n8n recarga los workflows activos al recibir el PUT:
+el cambio queda vivo de inmediato.
 
-### 7.2 El PUT es de reemplazo total (riesgo número 1)
+Trampas conocidas y mitigaciones (sin cambios desde la revisión 2, ahora
+aplicadas por conexión):
 
-La API de n8n no tiene "actualiza solo este campo". `PUT` espera el
-workflow completo (`name`, `nodes`, `connections`, `settings`) y reemplaza
-todo. Mitigaciones obligatorias en `lib/n8n/sync.ts`:
+- **El PUT es de reemplazo total.** Mitigación en `lib/n8n/sync.ts`:
+  leer-modificar-escribir atómico y corto (GET fresco, mutar solo el
+  string, PUT inmediato); detección de edición concurrente comparando
+  `versionId`/`updatedAt` capturado al mostrar el diff; sanitizar el body
+  (la API rechaza campos read-only como `id`, `active`, `tags`);
+  snapshot previo siempre en la bitácora.
+- **Expresiones.** Un string que empieza con `=` es expresión y los
+  `{{ ... }}` se interpolan en runtime. Se preserva el prefijo original
+  (`expression_prefix`); si el texto actual del nodo trae `{{ }}` y el
+  prompt nuevo no, se bloquea con advertencia (romperías la inyección de
+  datos del lead); si el prompt nuevo trae `{{ }}` literales y el campo
+  lleva `=`, también se advierte. Tests unitarios propios.
+- **Localización del nodo.** `listAgentNodes(workflow)` alimenta el
+  picker; `findBoundNode(workflow, binding)` busca por `node_id`, cae a
+  `node_name` (flujo reconstruido) pidiendo re-confirmación, y aborta con
+  error claro si no aparece o si el nodo ya no es un AI Agent.
 
-1. **Leer-modificar-escribir atómico y corto**: GET fresco, mutar
-   únicamente el string del systemMessage en memoria, PUT inmediato.
-   Nunca reutilizar un JSON leído minutos antes (por ejemplo el del
-   preview del diff en la UI).
-2. **Detección de edición concurrente**: al mostrar el diff de
-   confirmación se captura `versionId`/`updatedAt` del workflow. Antes
-   del PUT se relee; si cambió, se aborta con "El flujo cambió en n8n
-   mientras confirmabas, revisa y reintenta".
-3. **Sanitizar el body del PUT**: la API rechaza campos read-only (`id`,
-   `active`, `createdAt`, `updatedAt`, `tags`, etc.). El cliente REST
-   arma el body solo con los campos escribibles.
-4. **Snapshot previo siempre**: `previous_content` en la bitácora antes
-   de cada escritura. "Revertir" empuja ese texto de vuelta.
+### 8.3 Vincular al dar de alta al cliente (el camino feliz)
 
-### 7.3 Expresiones de n8n (riesgo número 2)
+El modal de nuevo cliente gana un paso opcional "Despliegue en n8n":
 
-En n8n, un parámetro string que empieza con `=` se evalúa como expresión:
-los `{{ ... }}` internos se interpolan con datos del flujo en runtime. El
-campo `systemMessage` de un AI Agent puede usarse así, por ejemplo para
-inyectar el nombre del lead en el prompt. Reglas del motor:
-
-- Al vincular, se detecta y guarda si el valor original trae el prefijo
-  (`expression_prefix`). Al empujar, se preserva: si estaba, se antepone.
-- Si el systemMessage **actual** del nodo contiene `{{ ... }}` y el prompt
-  nuevo del Studio no los trae, la UI bloquea el push con advertencia
-  clara: empujar rompería la inyección de datos. El usuario decide.
-- Si el prompt nuevo contiene `{{ }}` literales que NO deben evaluarse y
-  el campo lleva prefijo `=`, también se advierte (n8n intentaría
-  evaluarlos).
-
-Es la parte más delicada del plan y lleva tests unitarios propios en
-`lib/n8n/agent-node.ts`.
-
-### 7.4 Localización del nodo vinculado
-
-`lib/n8n/agent-node.ts` implementa las premisas de la sección 2:
-
-- `listAgentNodes(workflow)`: filtra `nodes` por
-  `type === "@n8n/n8n-nodes-langchain.agent"` y devuelve id, nombre y
-  preview del systemMessage de cada uno. Alimenta el picker de la UI.
-- `findBoundNode(workflow, binding)`: busca por `node_id`; si no está,
-  intenta por `node_name` (caso: flujo reconstruido a mano, los ids
-  cambian pero el nombre suele conservarse) y marca el resultado como
-  "encontrado por nombre" para que la UI pida re-confirmar y actualice el
-  `node_id` guardado. Si tampoco, error descriptivo y no se escribe nada.
-- Verificación de tipo: aunque se encuentre el id, si el nodo ya no es un
-  AI Agent se aborta (alguien pudo reemplazarlo).
-- `readSystemMessage(node)` / `writeSystemMessage(node, text)`: acceden a
-  `parameters.options.systemMessage` manejando el caso de que `options`
-  no exista aún (nodo recién creado con el prompt vacío) y el prefijo `=`.
-- Versionado del nodo (`typeVersion`) no afecta la ruta del campo en las
-  versiones actuales del nodo AI Agent; si n8n la moviera en el futuro,
-  este archivo es el único punto a tocar.
-
-## 8. Flujos de usuario (UI en español)
-
-### 8.1 Conectar n8n (una vez, en Settings)
-
-Settings → nueva sección "Integración n8n": URL base, API key, botón
-"Probar conexión". La key se cifra al guardar y nunca vuelve a mostrarse
-completa (solo `••••` + últimos 4).
-
-### 8.2 Vincular al dar de alta al cliente (el camino feliz)
-
-El modal de nuevo cliente en la Library gana un paso opcional "Vincular
-con n8n" (visible solo si la integración está configurada):
-
-1. Buscador de workflows por nombre (`GET /workflows`).
-2. Al elegir uno, se listan **sus nodos AI Agent** (nombre + preview de
-   las primeras líneas del systemMessage de cada uno), porque un flujo
-   puede tener varios. El usuario marca el suyo.
-3. Se pueden agregar más pares flujo/nodo antes de guardar (por ejemplo
-   el agente de comentarios y el de llamadas).
-4. El paso es saltable: un cliente puede nacer sin binding y vincularse
+1. Elegir tipo de destino:
+   - **"En un n8n conectado"**: elegir conexión → buscador de workflows →
+     lista de los nodos AI Agent de ese flujo (nombre + preview de las
+     primeras líneas de su systemMessage, porque puede haber varios) →
+     marcar el correcto.
+   - **"En el n8n del cliente (sin acceso)"**: escribir la etiqueta
+     descriptiva, por ejemplo "n8n de Kuyabeh, flujo WhatsApp".
+2. Se pueden agregar varios destinos de cualquier mezcla de modos antes
+   de guardar.
+3. El paso es saltable: un cliente puede nacer sin destinos y vincularse
    después.
 
-Aplica igual al flujo de "Importar prompt existente": ahí es todavía más
-natural, porque el usuario está trayendo el prompt justamente desde un
-nodo de n8n; vincular en el mismo paso deja el sistema listo (y es la
-"auto-vinculación" de la sección 12, que puede adelantarse si se quiere).
+Aplica igual al flujo de "Importar prompt existente", donde es todavía
+más natural (el prompt viene justamente de un nodo de n8n).
 
-### 8.3 Vincular o ajustar después (client detail)
+### 8.4 Vincular o ajustar después (client detail)
 
-En el client detail de la Library, tarjeta "n8n": misma experiencia de
-picker (workflow → nodo AI Agent → confirmar), con la lista de bindings
-existentes, desvincular por binding, y advertencias suaves:
+Tarjeta "Despliegue n8n" en el client detail: lista de destinos con su
+modo y estado, mismo picker para agregar, desvincular por destino, y
+convertir un destino manual a modo API si la instancia de ese cliente se
+conectó después (elige workflow y nodo, hereda el historial). Advertencias
+suaves al vincular en modo API: si el texto del nodo no se parece al
+prompt de producción (ni comparte la línea `Versión: X.Y`), o si el nodo
+ya está vinculado a otro cliente, se avisa.
 
-- Si el texto del nodo elegido no se parece al prompt de producción del
-  cliente (ni comparte la línea `Versión: X.Y`), se avisa por si se está
-  vinculando el nodo equivocado.
-- Si el nodo ya está vinculado a otro cliente, también se avisa.
+### 8.5 Promover con sincronización
 
-### 8.4 Promover con sincronización
-
-1. Usuario presiona "Promover a producción" en un cliente con bindings.
-2. Modal de confirmación muestra, por cada binding (workflow + nodo), el
-   **diff** entre lo que hay en n8n ahora mismo y lo que se va a empujar.
-3. Al confirmar: primero se marca `is_production` en DB (como hoy), luego
-   se empuja binding por binding.
-4. Resultado parcial posible: si un push falla, la promoción en DB NO se
-   revierte (la verdad del Studio ya cambió); el binding queda "Pendiente
-   de sincronizar" con botón "Reintentar". Nunca se deja al usuario sin
-   saber qué pasó.
-5. Clientes sin binding: el flujo actual no cambia en nada. Copiar al
+1. Usuario presiona "Promover a producción" en un cliente con destinos.
+2. Modal de confirmación con dos bloques:
+   - **Destinos API**: por cada uno, el diff entre lo que hay en n8n
+     ahora mismo y lo que se va a empujar.
+   - **Destinos manuales**: recordatorio de que quedarán pendientes,
+     con botón "Copiar prompt" ahí mismo.
+3. Al confirmar: primero se marca `is_production` en DB (como hoy),
+   luego se empujan los destinos API uno por uno.
+4. Si un push falla, la promoción NO se revierte (la verdad del Studio ya
+   cambió); ese destino queda "Pendiente" con "Reintentar".
+5. Los destinos manuales quedan "Pendiente de actualizar" hasta que el
+   usuario presione "Marcar como actualizado" (registra versión, fecha y
+   evento `manual_confirm`). El botón vive en el modal y en el client
+   detail.
+6. Clientes sin destinos: el flujo actual no cambia en nada. Copiar al
    portapapeles sigue existiendo siempre, también como plan B.
 
-### 8.5 Drift y estado
+### 8.6 Estados por destino
 
-- En el client detail, cada binding muestra un badge calculado al abrir
-  la página (GET al workflow + comparación de hash del systemMessage con
-  `last_pushed_hash`):
-  - **Sincronizado**: el nodo tiene exactamente lo último que se empujó.
-  - **Desincronizado**: alguien editó el nodo a mano después del último
-    push. Acciones: "Ver diff", "Empujar producción" (pisa lo de n8n) o
-    "Importar desde n8n" (trae el texto como versión nueva, reutilizando
-    el import existente).
-  - **Pendiente**: el último push falló.
-  - **Nodo no encontrado**: el flujo cambió y el nodo vinculado ya no
-    existe; acción "Volver a vincular".
-  - **Sin verificar**: n8n no respondió (no bloquea nada, solo informa).
-- Historial "Sincronizaciones" (de `n8n_sync_events`) con botón
-  "Revertir" en cada push exitoso.
+Badge calculado al abrir el client detail:
+
+| Estado | Modo | Significado |
+|---|---|---|
+| **Sincronizado** | API | El nodo tiene exactamente lo último empujado (hash coincide) |
+| **Desincronizado** | API | Alguien editó el nodo a mano después del último push. Acciones: "Ver diff", "Empujar producción", "Importar desde n8n" |
+| **Pendiente** | API | El último push falló. Acción: "Reintentar" |
+| **Nodo no encontrado** | API | El flujo cambió y el nodo vinculado ya no existe. Acción: "Volver a vincular" |
+| **Sin verificar** | API | La instancia no respondió (no bloquea, solo informa) |
+| **Actualizado (declarado)** | manual | La versión confirmada coincide con producción |
+| **Pendiente de actualizar** | manual | Producción avanzó y no se ha confirmado el pegado. Acciones: "Copiar prompt", "Marcar como actualizado" |
+
+El recordatorio de manuales pendientes también se asoma en la tarjeta del
+cliente en la grid de la Library, para que no dependa de abrir el detail.
+
+Historial "Sincronizaciones" (de `n8n_sync_events`) en el client detail,
+con "Revertir" en cada push API exitoso.
 
 ## 9. Seguridad
 
-- La API key de n8n puede reescribir TODOS los workflows de la agencia,
-  no solo prompts. Tratamiento: cifrada con `lib/crypto.ts` (AES-256-GCM,
-  mismo formato que providers), solo descifrada dentro de API routes,
-  jamás en el cliente, jamás en logs. Sin cambios a `.env` (vive en DB,
-  como las keys de LLM). Rotarla en n8n si se sospecha fuga.
-- El motor de sync solo ejecuta `GET workflow` y `PUT workflow`; no expone
-  ejecución ni borrado, aunque la key lo permita.
-- App y n8n corren en el mismo EasyPanel: evaluar usar el hostname interno
-  para que el tráfico no salga a internet (optimización, no bloqueante).
+- Una API key de n8n puede reescribir TODOS los workflows de su
+  instancia, no solo prompts. Y ahora puede haber keys de instancias de
+  clientes: mayor responsabilidad. Tratamiento: cifradas con
+  `lib/crypto.ts` (AES-256-GCM, mismo formato que providers), solo
+  descifradas dentro de API routes, jamás en el cliente, jamás en logs.
+  Sin cambios a `.env` (viven en DB). Rotar en la instancia de origen si
+  se sospecha fuga.
+- El motor de sync solo ejecuta `GET workflow` y `PUT workflow`; no
+  expone ejecución ni borrado, aunque la key lo permita.
+- App y n8n de Zebra corren en el mismo EasyPanel: evaluar hostname
+  interno para ese tráfico (optimización, no bloqueante). Las instancias
+  de clientes siempre van por HTTPS público.
 - Los `n8n_sync_events` guardan prompts completos (contenido sensible de
-  clientes): mismas garantías que la tabla `versions`, nada nuevo
-  expuesto.
+  clientes): mismas garantías que la tabla `versions`.
 
 ## 10. Plan de implementación (propuesta de Sprint 7)
 
@@ -352,42 +362,52 @@ Tickets en orden, uno a la vez, según las reglas del repo:
 | Ticket | Alcance | Riesgo |
 |---|---|---|
 | S7-T1 | Migración `011_n8n_sync.sql` (3 tablas + índices + RLS) | Bajo |
-| S7-T2 | `lib/n8n/client.ts` (REST) + `lib/n8n/agent-node.ts` (listar agentes, localizar nodo por id con fallback por nombre, lectura/escritura del systemMessage, manejo de `=` y `{{ }}`) + tests | Medio |
-| S7-T3 | Settings: sección "Integración n8n" + `/api/integrations/n8n` (guardar cifrado, probar conexión) | Bajo |
-| S7-T4 | Picker de vinculación (workflow → nodo AI Agent con preview) como componente reutilizable + `/api/clients/[id]/n8n-bindings` + tarjeta "n8n" en client detail | Medio |
-| S7-T5 | Integrar el picker al alta de cliente y al import (paso opcional "Vincular con n8n") | Bajo |
-| S7-T6 | Motor `lib/n8n/sync.ts` + hook en promote + modal de diff + estados pendiente/reintentar | Alto |
-| S7-T7 | Drift badge, "Nodo no encontrado" + re-vincular, historial de sincronizaciones, revertir, "Importar desde n8n" desde el diff | Medio |
+| S7-T2 | `lib/n8n/client.ts` (REST por conexión) + `lib/n8n/agent-node.ts` (listar agentes, localizar nodo con fallback, systemMessage, `=` y `{{ }}`) + tests | Medio |
+| S7-T3 | Settings: sección "Conexiones n8n" (CRUD + probar conexión) + `/api/integrations/n8n` | Bajo |
+| S7-T4 | Picker de vinculación (conexión → workflow → nodo, más la variante manual con etiqueta) como componente reutilizable + `/api/clients/[id]/n8n-bindings` + tarjeta "Despliegue n8n" en client detail | Medio |
+| S7-T5 | Integrar el picker al alta de cliente y al import (paso opcional "Despliegue en n8n") | Bajo |
+| S7-T6 | Motor `lib/n8n/sync.ts` + hook en promote + modal de diff/copiar + "Marcar como actualizado" + estados pendiente/reintentar | Alto |
+| S7-T7 | Badges de estado (API y manual), indicador de pendientes en la grid, "Nodo no encontrado" + re-vincular, historial, revertir, "Importar desde n8n" desde el diff | Medio |
 | S7-T8 | Docs: actualizar `ARCHITECTURE.md` y `SPEC.md` en inglés con lo implementado | Bajo |
 
 Sin dependencias nuevas previstas: fetch nativo para la API de n8n, crypto
 ya existe, diff ya existe en `lib/version-utils.ts`.
 
-Prerequisito humano antes de S7-T3: generar la API key en la instancia de
-n8n (Settings → n8n API) y tenerla a la mano para cargarla en el Studio.
+Prerequisito humano antes de S7-T3: generar la API key del n8n de Zebra
+(Settings → n8n API). Las de clientes, cuando y si las compartan.
+
+Nota de alcance: si el sprint se siente grande, el corte natural es
+entregar primero el modo manual (T1, T4, T5 y la mitad de T6/T7): es lo
+que cubre a la mayoría de los clientes hoy y no depende de ninguna API.
+El modo API se monta encima sin retrabajos porque el modelo de datos ya
+lo contempla. Decidir en la decisión abierta 1.
 
 ## 11. Decisiones abiertas (para pulir antes de codear)
 
-1. **¿Push automático o con confirmación?** Este plan propone SIEMPRE
+1. **¿Sprint completo o manual primero?** Ver nota de alcance en la
+   sección 10. Depende de cuántos clientes viven hoy en tu n8n vs el
+   suyo.
+2. **¿Push automático o con confirmación?** Este plan propone SIEMPRE
    mostrar el diff y confirmar (es producción de clientes reales). Se
    puede agregar un toggle "empujar sin preguntar" por binding después.
-2. **¿Promover sigue funcionando si n8n está caído?** Propuesta: sí, la
-   promoción en DB procede y el binding queda "Pendiente". Alternativa
-   más estricta: bloquear la promoción completa. Decidir.
-3. **¿Un binding puede apuntar a un workflow inactivo o de staging?**
-   Propuesta: sí, sin distinción especial en v1; multi-entorno queda para
-   después.
-4. **¿Adelantar la auto-vinculación en el import?** (sección 8.2). Barata
-   si el picker ya existe; decidir si entra en S7-T5 o después.
-5. Nombre de la sección en UI: "n8n", "Producción n8n", "Despliegue".
+3. **¿Promover sigue funcionando si una instancia está caída?**
+   Propuesta: sí, la promoción procede y el destino queda "Pendiente".
+   Alternativa más estricta: bloquear la promoción. Decidir.
+4. **¿Un binding puede apuntar a un workflow inactivo o de staging?**
+   Propuesta: sí, sin distinción especial en v1.
+5. **¿Adelantar la auto-vinculación en el import?** Barata si el picker
+   ya existe; decidir si entra en S7-T5 o después.
+6. Nombres en UI: "Despliegue n8n", "Producción n8n", "Destinos". Y el
+   texto del botón de confirmación manual: "Marcar como actualizado",
+   "Ya lo pegué", "Confirmar despliegue".
 
 ## 12. Evolución futura (fuera de este plan)
 
-- Opción B (pull en runtime) para drift cero, si algún día se acepta la
-  dependencia.
-- Webhook de n8n → Studio al editar un workflow, para detectar drift en
-  tiempo real en lugar de al abrir la página.
-- Soporte multi-instancia de n8n (la tabla `integration_settings` ya lo
-  permite estructuralmente).
+- Opción B (pull en runtime) para drift cero en el n8n propio, si algún
+  día se acepta la dependencia.
+- Webhook de n8n → Studio al editar un workflow, para drift en tiempo
+  real en lugar de al abrir la página.
+- Recordatorios activos de manuales pendientes (resumen al entrar a la
+  app, o aviso a Google Chat como ya hacen los flujos internos de Zebra).
 - Soporte de otros tipos de nodo (Chain LLM, OpenAI message) si algún
   prompt dejara de vivir en un AI Agent.
