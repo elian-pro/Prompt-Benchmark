@@ -1,6 +1,6 @@
 # Plan: sincronización de prompts con n8n ("Promover" actualiza el nodo)
 
-> Estado: PROPUESTA, revisión 4. Nada de esto está implementado. Este
+> Estado: PROPUESTA, revisión 5. Nada de esto está implementado. Este
 > documento existe para pulirse antes de escribir código. Cuando se
 > apruebe, se convertirá en el Sprint 7 y las decisiones finales se
 > integrarán a `docs/ARCHITECTURE.md` y `docs/SPEC.md`.
@@ -357,18 +357,36 @@ con "Revertir" en cada push API exitoso.
 
 ## 10. Plan de implementación (propuesta de Sprint 7)
 
-Tickets en orden, uno a la vez, según las reglas del repo:
+**Prioridad de entrega (decidida):** hoy la mayoría de los clientes viven
+en el n8n propio de Zebra, así que el **modo API es el valor principal de
+v1** y se entrega primero. El modo manual y el multi-instancia NO se
+posponen a otro sprint: el modelo de datos (sección 7) ya los contempla
+desde la primera migración, para no rehacer nada cuando lleguen clientes
+en sus propias instancias. Lo que se secuencia es la UI, no el esquema.
+
+Esto se traduce en dos fases dentro del mismo sprint:
+
+**Fase A: modo API contra el n8n de Zebra (el 80% del valor hoy).**
 
 | Ticket | Alcance | Riesgo |
 |---|---|---|
-| S7-T1 | Migración `011_n8n_sync.sql` (3 tablas + índices + RLS) | Bajo |
+| S7-T1 | Migración `011_n8n_sync.sql` completa (las 3 tablas, con `mode`, `n8n_connections` en plural y todos los campos manuales ya incluidos aunque la UI aún no los use) + índices + RLS | Bajo |
 | S7-T2 | `lib/n8n/client.ts` (REST por conexión) + `lib/n8n/agent-node.ts` (listar agentes, localizar nodo con fallback, systemMessage, `=` y `{{ }}`) + tests | Medio |
-| S7-T3 | Settings: sección "Conexiones n8n" (CRUD + probar conexión) + `/api/integrations/n8n` | Bajo |
-| S7-T4 | Picker de vinculación (conexión → workflow → nodo, más la variante manual con etiqueta) como componente reutilizable + `/api/clients/[id]/n8n-bindings` + tarjeta "Despliegue n8n" en client detail | Medio |
+| S7-T3 | Settings: sección "Conexiones n8n" (CRUD + probar conexión), diseñada multi-instancia desde el día uno aunque se cargue una sola | Bajo |
+| S7-T4 | Picker de vinculación modo API (conexión → workflow → nodo AI Agent con preview) como componente reutilizable + `/api/clients/[id]/n8n-bindings` + tarjeta "Despliegue n8n" en client detail | Medio |
 | S7-T5 | Integrar el picker al alta de cliente y al import (paso opcional "Despliegue en n8n") | Bajo |
-| S7-T6 | Motor `lib/n8n/sync.ts` + hook en promote + modal de diff/copiar + "Marcar como actualizado" + estados pendiente/reintentar | Alto |
-| S7-T7 | Badges de estado (API y manual), indicador de pendientes en la grid, "Nodo no encontrado" + re-vincular, historial, revertir, "Importar desde n8n" desde el diff | Medio |
-| S7-T8 | Docs: actualizar `ARCHITECTURE.md` y `SPEC.md` en inglés con lo implementado | Bajo |
+| S7-T6 | Motor `lib/n8n/sync.ts` + hook en promote + modal de diff + estados sincronizado/desincronizado/pendiente/reintentar + drift badge + historial + revertir | Alto |
+
+Al cerrar la fase A ya tienes lo que pediste originalmente: promover
+actualiza el nodo en tu n8n, con confirmación y drift.
+
+**Fase B: preparación para clientes en sus propias instancias.**
+
+| Ticket | Alcance | Riesgo |
+|---|---|---|
+| S7-T7 | Variante manual del binding: destino con etiqueta, "Marcar como actualizado", estado "Pendiente de actualizar", copiar prompt desde el modal de promoción, indicador de pendientes en la grid de la Library. Agregar segunda conexión (API key de un cliente) ya funciona sin código nuevo porque Settings es multi-instancia | Medio |
+| S7-T8 | Convertir un destino manual a modo API cuando un cliente comparte credenciales (hereda historial) + "Nodo no encontrado" + re-vincular | Bajo |
+| S7-T9 | Docs: actualizar `ARCHITECTURE.md` y `SPEC.md` en inglés con lo implementado | Bajo |
 
 Sin dependencias nuevas previstas: fetch nativo para la API de n8n, crypto
 ya existe, diff ya existe en `lib/version-utils.ts`.
@@ -376,17 +394,17 @@ ya existe, diff ya existe en `lib/version-utils.ts`.
 Prerequisito humano antes de S7-T3: generar la API key del n8n de Zebra
 (Settings → n8n API). Las de clientes, cuando y si las compartan.
 
-Nota de alcance: si el sprint se siente grande, el corte natural es
-entregar primero el modo manual (T1, T4, T5 y la mitad de T6/T7): es lo
-que cubre a la mayoría de los clientes hoy y no depende de ninguna API.
-El modo API se monta encima sin retrabajos porque el modelo de datos ya
-lo contempla. Decidir en la decisión abierta 1.
+Por qué la migración va completa en T1 y no por fases: cambiar el esquema
+después obligaría a un `012_*.sql` que añada `mode` y las columnas
+manuales a una tabla ya poblada, con backfill. Meter todo desde el inicio
+cuesta lo mismo hoy y evita esa cirugía. La regla del repo (no tocar
+`001_initial.sql`, una migración nueva por cambio) se respeta igual.
 
 ## 11. Decisiones abiertas (para pulir antes de codear)
 
-1. **¿Sprint completo o manual primero?** Ver nota de alcance en la
-   sección 10. Depende de cuántos clientes viven hoy en tu n8n vs el
-   suyo.
+1. ~~¿Sprint completo o manual primero?~~ **Decidido:** modo API primero
+   (fase A), modo manual y multi-instancia después (fase B), todo en el
+   mismo sprint y sobre la misma migración. Ver sección 10.
 2. **¿Push automático o con confirmación?** Este plan propone SIEMPRE
    mostrar el diff y confirmar (es producción de clientes reales). Se
    puede agregar un toggle "empujar sin preguntar" por binding después.
@@ -403,11 +421,28 @@ lo contempla. Decidir en la decisión abierta 1.
 
 ## 12. Evolución futura (fuera de este plan)
 
-- Opción B (pull en runtime) para drift cero en el n8n propio, si algún
-  día se acepta la dependencia.
-- Webhook de n8n → Studio al editar un workflow, para drift en tiempo
-  real en lugar de al abrir la página.
-- Recordatorios activos de manuales pendientes (resumen al entrar a la
-  app, o aviso a Google Chat como ya hacen los flujos internos de Zebra).
-- Soporte de otros tipos de nodo (Chain LLM, OpenAI message) si algún
-  prompt dejara de vivir en un AI Agent.
+Este plan ya deja el terreno listo para el crecimiento previsible; lo de
+aquí abajo es lo que queda más allá del horizonte del Sprint 7:
+
+- **Onboarding de instancia de cliente en un paso**: hoy agregar la
+  conexión de un cliente es cargar su URL y API key en Settings (ya
+  soportado). Un futuro asistente podría además descubrir sus workflows y
+  sugerir bindings automáticamente. Barato encima de lo que ya existe.
+- **Salud de conexiones**: un panel que pinga cada instancia y avisa si
+  la API key de un cliente fue revocada o la URL cambió, antes de que
+  falle un push.
+- **Opción B (pull en runtime)** para drift cero en el n8n propio, si
+  algún día se acepta la dependencia. No aplica a instancias de clientes.
+- **Webhook de n8n → Studio** al editar un workflow, para detectar drift
+  en tiempo real en lugar de al abrir la página. Requiere acceso a la
+  instancia, así que primero para el n8n propio.
+- **Recordatorios activos de manuales pendientes**: resumen al entrar a
+  la app, o aviso a Google Chat como ya hacen los flujos internos de
+  Zebra. Cobra más sentido conforme crezcan los clientes en sus propias
+  instancias.
+- **Soporte de otros tipos de nodo** (Chain LLM, OpenAI message) si algún
+  prompt dejara de vivir en un AI Agent. El registro de acceso al nodo
+  (`agent-node.ts`) es el único punto a extender.
+- **Roles y permisos por conexión** si algún día más gente del equipo usa
+  el Studio y no todos deben poder escribir en el n8n de todos los
+  clientes. Hoy no aplica (2 usuarios, un workspace compartido).
