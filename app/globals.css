@@ -517,6 +517,11 @@ button {
   font-size: 13px;
   margin-top: 4px;
 }
+.form-ok {
+  color: var(--success, #16a34a);
+  font-size: 13px;
+  margin-top: 4px;
+}
 
 /* ===========================================================================
    Settings page
