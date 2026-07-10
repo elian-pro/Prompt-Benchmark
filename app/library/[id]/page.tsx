@@ -20,6 +20,7 @@ import { Button } from "@/components/ui/Button";
 import { Modal } from "@/components/ui/Modal";
 import { FindReplace } from "@/components/ui/FindReplace";
 import { SegmentPicker } from "@/components/library/SegmentPicker";
+import { N8nDeploymentCard } from "@/components/library/N8nDeploymentCard";
 
 const SOURCE_LABELS: Record<string, string> = {
   manual: "Manual",
@@ -599,6 +600,8 @@ export default function ClientDetailPage() {
               );
             })}
           </div>
+
+          <N8nDeploymentCard clientId={id} />
         </aside>
 
         {viewingVersion ? (
