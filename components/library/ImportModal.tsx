@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { Modal } from "@/components/ui/Modal";
 import { Button } from "@/components/ui/Button";
 import { SegmentPicker } from "@/components/library/SegmentPicker";
+import { BindOnCreateToggle } from "@/components/library/BindOnCreateToggle";
 
 const VERSION_RE = /^v\d+\.\d+$/;
 
@@ -14,6 +15,7 @@ export function ImportModal({ open, onClose }: { open: boolean; onClose: () => v
   const [segment, setSegment] = useState("");
   const [content, setContent] = useState("");
   const [versionNumber, setVersionNumber] = useState("v1.0");
+  const [bindAfter, setBindAfter] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -55,7 +57,7 @@ export function ImportModal({ open, onClose }: { open: boolean; onClose: () => v
         const data = await vRes.json().catch(() => ({}));
         throw new Error(data.error ?? "No se pudo importar la versión.");
       }
-      router.push(`/library/${client.id}`);
+      router.push(`/library/${client.id}${bindAfter ? "?bind=1" : ""}`);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Error inesperado.");
       setSaving(false);
@@ -108,6 +110,7 @@ export function ImportModal({ open, onClose }: { open: boolean; onClose: () => v
           placeholder="Pega aquí el prompt de producción"
         />
       </div>
+      <BindOnCreateToggle checked={bindAfter} onChange={setBindAfter} />
       {error && <p className="form-error">{error}</p>}
     </Modal>
   );

@@ -21,6 +21,19 @@ export function N8nDeploymentCard({ clientId }: Props) {
   const [modalOpen, setModalOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // Opened straight from creation/import with ?bind=1: auto-open the picker
+  // once, then strip the param so a refresh doesn't reopen it. Reading
+  // window.location avoids the Suspense boundary useSearchParams would require.
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const url = new URL(window.location.href);
+    if (url.searchParams.get("bind") === "1") {
+      setModalOpen(true);
+      url.searchParams.delete("bind");
+      window.history.replaceState(null, "", url.pathname + url.search);
+    }
+  }, []);
+
   const load = useCallback(async () => {
     setLoading(true);
     try {

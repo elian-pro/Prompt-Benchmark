@@ -5,12 +5,14 @@ import { useRouter } from "next/navigation";
 import { Modal } from "@/components/ui/Modal";
 import { Button } from "@/components/ui/Button";
 import { SegmentPicker } from "@/components/library/SegmentPicker";
+import { BindOnCreateToggle } from "@/components/library/BindOnCreateToggle";
 
 export function NewClientModal({ open, onClose }: { open: boolean; onClose: () => void }) {
   const router = useRouter();
   const [name, setName] = useState("");
   const [segment, setSegment] = useState("");
   const [notes, setNotes] = useState("");
+  const [bindAfter, setBindAfter] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -32,7 +34,7 @@ export function NewClientModal({ open, onClose }: { open: boolean; onClose: () =
         throw new Error(data.error ?? "No se pudo crear el cliente.");
       }
       const { client } = await res.json();
-      router.push(`/library/${client.id}`);
+      router.push(`/library/${client.id}${bindAfter ? "?bind=1" : ""}`);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Error inesperado.");
       setSaving(false);
@@ -71,6 +73,7 @@ export function NewClientModal({ open, onClose }: { open: boolean; onClose: () =
           onChange={(e) => setNotes(e.target.value)}
         />
       </div>
+      <BindOnCreateToggle checked={bindAfter} onChange={setBindAfter} />
       {error && <p className="form-error">{error}</p>}
     </Modal>
   );
