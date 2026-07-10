@@ -3202,3 +3202,79 @@ body[data-theme="light"] .dot-grid::after {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+
+/* n8n sync modal (after promote) */
+.n8n-sync-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.n8n-sync-item {
+  padding: 10px 12px;
+  border: 0.5px solid var(--border);
+  border-radius: 10px;
+}
+.switch-inline {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--muted);
+  white-space: nowrap;
+}
+.sync-ok,
+.sync-err {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+  font-weight: 500;
+}
+.sync-ok {
+  color: var(--success, #16a34a);
+}
+.sync-err {
+  color: var(--danger);
+}
+.sync-note {
+  font-size: 12px;
+  color: var(--muted);
+  margin-top: 6px;
+}
+.sync-warn {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--warning, #b45309);
+  margin-top: 6px;
+}
+.sync-diff {
+  margin-top: 8px;
+}
+.sync-diff summary {
+  cursor: pointer;
+  font-size: 12px;
+  color: var(--muted);
+}
+.sync-diff-block {
+  margin-top: 6px;
+}
+.sync-diff-label {
+  display: block;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--faint);
+  margin-bottom: 2px;
+}
+.sync-diff-block pre {
+  max-height: 160px;
+  overflow: auto;
+  padding: 8px;
+  background: var(--surface-2, rgba(127, 127, 127, 0.06));
+  border-radius: 8px;
+  font-size: 12px;
+  white-space: pre-wrap;
+  word-break: break-word;
+}

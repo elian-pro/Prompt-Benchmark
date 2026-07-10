@@ -95,6 +95,16 @@ export function toRawSystemMessage(text: string, expressionPrefix: boolean): str
 }
 
 /**
+ * Returns the raw stored systemMessage (WITH any `=` marker), or "" when
+ * absent. Used for drift hashing and rollback snapshots, where we compare the
+ * exact string n8n holds rather than the human-facing text.
+ */
+export function rawSystemMessage(node: N8nNode): string {
+  const raw = node?.parameters?.options?.systemMessage;
+  return typeof raw === "string" ? raw : "";
+}
+
+/**
  * Returns a deep clone of `node` with its systemMessage set to `text`,
  * preserving the expression marker per `expressionPrefix`. The original node
  * is untouched. `options` is created if the node did not have one.

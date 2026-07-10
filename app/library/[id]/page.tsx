@@ -21,6 +21,7 @@ import { Modal } from "@/components/ui/Modal";
 import { FindReplace } from "@/components/ui/FindReplace";
 import { SegmentPicker } from "@/components/library/SegmentPicker";
 import { N8nDeploymentCard } from "@/components/library/N8nDeploymentCard";
+import { N8nSyncModal } from "@/components/library/N8nSyncModal";
 
 const SOURCE_LABELS: Record<string, string> = {
   manual: "Manual",
@@ -52,6 +53,10 @@ export default function ClientDetailPage() {
   // The version being promoted to production (opens the confirm modal).
   const [promoteTarget, setPromoteTarget] = useState<VersionListItem | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<VersionListItem | null>(null);
+  // Opens the n8n sync modal after a promotion, when the client has bindings.
+  const [syncTarget, setSyncTarget] = useState<{ versionId: string; versionNumber: string } | null>(
+    null,
+  );
   const [busy, setBusy] = useState(false);
 
   // Inline editing of a version's change summary (add it after a quick save).
@@ -223,6 +228,18 @@ export default function ClientDetailPage() {
       // Keep the just-promoted version in view (load() would default to latest).
       setSelectedVersionId(v.id);
       showToast(`${v.version_number} marcada como producción.`);
+      // If the client has API bindings, offer to push the prompt to n8n now.
+      try {
+        const bRes = await fetch(`/api/clients/${id}/n8n-bindings`);
+        if (bRes.ok) {
+          const bindings: { mode: string; sync_enabled: boolean }[] = await bRes.json();
+          if (bindings.some((b) => b.mode === "api" && b.sync_enabled)) {
+            setSyncTarget({ versionId: v.id, versionNumber: v.version_number });
+          }
+        }
+      } catch {
+        // Non-blocking: promotion already succeeded; sync can be retried later.
+      }
     } catch (e) {
       showToast(e instanceof Error ? e.message : "Error inesperado.");
     } finally {
@@ -805,6 +822,19 @@ export default function ClientDetailPage() {
           deshacer.
         </p>
       </Modal>
+
+      {syncTarget && (
+        <N8nSyncModal
+          clientId={id}
+          versionId={syncTarget.versionId}
+          versionNumber={syncTarget.versionNumber}
+          onClose={() => setSyncTarget(null)}
+          onDone={({ pushed, failed }) => {
+            if (pushed > 0 && failed === 0) showToast(`Sincronizado con n8n (${pushed}).`);
+            else if (failed > 0) showToast(`Sincronización con ${failed} error(es).`);
+          }}
+        />
+      )}
 
       {toast && <div className="toast">{toast}</div>}
     </div>
