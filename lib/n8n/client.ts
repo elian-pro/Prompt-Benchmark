@@ -85,12 +85,26 @@ async function ensureOk(res: Response, action: string): Promise<Response> {
   throw new N8nApiError(`${action} falló en n8n (${res.status})${detail}.`, res.status);
 }
 
-/** Lists workflows for the picker. Follows n8n's `{ data, nextCursor }` shape. */
+/**
+ * Lists ALL workflows for the picker, following n8n's cursor pagination
+ * (`{ data, nextCursor }`). n8n caps `limit` at 250 and returns a
+ * `nextCursor` when more pages exist; we loop until it's null so instances
+ * with hundreds of workflows show every one. The safety cap stops a runaway
+ * loop if the API ever misbehaves.
+ */
 export async function listWorkflows(creds: N8nConnectionCreds): Promise<WorkflowListItem[]> {
-  const res = await ensureOk(await request(creds, "/workflows?limit=100"), "Listar flujos");
-  const body = await res.json();
-  const rows: any[] = Array.isArray(body?.data) ? body.data : [];
-  return rows.map((w) => ({ id: String(w.id), name: w.name, active: !!w.active }));
+  const out: WorkflowListItem[] = [];
+  let cursor: string | null = null;
+  for (let page = 0; page < 50; page++) {
+    const qs = `/workflows?limit=250${cursor ? `&cursor=${encodeURIComponent(cursor)}` : ""}`;
+    const res = await ensureOk(await request(creds, qs), "Listar flujos");
+    const body = await res.json();
+    const rows: any[] = Array.isArray(body?.data) ? body.data : [];
+    for (const w of rows) out.push({ id: String(w.id), name: w.name, active: !!w.active });
+    cursor = body?.nextCursor ?? null;
+    if (!cursor) break;
+  }
+  return out;
 }
 
 /** Reads one workflow in full (needed for the node picker, push and drift). */

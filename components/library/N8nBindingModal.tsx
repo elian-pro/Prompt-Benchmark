@@ -1,8 +1,10 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { IconPlugConnected, IconSitemap } from "@tabler/icons-react";
 import { Modal } from "@/components/ui/Modal";
 import { Button } from "@/components/ui/Button";
+import { SearchableChip } from "@/components/ui/SearchableChip";
 import type { MaskedConnection } from "@/lib/db/n8n-connections";
 import type { WorkflowListItem } from "@/lib/n8n/client";
 import type { AgentNodeSummary } from "@/lib/n8n/agent-node";
@@ -30,11 +32,11 @@ type Mode = "api" | "manual";
 
 /**
  * Reusable binding picker with two modes:
- * - API: connection -> workflow -> AI Agent node (pushed automatically).
- * - Manual: a free-text label for a client's own n8n we cannot reach; the
- *   human deploys by hand and confirms from the client detail card.
- * Self-contained (fetches connections, workflows and agents on demand) so it
- * can be dropped into the client detail card and the new-client flow alike.
+ * - API: connection -> workflow -> AI Agent node (pushed automatically). The
+ *   node is chosen explicitly (a workflow can hold several AI Agents) and its
+ *   stable n8n id is what the binding stores, so pushes always hit that node.
+ * - Manual: a free-text label for a client's own n8n we cannot reach.
+ * Self-contained (fetches connections, workflows and agents on demand).
  */
 export function N8nBindingModal({ open, onClose, onConfirm, onConfirmManual }: Props) {
   const [mode, setMode] = useState<Mode>("api");
@@ -43,7 +45,6 @@ export function N8nBindingModal({ open, onClose, onConfirm, onConfirmManual }: P
   const [connectionId, setConnectionId] = useState("");
 
   const [workflows, setWorkflows] = useState<WorkflowListItem[]>([]);
-  const [workflowFilter, setWorkflowFilter] = useState("");
   const [workflowId, setWorkflowId] = useState("");
 
   const [agents, setAgents] = useState<AgentNodeSummary[]>([]);
@@ -55,15 +56,6 @@ export function N8nBindingModal({ open, onClose, onConfirm, onConfirmManual }: P
   const [loadingAgents, setLoadingAgents] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
-
-  // Load connections once when opened.
-  useEffect(() => {
-    if (!open) return;
-    fetch("/api/integrations/n8n")
-      .then((r) => r.json())
-      .then((rows: MaskedConnection[]) => setConnections(rows))
-      .catch(() => setError("No se pudieron cargar las conexiones n8n."));
-  }, [open]);
 
   const loadWorkflows = useCallback(async (connId: string) => {
     setLoadingWorkflows(true);
@@ -82,6 +74,22 @@ export function N8nBindingModal({ open, onClose, onConfirm, onConfirmManual }: P
       setLoadingWorkflows(false);
     }
   }, []);
+
+  // Load connections once when opened, and auto-select the first one (usually
+  // the team's own "Zebra") so its workflows are ready without an extra click.
+  useEffect(() => {
+    if (!open) return;
+    fetch("/api/integrations/n8n")
+      .then((r) => r.json())
+      .then((rows: MaskedConnection[]) => {
+        setConnections(rows);
+        if (rows.length > 0) {
+          setConnectionId(rows[0].id);
+          loadWorkflows(rows[0].id);
+        }
+      })
+      .catch(() => setError("No se pudieron cargar las conexiones n8n."));
+  }, [open, loadWorkflows]);
 
   const loadAgents = useCallback(async (connId: string, wfId: string) => {
     setLoadingAgents(true);
@@ -106,6 +114,8 @@ export function N8nBindingModal({ open, onClose, onConfirm, onConfirmManual }: P
 
   function onPickWorkflow(wfId: string) {
     setWorkflowId(wfId);
+    setAgents([]);
+    setNodeId("");
     if (wfId) loadAgents(connectionId, wfId);
   }
 
@@ -141,10 +151,6 @@ export function N8nBindingModal({ open, onClose, onConfirm, onConfirmManual }: P
     }
   }
 
-  const filteredWorkflows = workflows.filter((w) =>
-    w.name.toLowerCase().includes(workflowFilter.trim().toLowerCase()),
-  );
-
   const canConfirm = mode === "manual" ? Boolean(manualLabel.trim()) : Boolean(nodeId);
 
   return (
@@ -165,20 +171,20 @@ export function N8nBindingModal({ open, onClose, onConfirm, onConfirmManual }: P
     >
       <div className="field">
         <label className="field-label">Tipo de destino</label>
-        <div className="mode-toggle">
+        <div className="chip-row">
           <button
             type="button"
-            className={`mode-toggle-btn${mode === "api" ? " is-active" : ""}`}
+            className={`chip${mode === "api" ? " active" : ""}`}
             onClick={() => setMode("api")}
           >
             En un n8n conectado
           </button>
           <button
             type="button"
-            className={`mode-toggle-btn${mode === "manual" ? " is-active" : ""}`}
+            className={`chip${mode === "manual" ? " active" : ""}`}
             onClick={() => setMode("manual")}
           >
-            En el n8n del cliente (sin acceso)
+            n8n del cliente (sin acceso)
           </button>
         </div>
       </div>
@@ -205,51 +211,35 @@ export function N8nBindingModal({ open, onClose, onConfirm, onConfirmManual }: P
         <>
           <div className="field">
             <label className="field-label">Conexión</label>
-            <select
-              className="select"
+            <SearchableChip
+              icon={<IconPlugConnected size={13} />}
+              placeholder="Elige una conexión"
+              searchPlaceholder="Buscar conexión…"
+              items={connections.map((c) => ({ id: c.id, label: c.name, meta: c.base_url }))}
               value={connectionId}
-              onChange={(e) => onPickConnection(e.target.value)}
-            >
-              <option value="">Elige una conexión…</option>
-              {connections.map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.name}
-                </option>
-              ))}
-            </select>
+              onChange={onPickConnection}
+              emptyText="Sin conexiones."
+            />
           </div>
 
-          {connectionId && (
-            <div className="field">
-              <label className="field-label">Flujo</label>
-              {loadingWorkflows ? (
-                <p className="muted" style={{ fontSize: 13 }}>Cargando flujos…</p>
-              ) : (
-                <>
-                  <input
-                    className="input"
-                    placeholder="Buscar flujo por nombre…"
-                    value={workflowFilter}
-                    onChange={(e) => setWorkflowFilter(e.target.value)}
-                    style={{ marginBottom: 8 }}
-                  />
-                  <select
-                    className="select"
-                    value={workflowId}
-                    onChange={(e) => onPickWorkflow(e.target.value)}
-                  >
-                    <option value="">Elige un flujo…</option>
-                    {filteredWorkflows.map((w) => (
-                      <option key={w.id} value={w.id}>
-                        {w.name}
-                        {w.active ? "" : " (inactivo)"}
-                      </option>
-                    ))}
-                  </select>
-                </>
-              )}
-            </div>
-          )}
+          <div className="field">
+            <label className="field-label">Flujo</label>
+            <SearchableChip
+              icon={<IconSitemap size={13} />}
+              placeholder="Elige un flujo"
+              searchPlaceholder="Buscar flujo por nombre…"
+              items={workflows.map((w) => ({
+                id: w.id,
+                label: w.name,
+                meta: w.active ? "Activo" : "Inactivo",
+              }))}
+              value={workflowId}
+              onChange={onPickWorkflow}
+              loading={loadingWorkflows}
+              emptyText="No se encontraron flujos."
+              disabled={!connectionId}
+            />
+          </div>
 
           {workflowId && (
             <div className="field">
@@ -261,27 +251,34 @@ export function N8nBindingModal({ open, onClose, onConfirm, onConfirmManual }: P
                   Este flujo no tiene nodos AI Agent. Elige otro flujo.
                 </p>
               ) : (
-                <div className="agent-pick-list">
-                  {agents.map((a) => (
-                    <label
-                      key={a.node_id}
-                      className={`agent-pick${nodeId === a.node_id ? " is-active" : ""}`}
-                    >
-                      <input
-                        type="radio"
-                        name="agent-node"
-                        checked={nodeId === a.node_id}
-                        onChange={() => setNodeId(a.node_id)}
-                      />
-                      <span className="agent-pick-body">
-                        <span className="agent-pick-name">{a.node_name}</span>
-                        <span className="agent-pick-preview">
-                          {a.preview || "(prompt vacío)"}
+                <>
+                  <p className="muted" style={{ fontSize: 12, marginBottom: 8 }}>
+                    Elige el nodo cuyo prompt debe actualizarse. Se guarda su id,
+                    así que la app siempre escribe en ese nodo exacto.
+                  </p>
+                  <div className="agent-pick-list">
+                    {agents.map((a) => (
+                      <label
+                        key={a.node_id}
+                        className={`agent-pick${nodeId === a.node_id ? " is-active" : ""}`}
+                      >
+                        <input
+                          type="radio"
+                          name="agent-node"
+                          checked={nodeId === a.node_id}
+                          onChange={() => setNodeId(a.node_id)}
+                        />
+                        <span className="agent-pick-body">
+                          <span className="agent-pick-name">{a.node_name}</span>
+                          <span className="agent-pick-preview">
+                            {a.preview || "(prompt vacío)"}
+                          </span>
+                          <span className="agent-pick-id">id: {a.node_id}</span>
                         </span>
-                      </span>
-                    </label>
-                  ))}
-                </div>
+                      </label>
+                    ))}
+                  </div>
+                </>
               )}
             </div>
           )}

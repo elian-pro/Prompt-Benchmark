@@ -3357,3 +3357,15 @@ body[data-theme="light"] .dot-grid::after {
   padding: 8px 0;
   border-top: 0.5px solid var(--border);
 }
+
+/* n8n binding modal: destination-type chips + node id line */
+.chip-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.agent-pick-id {
+  font-size: 10.5px;
+  color: var(--faint);
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+}
