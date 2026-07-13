@@ -30,10 +30,13 @@
     /page.tsx                  providers + role defaults
   /api/
     /clients/                  CRUD clients
+      /[id]/n8n-bindings/      create/list/delete deploy targets, confirm manual, status (drift)
+      /[id]/n8n-sync/          preview + push to n8n, history, revert
     /versions/                 create version, promote
     /chat-sessions/            editor and creator chats
     /runs/                     adversarial lab
     /providers/                settings, models
+    /integrations/n8n/         connections CRUD, test, list workflows/agents (picker)
     /uploads/                  file upload to Storage
     /role-defaults/            per-role model assignment
 
@@ -46,27 +49,37 @@
     /anthropic.ts              Anthropic native adapter
     /google.ts                 Gemini native adapter
     /openrouter.ts             OpenRouter adapter (wraps openai-compat)
+  /n8n/
+    /client.ts                 REST client for the n8n public API, scoped to one connection
+    /agent-node.ts             read/write an AI Agent node's systemMessage, locate by id/name
+    /sync.ts                   push, drift check (checkDrift), revert (revertPush)
   /db/
     /clients.ts                data access for clients
     /versions.ts               data access for versions
     /chat-sessions.ts
     /runs.ts
     /providers.ts
+    /n8n-connections.ts        n8n instances (encrypted API keys)
+    /n8n-bindings.ts           client deploy targets (API or manual mode)
+    /n8n-sync-events.ts        push/rollback/manual-confirm audit log
   /presets.ts                  adversarial personas (5)
   /failure-modes.ts            judge taxonomy (8 categories)
   /version-utils.ts            bump, compare, diff
 
 /components
   /ui/                         primitives: Button, Card, Modal, Input, Badge
-  /library/                    ClientCard, NewBadge, VersionList, ImportModal
+  /library/                    ClientCard, NewBadge, VersionList, ImportModal,
+                                N8nBindingModal, N8nDeploymentCard, N8nSyncModal, N8nSyncHistory
   /editor/                     ChatMessage, FileUpload, FinalizeButton
   /creator/                    similar
   /adversarial/                ConversationView, ReportCard
+  /settings/                   ..., N8nConnectionFormModal, N8nConnectionRow
 
 /supabase
   /migrations/
     /001_initial.sql           deployed; never edit
-    /002_*.sql                 future migrations
+    /011_n8n_sync.sql          n8n_connections, n8n_bindings, n8n_sync_events
+    /0NN_*.sql                 future migrations
 ```
 
 ## Multi-provider adapter pattern
@@ -181,6 +194,107 @@ This means even if the source version is later auto-deleted by the
 5-version limit, the run report remains fully legible. The FK
 `runs.version_id` uses `ON DELETE SET NULL`.
 
+## n8n prompt sync
+
+Sprint 7. "Promover a producción" can also deploy the prompt straight into
+the n8n workflow node it lives in, so pasting it by hand becomes optional
+instead of the only path. Schema in `011_n8n_sync.sql`; the client-facing
+plan (context, rejected alternatives, open decisions) is
+`docs/N8N-SYNC-PLAN.md`.
+
+**Structural facts this design relies on**: every client prompt lives in a
+node of type `@n8n/n8n-nodes-langchain.agent`, in
+`parameters.options.systemMessage`. A workflow can hold more than one AI
+Agent node, so the app never guesses which one belongs to a client, the
+user picks the workflow and the specific node when binding.
+
+**Three tables**, all in `011_n8n_sync.sql`:
+- `n8n_connections`: reachable n8n instances (base URL + encrypted API
+  key). Zebra's own instance is one row; a client's instance can be added
+  the same way if they ever share credentials. Multi-instance from the
+  first migration, not bolted on later.
+- `n8n_bindings`: a client's deploy targets, one row per target. Two
+  modes, enforced by a `check` constraint:
+  - `mode = 'api'`: `connection_id` + `workflow_id` + `node_id` (the
+    node's stable n8n id, `node_name` cached for a name-fallback lookup
+    and for display). Deployed by the app.
+  - `mode = 'manual'`: just `manual_label` (free text, e.g. "n8n de
+    Kuyabeh, flujo WhatsApp"). Deployed by a human, outside the app,
+    because the app has no credentials for that instance.
+  - Both modes share `last_deployed_version_id` and `last_deployed_at`:
+    written by a successful push (api) or by "Marcar como actualizado"
+    (manual). This is the one field the "pending deploy" reminder reads:
+    a manual binding is pending when it differs from the client's current
+    production version. `last_pushed_hash` (api only) is the sha256 of
+    the raw systemMessage last written, used for drift detection.
+- `n8n_sync_events`: audit log of every push, rollback, drift detection
+  and manual confirmation. A successful push's `previous_content` is the
+  node's exact raw value before the write, which is what "Revertir" plays
+  back; n8n's own workflow version history is an enterprise feature, so
+  this table is the only rollback source available.
+
+**`lib/n8n/agent-node.ts`** is pure (no network, no DB) and does the part
+that needs care: n8n expression handling. A `systemMessage` string that
+starts with `=` is an n8n expression, and its `{{ ... }}` segments are
+interpolated at runtime (e.g. to inject the lead's name); the app must
+preserve that marker on every write (`expression_prefix` on the binding)
+and never blindly overwrite it. `computePushWarnings()` flags two cases
+before a push: the live node interpolates data the new prompt doesn't
+carry (would silently break personalization), or the new prompt contains
+literal `{{ }}` while the field is an expression (n8n would try to
+evaluate them). `locateBoundAgent()` finds the bound node by `node_id`,
+falling back to `node_name` if the workflow was rebuilt by hand (ids
+change, names usually survive); the caller re-confirms and refreshes the
+stored id on a name match. All of this is unit-tested directly
+(`agent-node.test.ts`).
+
+**`lib/n8n/client.ts`** wraps the n8n REST API (`X-N8N-API-KEY` header)
+for one connection: list workflows, get one, update one, test the
+connection. n8n's `PUT /workflows/{id}` replaces the whole workflow (no
+partial update), so `sanitizeForUpdate()` strips read-only fields
+(`id`, `active`, timestamps, `tags`, ...) before every write.
+
+**`lib/n8n/sync.ts`** is the engine, three operations:
+- `previewPush(binding, nextText)`: read-only. Locates the node, computes
+  warnings, and returns current vs. next text plus the workflow's
+  `versionId` at read time, for the confirmation diff.
+- `pushBinding(binding, version, options)`: fresh read, mutate only the
+  target node in memory, write back immediately. If
+  `expectedWorkflowVersionId` is given and the live workflow's
+  `versionId` no longer matches it, the push aborts (someone edited the
+  flow in n8n while the user was looking at the diff). Snapshots the
+  previous raw text, records the new hash on the binding, logs the event.
+- `checkDrift(binding)`: read-only, compares the live node's hash against
+  `last_pushed_hash` to detect a hand-edit in n8n since the last push.
+  A binding that was created but never pushed reports `no_baseline`
+  ("Sin verificar"), not an error.
+- `revertPush(binding, event)`: writes an event's `previous_content` back
+  verbatim (`setRawSystemMessage`, no re-derivation from
+  `expression_prefix`, since the stored value already has any `=` marker
+  baked in). Clears `last_deployed_version_id` on the binding: the
+  restored text predates whatever version was live, so it isn't
+  attributable to a known version.
+
+**Deploy flow**: promoting a version (`POST /api/versions/[id]/promote`)
+only ever flips `is_production` in `versions`, unchanged since before this
+sprint. The client detail page separately checks whether the client has
+any bindings and, if so, opens a confirmation modal: a diff per API
+binding (with warnings, and the option to skip unchanged targets) and a
+copy-and-confirm affordance per manual binding. A partial failure never
+rolls back the promotion, since the Studio's own state already changed;
+a failed API binding is retryable, an unconfirmed manual binding stays
+"Pendiente" until the human confirms.
+
+**API routes**, all server-side, all under `/api/clients/[id]/`:
+`n8n-bindings` (CRUD, `mode` in the POST body selects api vs. manual),
+`n8n-bindings/[bindingId]/confirm` (manual "Marcar como actualizado"),
+`n8n-bindings/status` (drift check for every API binding), `n8n-sync/
+preview` and `n8n-sync` (push), `n8n-sync/history` and `n8n-sync/
+[eventId]/revert`. Picker helpers live under `/api/integrations/n8n/`:
+list connections, list a connection's workflows, list a workflow's AI
+Agent nodes (with a prompt preview, since a workflow can have more than
+one).
+
 ## Uploads TTL
 
 - Editor / Creator file attachments go to Supabase Storage bucket
@@ -210,11 +324,15 @@ This means even if the source version is later auto-deleted by the
   accidentally exposed without Basic Auth, anonymous calls are still
   blocked at the DB layer.
 
-- **API key encryption**: stored in `providers.api_key_encrypted`,
-  encrypted with AES-256-GCM using Node's built-in `crypto` module. The
-  encryption key is derived from `KEY_ENCRYPTION_SECRET` env var via
-  SHA-256. Random 12-byte IV per encryption, stored alongside ciphertext.
-  Format: `base64(iv):base64(ciphertext):base64(authTag)`.
+- **API key encryption**: stored in `providers.api_key_encrypted` and,
+  since Sprint 7, `n8n_connections.api_key_encrypted`, both encrypted with
+  AES-256-GCM using Node's built-in `crypto` module. The encryption key is
+  derived from `KEY_ENCRYPTION_SECRET` env var via SHA-256. Random 12-byte
+  IV per encryption, stored alongside ciphertext. Format:
+  `base64(iv):base64(ciphertext):base64(authTag)`. An n8n API key can
+  rewrite every workflow in that instance, not just prompts, so the sync
+  engine (`lib/n8n/sync.ts`) only ever calls `GET`/`PUT` on a single
+  workflow, never exercising the rest of what the key can do.
 
 - **Rotation**: rotating `KEY_ENCRYPTION_SECRET` invalidates all stored
   keys. Document this loudly in `crypto.ts`.
@@ -234,6 +352,11 @@ See `.env.example`. Required at runtime:
 | `KEY_ENCRYPTION_SECRET` | 32+ byte secret for AES-256-GCM |
 | `NEXT_PUBLIC_BUILD_TAG` | Optional; shown in footer |
 
+No env var was added for n8n sync: connection URLs and API keys are saved
+through the Settings UI into `n8n_connections`, encrypted with the same
+`KEY_ENCRYPTION_SECRET` as everything else, the same way LLM provider keys
+already work.
+
 ## What lives where: cheat sheet
 
 | Concern | Layer |
@@ -245,3 +368,6 @@ See `.env.example`. Required at runtime:
 | Show a ClientCard | `/components/library/ClientCard.tsx` |
 | Theme tokens | `app/globals.css` (CSS variables on `[data-theme]`) |
 | Schema change | new file in `/supabase/migrations/` |
+| Push a prompt to n8n | `/api/clients/[id]/n8n-sync` → `lib/n8n/sync.ts` |
+| Read/write an AI Agent's prompt | `lib/n8n/agent-node.ts` |
+| Encrypt an n8n connection key | `/app/api/integrations/n8n` → `lib/db/n8n-connections.ts` |

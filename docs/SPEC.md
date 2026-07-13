@@ -28,9 +28,12 @@ A single tool where the team:
 - Stress-tests prompts adversarially before sending to production.
 - Creates new prompts from briefs using a chat-driven flow.
 
-Output is always the same: a clean prompt the user copies to clipboard and
-pastes into the corresponding n8n node. The Studio doesn't replace n8n; it
-replaces the chaotic editing process around n8n.
+Output is always the same: a clean prompt. Copying it to clipboard and
+pasting into the corresponding n8n node is still always available; since
+Sprint 7, a client can also be bound to its n8n node so that promoting a
+version deploys the prompt there directly (see "n8n sync" under Library
+below). The Studio doesn't replace n8n; it replaces the chaotic editing
+process around n8n.
 
 ## The four sections
 
@@ -102,6 +105,9 @@ Each card shows:
 - Version count (e.g. "3 / 5 versiones").
 - Badges: `NEW` (15 days after creation), `NEW VERSION` (3-5 days after a
   major bump), `LEGACY` (clients imported from production).
+- A small icon (since Sprint 7) when the client has a manual n8n binding
+  that hasn't confirmed the current production version yet, so a pending
+  hand-deploy is visible without opening the client.
 - Actions: edit (link to detail), copy production prompt to clipboard,
   delete (two-step confirmation).
 
@@ -113,6 +119,32 @@ Top of page:
 Click a card → client detail with version list, manual textarea editor,
 "Finalizar edición" button, "Promover a producción" button, copy-to-
 clipboard button.
+
+#### n8n sync (Sprint 7)
+
+A client detail can be bound to one or more n8n deploy targets, chosen
+when the client is created, imported, or any time later from its detail
+page. Two kinds of target:
+
+- **A connected n8n node.** The user picks a connection (configured once
+  in Settings, see below), a workflow, and the specific AI Agent node
+  (workflows can have more than one, so the picker shows a prompt preview
+  per node to tell them apart). "Promover a producción" then offers to
+  push the prompt there, showing a before/after diff to confirm first.
+  Warns if the deploy would drop an n8n `{{ }}` data interpolation the
+  live node currently has. The client detail shows a live status per
+  target: Sincronizado, Desincronizado (someone edited the node by hand
+  in n8n), Nodo no encontrado, or Sin verificar. A "Sincronizaciones"
+  history panel lists every push with a "Revertir" action.
+- **A client's own n8n (no access).** Just a label, e.g. "n8n de Kuyabeh,
+  flujo WhatsApp". No automatic push. After promoting, the user copies
+  the prompt and pastes it by hand, then presses "Marcar como
+  actualizado" to clear the pending reminder.
+
+**Settings → Conexiones n8n**: add/edit/remove n8n instances (name, base
+URL, API key, "Probar conexión"). Multiple instances are supported (the
+team's own n8n, plus any client instance that shares credentials), even
+though today almost everything lives in the team's own instance.
 
 ## Cross-cutting rules
 
