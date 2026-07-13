@@ -3298,3 +3298,43 @@ body[data-theme="light"] .dot-grid::after {
   align-items: center;
   color: var(--warning, #b45309);
 }
+
+/* n8n drift badges (API bindings) */
+.n8n-drift {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 8px;
+}
+.drift-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  padding: 2px 8px;
+  border-radius: 100px;
+  border: 0.5px solid var(--border);
+}
+.drift-synced {
+  color: var(--success, #16a34a);
+  border-color: var(--success, #16a34a);
+}
+.drift-drifted,
+.drift-not_found,
+.drift-not_agent {
+  color: var(--warning, #b45309);
+  border-color: var(--warning, #b45309);
+}
+.drift-no_baseline,
+.drift-unreachable {
+  color: var(--muted);
+}
+.n8n-sync-link {
+  background: none;
+  border: none;
+  padding: 0;
+  font-size: 12px;
+  color: var(--accent, #6366f1);
+  cursor: pointer;
+  text-decoration: underline;
+}

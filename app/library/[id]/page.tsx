@@ -629,6 +629,14 @@ export default function ClientDetailPage() {
                   }
                 : null
             }
+            onRequestSync={() => {
+              if (!detail.production_version) return;
+              setSyncTarget({
+                versionId: detail.production_version.id,
+                versionNumber: detail.production_version.version_number,
+                versionContent: detail.production_version.content,
+              });
+            }}
           />
         </aside>
 

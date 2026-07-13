@@ -1,8 +1,17 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { IconPlus, IconTrash, IconPlugConnected, IconCopy, IconCheck } from "@tabler/icons-react";
+import {
+  IconPlus,
+  IconTrash,
+  IconPlugConnected,
+  IconCopy,
+  IconCheck,
+  IconAlertTriangle,
+  IconQuestionMark,
+} from "@tabler/icons-react";
 import type { N8nBinding } from "@/lib/db/n8n-bindings";
+import type { DriftResult, DriftStatus } from "@/lib/n8n/sync";
 import { Button } from "@/components/ui/Button";
 import { N8nBindingModal, type BindingSelection } from "./N8nBindingModal";
 
@@ -11,6 +20,18 @@ type ProductionVersion = { id: string; version_number: string; content: string }
 type Props = {
   clientId: string;
   productionVersion: ProductionVersion;
+  /** Opens the promote-style sync modal against the current production
+   *  version, so a drifted binding can be re-pushed with the usual diff. */
+  onRequestSync: () => void;
+};
+
+const DRIFT_LABEL: Record<DriftStatus, string> = {
+  synced: "Sincronizado",
+  drifted: "Desincronizado",
+  no_baseline: "Sin verificar",
+  not_found: "Nodo no encontrado",
+  not_agent: "Nodo no encontrado",
+  unreachable: "Sin verificar",
 };
 
 /**
@@ -20,13 +41,14 @@ type Props = {
  * page lean. Manual targets show a pending-deploy reminder that compares
  * `last_deployed_version_id` against the client's current production version.
  */
-export function N8nDeploymentCard({ clientId, productionVersion }: Props) {
+export function N8nDeploymentCard({ clientId, productionVersion, onRequestSync }: Props) {
   const [bindings, setBindings] = useState<N8nBinding[]>([]);
   const [loading, setLoading] = useState(true);
   const [modalOpen, setModalOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [confirmingId, setConfirmingId] = useState<string | null>(null);
   const [copiedId, setCopiedId] = useState<string | null>(null);
+  const [driftById, setDriftById] = useState<Record<string, DriftResult>>({});
 
   // Opened straight from creation/import with ?bind=1: auto-open the picker
   // once, then strip the param so a refresh doesn't reopen it. Reading
@@ -46,12 +68,25 @@ export function N8nDeploymentCard({ clientId, productionVersion }: Props) {
     try {
       const res = await fetch(`/api/clients/${clientId}/n8n-bindings`);
       if (!res.ok) throw new Error((await res.json()).error ?? "Error al cargar los vínculos.");
-      setBindings(await res.json());
+      const rows: N8nBinding[] = await res.json();
+      setBindings(rows);
       setError(null);
+      if (rows.some((b) => b.mode === "api")) loadDrift();
     } catch (e) {
       setError(e instanceof Error ? e.message : "Error inesperado.");
     } finally {
       setLoading(false);
+    }
+  }, [clientId]);
+
+  const loadDrift = useCallback(async () => {
+    try {
+      const res = await fetch(`/api/clients/${clientId}/n8n-bindings/status`);
+      if (!res.ok) return;
+      const rows: DriftResult[] = await res.json();
+      setDriftById(Object.fromEntries(rows.map((r) => [r.binding_id, r])));
+    } catch {
+      // Non-blocking: drift is informational, retried on next load.
     }
   }, [clientId]);
 
@@ -184,6 +219,29 @@ export function N8nDeploymentCard({ clientId, productionVersion }: Props) {
                 Quitar
               </Button>
             </div>
+
+            {b.mode === "api" && (
+              <div className="n8n-drift">
+                <span className={`drift-badge drift-${driftById[b.id]?.status ?? "no_baseline"}`}>
+                  {driftById[b.id]?.status === "drifted" && <IconAlertTriangle size={12} />}
+                  {(driftById[b.id]?.status === "not_found" ||
+                    driftById[b.id]?.status === "not_agent") && <IconAlertTriangle size={12} />}
+                  {(driftById[b.id]?.status === "no_baseline" ||
+                    driftById[b.id]?.status === "unreachable" ||
+                    !driftById[b.id]) && <IconQuestionMark size={12} />}
+                  {driftById[b.id]?.status === "synced" && <IconCheck size={12} />}
+                  {DRIFT_LABEL[driftById[b.id]?.status ?? "no_baseline"]}
+                </span>
+                {(driftById[b.id]?.status === "drifted" ||
+                  driftById[b.id]?.status === "not_found" ||
+                  driftById[b.id]?.status === "not_agent") &&
+                  productionVersion && (
+                    <button className="n8n-sync-link" onClick={onRequestSync}>
+                      Ver diff / sincronizar
+                    </button>
+                  )}
+              </div>
+            )}
 
             {b.mode === "manual" && (
               <div className="n8n-manual-status">

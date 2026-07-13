@@ -109,6 +109,55 @@ export async function previewPush(binding: N8nBinding, nextText: string): Promis
   }
 }
 
+export type DriftStatus = "synced" | "drifted" | "no_baseline" | "not_found" | "not_agent" | "unreachable";
+
+export type DriftResult = {
+  binding_id: string;
+  status: DriftStatus;
+  message?: string;
+};
+
+/**
+ * Compares the node's live systemMessage hash against `last_pushed_hash` to
+ * tell whether someone edited it by hand in n8n since the last push. Read-only.
+ * `no_baseline` means the binding was created but never pushed yet (nothing
+ * to compare against), which the UI shows as "Sin verificar" rather than an
+ * error.
+ */
+export async function checkDrift(binding: N8nBinding): Promise<DriftResult> {
+  if (binding.mode !== "api" || !binding.connection_id || !binding.workflow_id) {
+    return { binding_id: binding.id, status: "unreachable", message: "El vínculo no es de tipo API." };
+  }
+  if (!binding.last_pushed_hash) {
+    return { binding_id: binding.id, status: "no_baseline" };
+  }
+  try {
+    const creds = await getConnectionCreds(binding.connection_id);
+    const workflow = await getWorkflow(creds, binding.workflow_id);
+    const located = locateBoundAgent(workflow, {
+      node_id: binding.node_id!,
+      node_name: binding.node_name,
+    });
+    if (!located.ok) {
+      return {
+        binding_id: binding.id,
+        status: located.reason === "not_found" ? "not_found" : "not_agent",
+      };
+    }
+    const liveHash = hashSystemMessage(rawSystemMessage(located.node));
+    return {
+      binding_id: binding.id,
+      status: liveHash === binding.last_pushed_hash ? "synced" : "drifted",
+    };
+  } catch (err) {
+    return {
+      binding_id: binding.id,
+      status: "unreachable",
+      message: err instanceof Error ? err.message : "No se pudo leer el flujo en n8n.",
+    };
+  }
+}
+
 export type PushOutcome = {
   binding_id: string;
   status: "success" | "error";
