@@ -39,7 +39,7 @@ test("sanitizeForUpdate defaults settings to an empty object", () => {
 });
 
 test("sanitizeSettings drops UI/enterprise-only keys the PUT rejects", () => {
-  // Shape as returned by GET on a real workflow — the extra keys 400 on PUT.
+  // Shape as returned by GET on a real workflow. The extra keys 400 on PUT.
   const settings = {
     executionOrder: "v1",
     errorWorkflow: "DZXbenEKvV03aJru",
