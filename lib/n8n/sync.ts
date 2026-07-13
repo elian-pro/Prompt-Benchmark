@@ -10,7 +10,12 @@
  */
 import { createHash } from "node:crypto";
 import { getConnectionCreds } from "../db/n8n-connections";
-import { markBindingDeployed, updateBindingNode, type N8nBinding } from "../db/n8n-bindings";
+import {
+  markBindingDeployed,
+  recordRevert,
+  updateBindingNode,
+  type N8nBinding,
+} from "../db/n8n-bindings";
 import { logSyncEvent } from "../db/n8n-sync-events";
 import { getWorkflow, updateWorkflow } from "./client";
 import {
@@ -18,6 +23,7 @@ import {
   locateBoundAgent,
   rawSystemMessage,
   readSystemMessage,
+  setRawSystemMessage,
   toRawSystemMessage,
   writeSystemMessage,
   type PushWarning,
@@ -246,5 +252,81 @@ export async function pushBinding(
     return { binding_id: binding.id, status: "success" };
   } catch (err) {
     return fail(err instanceof Error ? err.message : "No se pudo escribir en n8n.");
+  }
+}
+
+/**
+ * Reverts a successful push: writes `previousContent` (the exact raw value
+ * n8n held before that push, from the event's `previous_content`) back into
+ * the node. Same read-modify-write safety as pushBinding, minus the
+ * concurrent-edit guard (reverting is itself a deliberate, immediate action).
+ * `last_deployed_version_id` is cleared since the restored text no longer
+ * corresponds to a known version. Logs an `action: "rollback"` event.
+ */
+export async function revertPush(
+  binding: N8nBinding,
+  event: { previous_content: string | null },
+): Promise<PushOutcome> {
+  const fail = async (message: string): Promise<PushOutcome> => {
+    await logSyncEvent({
+      binding_id: binding.id,
+      client_id: binding.client_id,
+      version_id: null,
+      action: "rollback",
+      status: "error",
+      error_message: message,
+    });
+    return { binding_id: binding.id, status: "error", message };
+  };
+
+  if (binding.mode !== "api" || !binding.connection_id || !binding.workflow_id) {
+    return fail("El vínculo no es de tipo API.");
+  }
+  if (event.previous_content == null) {
+    return fail("Este evento no tiene contenido previo para revertir.");
+  }
+
+  try {
+    const creds = await getConnectionCreds(binding.connection_id);
+    const workflow = await getWorkflow(creds, binding.workflow_id);
+    const located = locateBoundAgent(workflow, {
+      node_id: binding.node_id!,
+      node_name: binding.node_name,
+    });
+    if (!located.ok) {
+      return fail(
+        located.reason === "not_found"
+          ? "El nodo vinculado ya no existe en el flujo."
+          : "El nodo vinculado ya no es un AI Agent.",
+      );
+    }
+
+    const currentRaw = rawSystemMessage(located.node);
+    const nextNode = setRawSystemMessage(located.node, event.previous_content);
+    workflow.nodes = workflow.nodes.map((n) => (n === located.node ? nextNode : n));
+    await updateWorkflow(creds, binding.workflow_id, workflow);
+
+    if (located.matched_by === "name") {
+      await updateBindingNode(binding.id, { node_id: located.node.id, node_name: located.node.name });
+    }
+
+    await recordRevert(binding.id, {
+      pushedHash: hashSystemMessage(event.previous_content),
+      revertedAt: new Date().toISOString(),
+    });
+
+    await logSyncEvent({
+      binding_id: binding.id,
+      client_id: binding.client_id,
+      version_id: null,
+      action: "rollback",
+      status: "success",
+      previous_content: currentRaw,
+      pushed_content: event.previous_content,
+    });
+
+    return { binding_id: binding.id, status: "success" };
+  } catch (err) {
+    return fail(err instanceof Error ? err.message : "No se pudo revertir en n8n.");
   }
 }

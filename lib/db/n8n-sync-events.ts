@@ -46,6 +46,13 @@ export async function logSyncEvent(input: {
   if (error) console.error(`No se pudo registrar el evento de sync n8n: ${error.message}`);
 }
 
+export async function getSyncEvent(id: string): Promise<SyncEvent | null> {
+  const sb = getSupabase();
+  const { data, error } = await sb.from("n8n_sync_events").select("*").eq("id", id).maybeSingle();
+  if (error) throw new Error(`No se pudo obtener el evento de sync: ${error.message}`);
+  return (data as SyncEvent | null) ?? null;
+}
+
 export async function listSyncEvents(clientId: string, limit = 50): Promise<SyncEvent[]> {
   const sb = getSupabase();
   const { data, error } = await sb

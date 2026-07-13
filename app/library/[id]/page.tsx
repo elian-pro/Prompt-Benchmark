@@ -21,6 +21,7 @@ import { Modal } from "@/components/ui/Modal";
 import { FindReplace } from "@/components/ui/FindReplace";
 import { SegmentPicker } from "@/components/library/SegmentPicker";
 import { N8nDeploymentCard } from "@/components/library/N8nDeploymentCard";
+import { N8nSyncHistory } from "@/components/library/N8nSyncHistory";
 import { N8nSyncModal } from "@/components/library/N8nSyncModal";
 
 const SOURCE_LABELS: Record<string, string> = {
@@ -638,6 +639,7 @@ export default function ClientDetailPage() {
               });
             }}
           />
+          <N8nSyncHistory clientId={id} />
         </aside>
 
         {viewingVersion ? (

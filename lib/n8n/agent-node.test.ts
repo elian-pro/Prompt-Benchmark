@@ -12,6 +12,7 @@ import {
   listAgentNodes,
   locateBoundAgent,
   readSystemMessage,
+  setRawSystemMessage,
   toRawSystemMessage,
   writeSystemMessage,
   type N8nNode,
@@ -74,6 +75,13 @@ test("writeSystemMessage creates options when the node lacks one", () => {
   const node = agent("a", "Agent");
   const next = writeSystemMessage(node, "nuevo", false);
   assert.equal(next.parameters!.options.systemMessage, "nuevo");
+});
+
+test("setRawSystemMessage writes the exact raw string, marker included", () => {
+  const node = agent("a", "Agent", "nuevo");
+  const next = setRawSystemMessage(node, "=viejo {{ $json.x }}");
+  assert.equal(next.parameters!.options.systemMessage, "=viejo {{ $json.x }}");
+  assert.equal(node.parameters!.options.systemMessage, "nuevo");
 });
 
 test("listAgentNodes returns only agents, with a one-line preview", () => {

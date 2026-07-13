@@ -150,6 +150,28 @@ export async function markBindingDeployed(
   if (error) throw new Error(`No se pudo registrar el despliegue: ${error.message}`);
 }
 
+/**
+ * Records a rollback: the node now holds an older, unattributed text (it
+ * predates whichever version was live), so `last_deployed_version_id` is
+ * cleared rather than guessed. `last_pushed_hash` is updated so the drift
+ * badge reads "Sincronizado" against the restored text.
+ */
+export async function recordRevert(
+  id: string,
+  input: { pushedHash: string; revertedAt: string },
+): Promise<void> {
+  const sb = getSupabase();
+  const { error } = await sb
+    .from("n8n_bindings")
+    .update({
+      last_deployed_version_id: null,
+      last_pushed_hash: input.pushedHash,
+      last_deployed_at: input.revertedAt,
+    })
+    .eq("id", id);
+  if (error) throw new Error(`No se pudo registrar la reversión: ${error.message}`);
+}
+
 /** Refreshes the stored node id after a name-fallback re-location (T6). */
 export async function updateBindingNode(
   id: string,

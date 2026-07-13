@@ -114,10 +114,20 @@ export function writeSystemMessage(
   text: string,
   expressionPrefix: boolean,
 ): N8nNode {
+  return setRawSystemMessage(node, toRawSystemMessage(text, expressionPrefix));
+}
+
+/**
+ * Returns a deep clone of `node` with its systemMessage set to the exact raw
+ * string given (marker included, if any). Used for rollback: a sync event's
+ * `previous_content` is already the raw value n8n held, so it's written back
+ * verbatim rather than re-derived from expressionPrefix.
+ */
+export function setRawSystemMessage(node: N8nNode, raw: string): N8nNode {
   const clone: N8nNode = structuredClone(node);
   const params = (clone.parameters ??= {});
   const options = (params.options ??= {});
-  options.systemMessage = toRawSystemMessage(text, expressionPrefix);
+  options.systemMessage = raw;
   return clone;
 }
 
