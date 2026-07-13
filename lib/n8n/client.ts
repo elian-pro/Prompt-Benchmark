@@ -120,15 +120,46 @@ export async function getWorkflow(
 }
 
 /**
+ * The only `settings` keys n8n's public PUT schema accepts. The GET response
+ * carries extra UI/enterprise-only fields (`callerPolicy`, `timeSavedMode`,
+ * `timeSavedPerExecution`, `availableInMCP`, `binaryMode`, ...) that the PUT
+ * rejects with "settings must NOT have additional properties" (HTTP 400), so
+ * we keep only this allow-list and drop the rest.
+ */
+const ALLOWED_SETTINGS_KEYS = [
+  "saveExecutionProgress",
+  "saveManualExecutions",
+  "saveDataErrorExecution",
+  "saveDataSuccessExecution",
+  "executionTimeout",
+  "errorWorkflow",
+  "timezone",
+  "executionOrder",
+] as const;
+
+/** Keeps only the settings keys the public API's PUT schema allows. */
+export function sanitizeSettings(settings: unknown): Record<string, unknown> {
+  const out: Record<string, unknown> = {};
+  if (settings && typeof settings === "object") {
+    for (const key of ALLOWED_SETTINGS_KEYS) {
+      const value = (settings as Record<string, unknown>)[key];
+      if (value !== undefined) out[key] = value;
+    }
+  }
+  return out;
+}
+
+/**
  * Strips read-only fields n8n's PUT rejects, keeping only the writable core.
- * Exported for unit testing.
+ * `settings` is further filtered to the keys the PUT schema accepts (see
+ * sanitizeSettings). Exported for unit testing.
  */
 export function sanitizeForUpdate(workflow: N8nWorkflow): Record<string, unknown> {
   return {
     name: workflow.name,
     nodes: workflow.nodes,
     connections: workflow.connections,
-    settings: workflow.settings ?? {},
+    settings: sanitizeSettings(workflow.settings),
   };
 }
 

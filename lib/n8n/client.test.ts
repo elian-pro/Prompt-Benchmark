@@ -5,7 +5,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 
-import { sanitizeForUpdate } from "./client.ts";
+import { sanitizeForUpdate, sanitizeSettings } from "./client.ts";
 import type { N8nWorkflow } from "./agent-node.ts";
 
 test("sanitizeForUpdate keeps only writable fields", () => {
@@ -36,4 +36,26 @@ test("sanitizeForUpdate defaults settings to an empty object", () => {
     connections: {},
   } as unknown as N8nWorkflow;
   assert.deepEqual((sanitizeForUpdate(wf) as any).settings, {});
+});
+
+test("sanitizeSettings drops UI/enterprise-only keys the PUT rejects", () => {
+  // Shape as returned by GET on a real workflow — the extra keys 400 on PUT.
+  const settings = {
+    executionOrder: "v1",
+    errorWorkflow: "DZXbenEKvV03aJru",
+    timeSavedMode: "fixed",
+    timeSavedPerExecution: 1,
+    callerPolicy: "workflowsFromSameOwner",
+    availableInMCP: true,
+    binaryMode: "separate",
+  };
+  assert.deepEqual(sanitizeSettings(settings), {
+    executionOrder: "v1",
+    errorWorkflow: "DZXbenEKvV03aJru",
+  });
+});
+
+test("sanitizeSettings tolerates null/undefined", () => {
+  assert.deepEqual(sanitizeSettings(null), {});
+  assert.deepEqual(sanitizeSettings(undefined), {});
 });
