@@ -1,10 +1,11 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { IconAlertTriangle, IconCheck, IconX } from "@tabler/icons-react";
+import { IconAlertTriangle, IconCheck, IconCopy, IconX } from "@tabler/icons-react";
 import { Modal } from "@/components/ui/Modal";
 import { Button } from "@/components/ui/Button";
 import type { PushWarning } from "@/lib/n8n/agent-node";
+import type { N8nBinding } from "@/lib/db/n8n-bindings";
 
 type Preview =
   | {
@@ -41,32 +42,49 @@ type Props = {
   clientId: string;
   versionId: string;
   versionNumber: string;
+  /** The just-promoted version's text, so manual targets can copy it. */
+  versionContent: string;
   onClose: () => void;
   onDone: (summary: { pushed: number; failed: number }) => void;
 };
 
 /**
  * Shown after a version is promoted: previews the change against each API
- * binding and pushes the prompt into n8n on confirmation. The DB promotion
- * already happened, so this modal only drives the deploy side.
+ * binding and pushes the prompt into n8n on confirmation, and lists manual
+ * targets with a copy-and-confirm flow. The DB promotion already happened,
+ * so this modal only drives the deploy side.
  */
-export function N8nSyncModal({ clientId, versionId, versionNumber, onClose, onDone }: Props) {
+export function N8nSyncModal({
+  clientId,
+  versionId,
+  versionNumber,
+  versionContent,
+  onClose,
+  onDone,
+}: Props) {
   const [previews, setPreviews] = useState<Preview[] | null>(null);
   const [selected, setSelected] = useState<Record<string, boolean>>({});
   const [loadError, setLoadError] = useState<string | null>(null);
   const [pushing, setPushing] = useState(false);
   const [outcomes, setOutcomes] = useState<Outcome[] | null>(null);
 
+  const [manualBindings, setManualBindings] = useState<N8nBinding[]>([]);
+  const [copiedId, setCopiedId] = useState<string | null>(null);
+  const [confirmingId, setConfirmingId] = useState<string | null>(null);
+
   const load = useCallback(async () => {
     setLoadError(null);
     try {
-      const res = await fetch(`/api/clients/${clientId}/n8n-sync/preview`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ version_id: versionId }),
-      });
-      if (!res.ok) throw new Error((await res.json()).error ?? "No se pudo leer n8n.");
-      const rows: Preview[] = await res.json();
+      const [pRes, bRes] = await Promise.all([
+        fetch(`/api/clients/${clientId}/n8n-sync/preview`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ version_id: versionId }),
+        }),
+        fetch(`/api/clients/${clientId}/n8n-bindings`),
+      ]);
+      if (!pRes.ok) throw new Error((await pRes.json()).error ?? "No se pudo leer n8n.");
+      const rows: Preview[] = await pRes.json();
       setPreviews(rows);
       // Default-select pushable targets that actually change.
       setSelected(
@@ -74,6 +92,12 @@ export function N8nSyncModal({ clientId, versionId, versionNumber, onClose, onDo
           rows.filter((p) => p.ok && !p.unchanged).map((p) => [p.binding_id, true]),
         ),
       );
+      if (bRes.ok) {
+        const bindings: N8nBinding[] = await bRes.json();
+        setManualBindings(
+          bindings.filter((b) => b.mode === "manual" && b.last_deployed_version_id !== versionId),
+        );
+      }
     } catch (e) {
       setLoadError(e instanceof Error ? e.message : "Error inesperado.");
     }
@@ -82,6 +106,29 @@ export function N8nSyncModal({ clientId, versionId, versionNumber, onClose, onDo
   useEffect(() => {
     load();
   }, [load]);
+
+  async function copyPrompt(bindingId: string) {
+    await navigator.clipboard.writeText(versionContent);
+    setCopiedId(bindingId);
+    window.setTimeout(() => setCopiedId((v) => (v === bindingId ? null : v)), 1800);
+  }
+
+  async function confirmManual(bindingId: string) {
+    setConfirmingId(bindingId);
+    try {
+      const res = await fetch(`/api/clients/${clientId}/n8n-bindings/${bindingId}/confirm`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ version_id: versionId }),
+      });
+      if (!res.ok) throw new Error((await res.json()).error ?? "No se pudo confirmar.");
+      setManualBindings((rows) => rows.filter((b) => b.id !== bindingId));
+    } catch (e) {
+      setLoadError(e instanceof Error ? e.message : "Error inesperado.");
+    } finally {
+      setConfirmingId(null);
+    }
+  }
 
   async function handlePush() {
     if (!previews) return;
@@ -152,9 +199,9 @@ export function N8nSyncModal({ clientId, versionId, versionNumber, onClose, onDo
       )}
       {loadError && <p className="form-error">{loadError}</p>}
 
-      {previews && previews.length === 0 && (
+      {previews && previews.length === 0 && manualBindings.length === 0 && (
         <p className="muted" style={{ fontSize: 13 }}>
-          Este cliente no tiene vínculos n8n de tipo API.
+          Este cliente no tiene vínculos n8n.
         </p>
       )}
 
@@ -224,6 +271,39 @@ export function N8nSyncModal({ clientId, versionId, versionNumber, onClose, onDo
             </div>
           );
         })}
+
+        {manualBindings.map((b) => (
+          <div key={b.id} className="n8n-sync-item">
+            <div className="row-between">
+              <div className="n8n-binding-body">
+                <span className="n8n-binding-node">{b.manual_label}</span>
+                <span className="n8n-binding-meta">Manual, sin push automático</span>
+              </div>
+            </div>
+            <p className="sync-note">
+              Copia el prompt y pégalo en el n8n de este cliente. Cuando termines,
+              confirma para limpiar el pendiente.
+            </p>
+            <div className="n8n-manual-actions">
+              <Button
+                size="sm"
+                variant="secondary"
+                icon={copiedId === b.id ? <IconCheck size={13} /> : <IconCopy size={13} />}
+                onClick={() => copyPrompt(b.id)}
+              >
+                {copiedId === b.id ? "Copiado" : "Copiar prompt"}
+              </Button>
+              <Button
+                size="sm"
+                variant="primary"
+                disabled={confirmingId === b.id}
+                onClick={() => confirmManual(b.id)}
+              >
+                {confirmingId === b.id ? "Confirmando…" : "Marcar como actualizado"}
+              </Button>
+            </div>
+          </div>
+        ))}
       </div>
     </Modal>
   );

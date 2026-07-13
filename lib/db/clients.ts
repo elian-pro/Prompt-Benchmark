@@ -33,7 +33,11 @@ export type ClientSummary = Client & {
   latest_version_created_at: string | null;
   latest_version_bump_type: "major" | "minor" | "imported" | null;
   production_version_number: string | null;
+  production_version_id: string | null;
   last_update_at: string;
+  /** True when a manual n8n binding hasn't confirmed the current production
+   *  version yet (see docs/N8N-SYNC-PLAN.md, "Pendiente de actualizar"). */
+  has_pending_n8n_deploy: boolean;
 };
 
 export type ClientDetail = Client & {
@@ -42,13 +46,14 @@ export type ClientDetail = Client & {
 };
 
 type NestedVersion = {
+  id: string;
   version_number: string;
   created_at: string;
   bump_type: "major" | "minor" | "imported" | null;
   is_production: boolean;
 };
 
-function toSummary(row: any): ClientSummary {
+function toSummary(row: any, pendingClientIds: Set<string>): ClientSummary {
   const versions: NestedVersion[] = row.versions ?? [];
   const sorted = [...versions].sort((a, b) => b.created_at.localeCompare(a.created_at));
   const latest = sorted[0] ?? null;
@@ -61,8 +66,44 @@ function toSummary(row: any): ClientSummary {
     latest_version_created_at: latest?.created_at ?? null,
     latest_version_bump_type: latest?.bump_type ?? null,
     production_version_number: production?.version_number ?? null,
+    production_version_id: production?.id ?? null,
     last_update_at: latest?.created_at ?? row.updated_at,
+    has_pending_n8n_deploy: pendingClientIds.has(row.id),
   };
+}
+
+/**
+ * Client ids with at least one enabled manual n8n binding that hasn't
+ * confirmed the client's current production version. One query for the
+ * whole list (not per-client) to keep listClients cheap.
+ */
+async function pendingN8nDeployClientIds(clientIds: string[]): Promise<Set<string>> {
+  if (clientIds.length === 0) return new Set();
+  const sb = getSupabase();
+
+  const [{ data: bindings, error: bErr }, { data: prodVersions, error: vErr }] = await Promise.all([
+    sb
+      .from("n8n_bindings")
+      .select("client_id, last_deployed_version_id")
+      .eq("mode", "manual")
+      .eq("sync_enabled", true)
+      .in("client_id", clientIds),
+    sb
+      .from("versions")
+      .select("client_id, id")
+      .eq("is_production", true)
+      .in("client_id", clientIds),
+  ]);
+  if (bErr) throw new Error(`No se pudieron calcular los despliegues pendientes: ${bErr.message}`);
+  if (vErr) throw new Error(`No se pudieron calcular los despliegues pendientes: ${vErr.message}`);
+
+  const prodByClient = new Map((prodVersions ?? []).map((v: any) => [v.client_id, v.id]));
+  const pending = new Set<string>();
+  for (const b of bindings ?? []) {
+    const prodId = prodByClient.get(b.client_id as string);
+    if (prodId && b.last_deployed_version_id !== prodId) pending.add(b.client_id as string);
+  }
+  return pending;
 }
 
 export async function listClients({
@@ -75,7 +116,7 @@ export async function listClients({
   const sb = getSupabase();
   let query = sb
     .from("clients")
-    .select("*, versions(version_number, created_at, bump_type, is_production)");
+    .select("*, versions(id, version_number, created_at, bump_type, is_production)");
 
   if (filter === "archived") {
     query = query.not("archived_at", "is", null);
@@ -97,7 +138,8 @@ export async function listClients({
   const { data, error } = await query;
   if (error) throw new Error(`No se pudieron listar los clientes: ${error.message}`);
 
-  let rows = (data ?? []).map(toSummary);
+  const pendingIds = await pendingN8nDeployClientIds((data ?? []).map((r: any) => r.id));
+  let rows = (data ?? []).map((row: any) => toSummary(row, pendingIds));
   if (filter === "production") {
     rows = rows.filter((r) => r.production_version_number !== null);
   } else if (filter === "editing") {

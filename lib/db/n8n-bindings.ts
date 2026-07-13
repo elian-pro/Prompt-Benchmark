@@ -107,6 +107,24 @@ export async function createApiBinding(
   return toBinding(data);
 }
 
+export async function createManualBinding(
+  clientId: string,
+  input: { manual_label: string },
+): Promise<N8nBinding> {
+  const sb = getSupabase();
+  const { data, error } = await sb
+    .from("n8n_bindings")
+    .insert({
+      client_id: clientId,
+      mode: "manual",
+      manual_label: input.manual_label,
+    })
+    .select(`${COLS}, n8n_connections(name)`)
+    .single();
+  if (error) throw new Error(`No se pudo crear el vínculo n8n: ${error.message}`);
+  return toBinding(data);
+}
+
 export async function deleteBinding(id: string): Promise<void> {
   const sb = getSupabase();
   const { error } = await sb.from("n8n_bindings").delete().eq("id", id);

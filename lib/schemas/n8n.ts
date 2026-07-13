@@ -40,7 +40,15 @@ export const createApiBindingSchema = z.object({
   expression_prefix: z.boolean().optional(),
 });
 
+export const createManualBindingSchema = z.object({
+  manual_label: z
+    .string({ required_error: "La etiqueta es obligatoria." })
+    .trim()
+    .min(1, "La etiqueta es obligatoria."),
+});
+
 export type CreateConnectionInput = z.infer<typeof createConnectionSchema>;
 export type UpdateConnectionInput = z.infer<typeof updateConnectionSchema>;
 export type TestConnectionInput = z.infer<typeof testConnectionSchema>;
 export type CreateApiBindingInput = z.infer<typeof createApiBindingSchema>;
+export type CreateManualBindingInput = z.infer<typeof createManualBindingSchema>;

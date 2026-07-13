@@ -54,9 +54,9 @@ export default function ClientDetailPage() {
   const [promoteTarget, setPromoteTarget] = useState<VersionListItem | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<VersionListItem | null>(null);
   // Opens the n8n sync modal after a promotion, when the client has bindings.
-  const [syncTarget, setSyncTarget] = useState<{ versionId: string; versionNumber: string } | null>(
-    null,
-  );
+  const [syncTarget, setSyncTarget] = useState<
+    { versionId: string; versionNumber: string; versionContent: string } | null
+  >(null);
   const [busy, setBusy] = useState(false);
 
   // Inline editing of a version's change summary (add it after a quick save).
@@ -228,13 +228,13 @@ export default function ClientDetailPage() {
       // Keep the just-promoted version in view (load() would default to latest).
       setSelectedVersionId(v.id);
       showToast(`${v.version_number} marcada como producción.`);
-      // If the client has API bindings, offer to push the prompt to n8n now.
+      // If the client has any n8n bindings (API or manual), offer to deploy now.
       try {
         const bRes = await fetch(`/api/clients/${id}/n8n-bindings`);
         if (bRes.ok) {
           const bindings: { mode: string; sync_enabled: boolean }[] = await bRes.json();
-          if (bindings.some((b) => b.mode === "api" && b.sync_enabled)) {
-            setSyncTarget({ versionId: v.id, versionNumber: v.version_number });
+          if (bindings.some((b) => (b.mode === "api" && b.sync_enabled) || b.mode === "manual")) {
+            setSyncTarget({ versionId: v.id, versionNumber: v.version_number, versionContent: v.content ?? "" });
           }
         }
       } catch {
@@ -618,7 +618,18 @@ export default function ClientDetailPage() {
             })}
           </div>
 
-          <N8nDeploymentCard clientId={id} />
+          <N8nDeploymentCard
+            clientId={id}
+            productionVersion={
+              detail.production_version
+                ? {
+                    id: detail.production_version.id,
+                    version_number: detail.production_version.version_number,
+                    content: detail.production_version.content,
+                  }
+                : null
+            }
+          />
         </aside>
 
         {viewingVersion ? (
@@ -828,6 +839,7 @@ export default function ClientDetailPage() {
           clientId={id}
           versionId={syncTarget.versionId}
           versionNumber={syncTarget.versionNumber}
+          versionContent={syncTarget.versionContent}
           onClose={() => setSyncTarget(null)}
           onDone={({ pushed, failed }) => {
             if (pushed > 0 && failed === 0) showToast(`Sincronizado con n8n (${pushed}).`);

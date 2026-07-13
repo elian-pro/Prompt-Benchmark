@@ -3278,3 +3278,23 @@ body[data-theme="light"] .dot-grid::after {
   white-space: pre-wrap;
   word-break: break-word;
 }
+
+/* n8n manual binding status (client detail card + sync modal) */
+.n8n-manual-status {
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 0.5px dashed var(--border);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.n8n-manual-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.n8n-pending-icon {
+  display: inline-flex;
+  align-items: center;
+  color: var(--warning, #b45309);
+}

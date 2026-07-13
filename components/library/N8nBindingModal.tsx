@@ -20,16 +20,25 @@ export type BindingSelection = {
 type Props = {
   open: boolean;
   onClose: () => void;
-  /** Called with the chosen target. The parent persists it. */
+  /** Called with the chosen API target. The parent persists it. */
   onConfirm: (selection: BindingSelection) => Promise<void> | void;
+  /** Called with a manual target's label. The parent persists it. */
+  onConfirmManual: (label: string) => Promise<void> | void;
 };
 
+type Mode = "api" | "manual";
+
 /**
- * Reusable API-mode binding picker: connection -> workflow -> AI Agent node.
+ * Reusable binding picker with two modes:
+ * - API: connection -> workflow -> AI Agent node (pushed automatically).
+ * - Manual: a free-text label for a client's own n8n we cannot reach; the
+ *   human deploys by hand and confirms from the client detail card.
  * Self-contained (fetches connections, workflows and agents on demand) so it
  * can be dropped into the client detail card and the new-client flow alike.
  */
-export function N8nBindingModal({ open, onClose, onConfirm }: Props) {
+export function N8nBindingModal({ open, onClose, onConfirm, onConfirmManual }: Props) {
+  const [mode, setMode] = useState<Mode>("api");
+
   const [connections, setConnections] = useState<MaskedConnection[]>([]);
   const [connectionId, setConnectionId] = useState("");
 
@@ -39,6 +48,8 @@ export function N8nBindingModal({ open, onClose, onConfirm }: Props) {
 
   const [agents, setAgents] = useState<AgentNodeSummary[]>([]);
   const [nodeId, setNodeId] = useState("");
+
+  const [manualLabel, setManualLabel] = useState("");
 
   const [loadingWorkflows, setLoadingWorkflows] = useState(false);
   const [loadingAgents, setLoadingAgents] = useState(false);
@@ -99,13 +110,20 @@ export function N8nBindingModal({ open, onClose, onConfirm }: Props) {
   }
 
   async function handleConfirm() {
-    const connection = connections.find((c) => c.id === connectionId);
-    const workflow = workflows.find((w) => w.id === workflowId);
-    const agent = agents.find((a) => a.node_id === nodeId);
-    if (!connection || !workflow || !agent) return;
     setSaving(true);
     setError(null);
     try {
+      if (mode === "manual") {
+        const label = manualLabel.trim();
+        if (!label) return;
+        await onConfirmManual(label);
+        onClose();
+        return;
+      }
+      const connection = connections.find((c) => c.id === connectionId);
+      const workflow = workflows.find((w) => w.id === workflowId);
+      const agent = agents.find((a) => a.node_id === nodeId);
+      if (!connection || !workflow || !agent) return;
       await onConfirm({
         connection_id: connection.id,
         connection_name: connection.name,
@@ -127,6 +145,8 @@ export function N8nBindingModal({ open, onClose, onConfirm }: Props) {
     w.name.toLowerCase().includes(workflowFilter.trim().toLowerCase()),
   );
 
+  const canConfirm = mode === "manual" ? Boolean(manualLabel.trim()) : Boolean(nodeId);
+
   return (
     <Modal
       open={open}
@@ -137,13 +157,47 @@ export function N8nBindingModal({ open, onClose, onConfirm }: Props) {
           <Button variant="ghost" onClick={onClose} disabled={saving}>
             Cancelar
           </Button>
-          <Button variant="primary" onClick={handleConfirm} disabled={saving || !nodeId}>
+          <Button variant="primary" onClick={handleConfirm} disabled={saving || !canConfirm}>
             {saving ? "Guardando…" : "Vincular"}
           </Button>
         </>
       }
     >
-      {connections.length === 0 ? (
+      <div className="field">
+        <label className="field-label">Tipo de destino</label>
+        <div className="mode-toggle">
+          <button
+            type="button"
+            className={`mode-toggle-btn${mode === "api" ? " is-active" : ""}`}
+            onClick={() => setMode("api")}
+          >
+            En un n8n conectado
+          </button>
+          <button
+            type="button"
+            className={`mode-toggle-btn${mode === "manual" ? " is-active" : ""}`}
+            onClick={() => setMode("manual")}
+          >
+            En el n8n del cliente (sin acceso)
+          </button>
+        </div>
+      </div>
+
+      {mode === "manual" ? (
+        <div className="field">
+          <label className="field-label">Etiqueta</label>
+          <input
+            className="input"
+            value={manualLabel}
+            onChange={(e) => setManualLabel(e.target.value)}
+            placeholder="n8n de Kuyabeh, flujo WhatsApp"
+          />
+          <p className="muted" style={{ fontSize: 12, marginTop: 6 }}>
+            No hay push automático. Después de promover, copias el prompt y
+            confirmas manualmente que ya lo pegaste en n8n.
+          </p>
+        </div>
+      ) : connections.length === 0 ? (
         <p className="muted" style={{ fontSize: 13 }}>
           No hay conexiones n8n. Agrega una en Configuración → Conexiones n8n.
         </p>
