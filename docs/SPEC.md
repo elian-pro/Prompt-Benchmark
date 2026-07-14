@@ -75,10 +75,23 @@ Two AIs converse and a judge produces a structured report.
   `caotico` (typos, off-topic, multimensaje), `evasivo` (won't give data,
   responds with questions), `manipulador` (tries to extract discounts /
   jailbreak), `interrogador` (forces hallucinations with hyper-detail),
-  `comprador` (urgent, frustrated, multi-message bursts).
+  `comprador` (urgent, frustrated, multi-message bursts). The lead never
+  sees the bot's prompt (that would let it target known weak spots instead
+  of behaving like a real prospect who doesn't know the agent's rules).
+  Since Sprint 11, when starting a run the team can optionally write a
+  short "situación del lead" brief (e.g. "Eres un empresario, tienes un
+  presupuesto de 20mdp y quieres una casa"). Without it the lead has no
+  concrete facts to draw on when the bot asks for specifics and either
+  stalls or improvises something incoherent that gets it misclassified as
+  unqualified, cutting the test short. The brief is still just the lead's
+  own situation, not the bot's prompt.
 - **Judge** analyses the full conversation and produces JSON: findings
   categorized by failure mode + severity (`crítico`/`medio`/`bajo`),
   hypothesis of what's wrong, suggested fix, edge cases, scope disclaimer.
+  Since Sprint 11 the judge also receives the bot's prompt as labeled
+  reference context (not just the transcript), so it can actually check
+  claims against the agent's real instructions instead of guessing at
+  what counts as a hallucination or scope failure.
 
 The 8 failure modes the judge looks for: salida de rol, pérdida de
 objetivo, alucinación, fallo de alcance, manipulación/jailbreak, loop/

@@ -246,6 +246,18 @@ This means even if the source version is later auto-deleted by the
 5-version limit, the run report remains fully legible. The FK
 `runs.version_id` uses `ON DELETE SET NULL`.
 
+Since Sprint 11 (`013_add_lead_brief_to_runs.sql`) a run can also carry
+`lead_brief`, an optional short situation for the adversarial lead (e.g.
+"Eres un empresario, tienes un presupuesto de 20mdp y quieres una casa"),
+appended to `buildLeadSystemPrompt`'s output. It is never derived from
+`prompt_snapshot`: the lead still doesn't see the bot's own rules, it just
+gets concrete facts to answer profiling questions with instead of
+improvising something incoherent. Also since Sprint 11, the judge receives
+`prompt_snapshot` alongside the transcript (`formatJudgeInput` in
+`lib/prompts/judge.ts`), labeled as reference instructions, so hallucination
+and scope-failure findings are checked against what the agent was actually
+told to do rather than inferred from the conversation alone.
+
 ## Playground conversation rounds
 
 Sprint 8 (`012_playground_rounds.sql`). A Playground session can be reset or
