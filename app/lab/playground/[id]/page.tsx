@@ -3,7 +3,14 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
-import { IconArrowLeft, IconArrowRight, IconPencil, IconSend, IconTrash } from "@tabler/icons-react";
+import {
+  IconArrowLeft,
+  IconArrowRight,
+  IconPencil,
+  IconSend,
+  IconTrash,
+  IconNotes,
+} from "@tabler/icons-react";
 import type {
   DemoSessionDetail,
   DemoMessageRole,
@@ -171,17 +178,23 @@ function NotesPanel({
   const isComposing = editingNoteId !== null || selectedIds.length > 0 || draftText.trim().length > 0;
 
   return (
-    <aside className="notes-panel">
-      <p className="section-label" style={{ marginBottom: 0 }}>
-        Notas
-      </p>
+    <aside className="notes-panel notes-card">
+      <div className="notes-header">
+        <p className="section-label" style={{ margin: 0 }}>
+          Notas
+        </p>
+        {notes.length > 0 && <span className="notes-count">{notes.length}</span>}
+      </div>
 
       <div className="notes-list">
         {notes.length === 0 && (
-          <p className="empty-hint">
-            Haz clic en uno o más mensajes para taggearlos, o escribe una nota general sin
-            seleccionar nada.
-          </p>
+          <div className="notes-empty">
+            <IconNotes size={22} stroke={1.5} />
+            <p>
+              Aún no hay notas. Haz clic en uno o más mensajes para taggearlos, o escribe una
+              nota general sin seleccionar nada.
+            </p>
+          </div>
         )}
         {notes.map((note, i) => (
           <div

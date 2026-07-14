@@ -2375,6 +2375,47 @@ a.lab-card:hover {
   flex-direction: column;
   gap: 14px;
 }
+/* Enclose the notes panel in its own card so it reads as a section even when
+   empty (Sprint 8, T3). */
+.notes-card {
+  border: 0.5px solid var(--border2);
+  border-radius: 14px;
+  background: var(--surface);
+  padding: 16px;
+}
+.notes-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.notes-count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 6px;
+  border-radius: 100px;
+  background: var(--surface2);
+  color: var(--muted);
+  font-size: 11px;
+  font-feature-settings: "tnum";
+}
+.notes-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 10px;
+  padding: 22px 10px;
+  color: var(--faint);
+}
+.notes-empty p {
+  font-size: 12.5px;
+  line-height: 1.55;
+  color: var(--muted);
+  max-width: 240px;
+}
 .notes-list {
   display: flex;
   flex-direction: column;
