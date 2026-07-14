@@ -3623,3 +3623,9 @@ body[data-theme="light"] .dot-grid::after {
   color: var(--danger);
   font-style: normal;
 }
+
+/* Prompt block card while the block is still streaming (Sprint 9, T4). */
+.prompt-block-card.is-writing {
+  border-style: dashed;
+  opacity: 0.85;
+}

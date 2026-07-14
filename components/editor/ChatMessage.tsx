@@ -25,14 +25,24 @@ function renderBold(text: string): ReactNode[] {
     .map((part, i) => (i % 2 === 1 ? <strong key={i}>{part}</strong> : part));
 }
 
-/** The collapsed "here's the updated draft" card that replaces the raw fenced
- *  block — copies straight from the chat instead of requiring a scroll to the
- *  drawer and a manual select-all. */
-function PromptBlockCard({ label, block }: { label: string; block: string }) {
+/** The collapsed "here's the updated draft" card that replaces the raw prompt
+ *  block: copies straight from the chat instead of scrolling to the drawer.
+ *  While `writing` (the block is still streaming) it shows an "escribiendo..."
+ *  meta in place of the line count and hides the copy button. */
+function PromptBlockCard({
+  label,
+  block,
+  writing = false,
+}: {
+  label: string;
+  block?: string;
+  writing?: boolean;
+}) {
   const [copied, setCopied] = useState(false);
-  const lineCount = block.split("\n").length;
+  const lineCount = block ? block.split("\n").length : 0;
 
   async function copy() {
+    if (!block) return;
     try {
       await navigator.clipboard.writeText(block);
       setCopied(true);
@@ -43,22 +53,35 @@ function PromptBlockCard({ label, block }: { label: string; block: string }) {
   }
 
   return (
-    <div className="prompt-block-card">
+    <div className={`prompt-block-card${writing ? " is-writing" : ""}`}>
       <IconFileText size={16} className="prompt-block-icon" />
       <div className="prompt-block-info">
         <span className="prompt-block-title">{label}</span>
-        <span className="prompt-block-meta">
-          {lineCount} {lineCount === 1 ? "línea" : "líneas"}
-        </span>
+        {writing ? (
+          <span className="prompt-block-meta chat-typing">
+            escribiendo
+            <span className="typing-dots" aria-hidden="true">
+              <span />
+              <span />
+              <span />
+            </span>
+          </span>
+        ) : (
+          <span className="prompt-block-meta">
+            {lineCount} {lineCount === 1 ? "línea" : "líneas"}
+          </span>
+        )}
       </div>
-      <Button
-        variant="ghost"
-        size="sm"
-        icon={copied ? <IconCheck size={13} /> : <IconCopy size={13} />}
-        onClick={copy}
-      >
-        {copied ? "Copiado" : "Copiar"}
-      </Button>
+      {!writing && block && (
+        <Button
+          variant="ghost"
+          size="sm"
+          icon={copied ? <IconCheck size={13} /> : <IconCopy size={13} />}
+          onClick={copy}
+        >
+          {copied ? "Copiado" : "Copiar"}
+        </Button>
+      )}
     </div>
   );
 }
@@ -84,11 +107,11 @@ export function ChatMessage({
   const { before, block, after } =
     role === "assistant" ? splitPromptBlock(content) : { before: content, block: null, after: "" };
 
-  // Mid-stream with a fence opened but not yet closed: hide the raw partial
-  // block (nobody should watch a full prompt "type" into the chat character
-  // by character) and show a typing indicator instead — the same treatment
-  // the Adversarial Lab uses for its "Escribiendo…" state. Once the fence
-  // closes (live or already persisted), it renders as the card below instead.
+  // Mid-stream with the block opened but not yet closed: nobody should watch a
+  // full prompt "type" into the chat character by character. Show the card
+  // right away in its "escribiendo..." state instead of the raw partial block;
+  // once the block closes (live or persisted) the same card shows the line
+  // count. The raw prompt text never renders as chat prose.
   const midBlock = streaming && block === null && hasUnclosedPromptBlock(content);
 
   return (
@@ -96,19 +119,10 @@ export function ChatMessage({
       <span className="chat-role">{role === "user" ? "Tú" : "Opus"}</span>
       <div className="chat-content">
         {before.trim() && renderBold(before)}
-        {midBlock && (
-          <span className="chat-typing">
-            Escribiendo el prompt actualizado…
-            <span className="typing-dots" aria-hidden="true">
-              <span />
-              <span />
-              <span />
-            </span>
-          </span>
-        )}
+        {midBlock && <PromptBlockCard label={BLOCK_LABEL[mode]} writing />}
         {block && <PromptBlockCard label={BLOCK_LABEL[mode]} block={block} />}
         {after.trim() && renderBold(after)}
-        {streaming && !midBlock && <span className="chat-caret" aria-hidden />}
+        {streaming && !midBlock && !block && <span className="chat-caret" aria-hidden />}
       </div>
       {attachments && attachments.length > 0 && (
         <div className="chat-attachments">
