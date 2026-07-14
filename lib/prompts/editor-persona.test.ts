@@ -11,6 +11,7 @@ import {
   replacePromptBlock,
   hasUnclosedPromptBlock,
   extractChangeSummary,
+  capSummary,
   PROMPT_START,
   PROMPT_END,
 } from "./editor-persona.ts";
@@ -92,4 +93,25 @@ test("replacePromptBlock swaps the block content, keeps the summary", () => {
 
 test("replacePromptBlock leaves a reply with no block untouched", () => {
   assert.equal(replacePromptBlock("¿A qué sección?", "x"), "¿A qué sección?");
+});
+
+test("capSummary keeps at most 3 bullets", () => {
+  const out = capSummary("Header\n- a\n- b\n- c\n- d\n- e");
+  assert.equal(out, "Header\n- a\n- b\n- c");
+});
+
+test("capSummary truncates to 250 chars with an ellipsis", () => {
+  const long = "- " + "x".repeat(400);
+  const out = capSummary(long);
+  assert.ok(out.length <= 250);
+  assert.ok(out.endsWith("…"));
+});
+
+test("extractChangeSummary caps a runaway summary to 3 bullets", () => {
+  const reply = sentinelReply(
+    "prompt",
+    "**CAMBIOS REALIZADOS:**\n- uno\n- dos\n- tres\n- cuatro\n- cinco",
+  );
+  const summary = extractChangeSummary(reply) ?? "";
+  assert.equal((summary.match(/^- /gm) ?? []).length, 3);
 });

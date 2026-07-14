@@ -45,12 +45,12 @@ FORMATO DE ENTREGA (obligatorio en cada respuesta que modifique el prompt):
 (aquí va el prompt completo, listo para copiar y pegar)
 ===FIN DEL PROMPT===
 No envuelvas el prompt en un bloque de código markdown (triple backtick). El prompt puede CONTENER bloques \`\`\` internos (por ejemplo ejemplos de salida en JSON); por eso los delimitadores son de texto y no backticks. Todo lo que esté entre esas dos líneas se guarda como el prompt, tal cual.
-2. Después de la línea ===FIN DEL PROMPT===, incluye este resumen:
+2. Después de la línea ===FIN DEL PROMPT===, incluye este resumen. EXACTAMENTE 3 viñetas, cada una de una sola línea muy breve. Nada de párrafos ni de pegar partes del prompt:
 
 **CAMBIOS REALIZADOS:**
-- Sección modificada: [nombre]
-- Tipo de cambio: [qué se hizo en una línea]
-- Líneas/elementos afectados: [descripción breve]
+- Sección modificada: [nombre, muy breve]
+- Tipo de cambio: [qué se hizo, una línea]
+- Elementos afectados: [descripción muy breve]
 
 **SIN CAMBIOS:**
 - Todo lo demás del prompt permanece idéntico.
@@ -173,6 +173,28 @@ export function hasUnclosedPromptBlock(reply: string): boolean {
  * summary), strips `**bold**`, and drops the boilerplate "SIN CAMBIOS" tail.
  * Returns null when there's nothing meaningful after the block.
  */
+export const SUMMARY_MAX_CHARS = 250;
+export const SUMMARY_MAX_BULLETS = 3;
+
+/** Keeps the summary small: at most 3 bullet lines and 250 characters, so the
+ *  Library shows tidy change notes instead of walls of text. Extra bullets are
+ *  dropped; an over-long result is truncated with an ellipsis. */
+export function capSummary(text: string): string {
+  const out: string[] = [];
+  let bullets = 0;
+  for (const line of text.split("\n")) {
+    if (/^\s*[-•*]/.test(line)) {
+      if (bullets >= SUMMARY_MAX_BULLETS) continue;
+      bullets++;
+    }
+    out.push(line);
+  }
+  const result = out.join("\n").trim();
+  return result.length > SUMMARY_MAX_CHARS
+    ? `${result.slice(0, SUMMARY_MAX_CHARS - 1).trimEnd()}…`
+    : result;
+}
+
 export function extractChangeSummary(reply: string): string | null {
   const loc = locatePromptBlock(reply);
   const withoutBlock = (
@@ -181,6 +203,6 @@ export function extractChangeSummary(reply: string): string | null {
   if (!withoutBlock) return null;
   // Cut the trailing "SIN CAMBIOS ..." confirmation, keeping only real changes.
   const trimmed = withoutBlock.replace(/\n*\**\s*SIN CAMBIOS[\s\S]*$/i, "").trim();
-  const cleaned = (trimmed || withoutBlock).replace(/\*\*/g, "").trim();
+  const cleaned = capSummary((trimmed || withoutBlock).replace(/\*\*/g, "").trim());
   return cleaned.length > 0 ? cleaned : null;
 }

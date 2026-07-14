@@ -15,7 +15,7 @@ type Params = { params: Promise<{ id: string }> };
 
 const updateVersionSchema = z
   .object({
-    changeSummary: z.string().max(4000, "El resumen es demasiado largo.").nullable().optional(),
+    changeSummary: z.string().max(280, "El resumen es demasiado largo (máx. 250).").nullable().optional(),
     versionNumber: z
       .string()
       .regex(/^v\d+\.\d+$/, "El número debe tener formato vX.Y (p. ej. v2.5).")
