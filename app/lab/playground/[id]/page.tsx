@@ -387,8 +387,10 @@ export default function PlaygroundSessionPage() {
   const messageRefs = useRef<Record<string, HTMLDivElement | null>>({});
   const noteRefs = useRef<Record<string, HTMLDivElement | null>>({});
 
-  const load = useCallback(async () => {
-    setLoading(true);
+  const load = useCallback(async ({ silent = false }: { silent?: boolean } = {}) => {
+    // Only the first load blanks the screen; refreshes after a message / reset
+    // are silent so the conversation doesn't flash to a loading state.
+    if (!silent) setLoading(true);
     setError(null);
     try {
       const res = await fetch(`/api/demo-sessions/${id}`);
@@ -550,7 +552,7 @@ export default function PlaygroundSessionPage() {
         body: JSON.stringify({ content }),
       });
       if (!res.ok) throw new Error((await res.json()).error ?? "No se pudo enviar el mensaje.");
-      await load();
+      await load({ silent: true });
     } catch (e) {
       setError(e instanceof Error ? e.message : "Error al enviar el mensaje.");
       setInput(content);
@@ -589,7 +591,7 @@ export default function PlaygroundSessionPage() {
       if (!res.ok) throw new Error((await res.json()).error ?? "No se pudo reiniciar.");
       setResetOpen(false);
       cancelCompose();
-      await load();
+      await load({ silent: true });
     } catch (e) {
       setError(e instanceof Error ? e.message : "Error al reiniciar la conversación.");
     } finally {
@@ -611,7 +613,7 @@ export default function PlaygroundSessionPage() {
       });
       if (!res.ok) throw new Error((await res.json()).error ?? "No se pudo cambiar la versión.");
       cancelCompose();
-      await load();
+      await load({ silent: true });
     } catch (e) {
       setError(e instanceof Error ? e.message : "Error al cambiar la versión.");
     } finally {

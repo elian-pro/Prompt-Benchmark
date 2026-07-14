@@ -145,8 +145,10 @@ export function SessionChat({
     { versionId: string; versionNumber: string; versionContent: string } | null
   >(null);
 
-  const load = useCallback(async () => {
-    setLoading(true);
+  const load = useCallback(async ({ silent = false }: { silent?: boolean } = {}) => {
+    // Only the first load blanks the screen with a spinner; refreshes after a
+    // reply are silent so the chat doesn't flash to a loading state.
+    if (!silent) setLoading(true);
     setError(null);
     try {
       const res = await fetch(`/api/chat-sessions/${sessionId}`);
@@ -294,8 +296,9 @@ export function SessionChat({
             }
           }
         }
-        // Re-sync from the server: canonical messages, token usage, updated draft.
-        await load();
+        // Re-sync from the server: canonical messages, token usage, updated
+        // draft. Silent so the chat doesn't flash to the loading state.
+        await load({ silent: true });
 
         if (draftBroken) {
           showToast(
@@ -525,7 +528,7 @@ export function SessionChat({
               onDone={({ version }) => {
                 setFinalizedVersion({ id: version.id, number: version.version_number });
                 showToast(`Versión ${version.version_number} creada en la Biblioteca.`);
-                load();
+                load({ silent: true });
               }}
               onError={showToast}
             />
@@ -546,7 +549,7 @@ export function SessionChat({
               disabled={!hasDraft}
               onDone={({ client, version }) => {
                 showToast(`Cliente "${client.name}" creado como ${version.version_number}.`);
-                load();
+                load({ silent: true });
               }}
               onError={showToast}
             />
