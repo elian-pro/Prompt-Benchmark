@@ -3403,3 +3403,69 @@ body[data-theme="light"] .dot-grid::after {
   width: 90px;
   font-feature-settings: "tnum";
 }
+
+/* ===========================================================================
+   Playground: WhatsApp-style turn stacks (Sprint 8, T2)
+   A turn is the selectable unit (tag by turn); inside it, the bot's reply is
+   split into one bubble per line break, first bubble labeled, estado on last.
+   =========================================================================== */
+.chat-turn {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  max-width: 92%;
+  cursor: pointer;
+  border-radius: 14px;
+  transition: box-shadow 0.15s ease;
+}
+.chat-turn.turn-bot {
+  align-self: flex-start;
+  align-items: flex-start;
+}
+.chat-turn.turn-lead {
+  align-self: flex-end;
+  align-items: flex-end;
+}
+.chat-turn-role {
+  font-size: 9px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin-bottom: 2px;
+  padding: 0 2px;
+}
+.chat-msg {
+  padding: 9px 13px;
+  border-radius: 14px;
+  border: 0.5px solid var(--border);
+  max-width: 100%;
+}
+.turn-bot .chat-msg {
+  background: var(--surface2);
+  color: var(--fg);
+  border-bottom-left-radius: 5px;
+}
+.turn-lead .chat-msg {
+  background: var(--fg);
+  color: var(--bg);
+  border-color: var(--fg);
+  border-bottom-right-radius: 5px;
+}
+.turn-lead .chat-msg .chat-content {
+  color: var(--bg);
+}
+/* Only the last bubble of a run keeps the full tail corner. */
+.chat-turn.turn-bot .chat-msg:last-of-type {
+  border-bottom-left-radius: 14px;
+}
+.chat-turn.turn-lead .chat-msg:last-of-type {
+  border-bottom-right-radius: 14px;
+}
+/* Selection + flash ring the whole turn (all its bubbles). */
+.playground-chat .chat-turn.is-selected {
+  box-shadow: 0 0 0 1.5px var(--accent);
+}
+.playground-chat .chat-turn.is-flashed .chat-msg {
+  animation: noteFlash 1.6s ease;
+}

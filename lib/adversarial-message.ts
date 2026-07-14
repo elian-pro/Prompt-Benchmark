@@ -79,6 +79,29 @@ export function parseTurn(content: string): { message: string; state: string | n
   }
 }
 
+/** Splits readable text into WhatsApp-style bubbles: one per line break (a
+ *  single `\n` already means a separate WhatsApp message in production), empty
+ *  segments dropped. */
+function splitBubbles(text: string): string[] {
+  return text
+    .split(/\n+/)
+    .map((s) => s.trim())
+    .filter((s) => s.length > 0);
+}
+
+/**
+ * Like parseTurn, but returns the message as an ARRAY of bubbles instead of one
+ * string, so the Playground can render a bot turn the way n8n delivers it to
+ * WhatsApp: one bubble per line break / per `mensajes` array item. `state` is
+ * the JSON envelope's estado, meant to hang off the last bubble. A turn with no
+ * readable text (e.g. only an estado) yields an empty `messages` array; the
+ * caller decides what to show in that case.
+ */
+export function parseTurnBubbles(content: string): { messages: string[]; state: string | null } {
+  const { message, state } = parseTurn(content);
+  return { messages: splitBubbles(message), state };
+}
+
 // Matches a leading parenthetical paragraph — allowing one level of nested
 // parens — followed by a blank line before more content. This is the shape of
 // a stage direction some models emit despite instructions (e.g. "(espero la

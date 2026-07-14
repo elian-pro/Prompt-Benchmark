@@ -10,7 +10,7 @@ import type {
   DemoMessageRow,
 } from "@/lib/db/demo-sessions";
 import type { DemoNoteRow } from "@/lib/db/demo-notes";
-import { parseTurn } from "@/lib/adversarial-message";
+import { parseTurn, parseTurnBubbles } from "@/lib/adversarial-message";
 import { relativeTimeEs } from "@/lib/format";
 import { Button } from "@/components/ui/Button";
 
@@ -44,12 +44,18 @@ function Turn({
   onJumpToNote: (noteIndex: number) => void;
   registerRef: (id: string, el: HTMLDivElement | null) => void;
 }) {
-  const cls = role === "bot" ? "chat-assistant" : "chat-user";
-  const { message, state } = parseTurn(content);
+  const side = role === "bot" ? "turn-bot" : "turn-lead";
+  const roleLabel = role === "bot" ? "Bot del cliente" : "Tú (lead)";
+  const { messages, state } = parseTurnBubbles(content);
+  // A turn with no readable text (e.g. the bot only emitted an estado) still
+  // renders a single explanatory bubble, so nothing looks silently dropped.
+  const bubbles = messages.length > 0 ? messages : [emptyBotMessage(state)];
+  const isEmpty = messages.length === 0;
+
   return (
     <div
       ref={(el) => registerRef(id, el)}
-      className={`chat-bubble ${cls}${selected ? " is-selected" : ""}${flashed ? " is-flashed" : ""}`}
+      className={`chat-turn ${side}${selected ? " is-selected" : ""}${flashed ? " is-flashed" : ""}`}
       onClick={() => onToggleSelect(id)}
       role="button"
       tabIndex={0}
@@ -78,16 +84,22 @@ function Turn({
           ))}
         </div>
       )}
-      <span className="chat-role">{role === "bot" ? "Bot del cliente" : "Tú (lead)"}</span>
-      <div className="chat-content">
-        {message ? message : <span className="chat-empty">{emptyBotMessage(state)}</span>}
-      </div>
-      {state && message && (
-        <div className="chat-state">
-          <span className="chat-state-label">Estado</span>
-          <span className="chat-state-value">{state}</span>
-        </div>
-      )}
+      <span className="chat-turn-role">{roleLabel}</span>
+      {bubbles.map((b, i) => {
+        const isLast = i === bubbles.length - 1;
+        return (
+          <div key={i} className="chat-msg">
+            <div className={`chat-content${isEmpty ? " chat-empty" : ""}`}>{b}</div>
+            {/* The estado hangs off the last bubble, WhatsApp-style. */}
+            {state && isLast && !isEmpty && (
+              <div className="chat-state">
+                <span className="chat-state-label">Estado</span>
+                <span className="chat-state-value">{state}</span>
+              </div>
+            )}
+          </div>
+        );
+      })}
     </div>
   );
 }
@@ -96,24 +108,28 @@ function Turn({
  *  never persisted yet, so it has no id and can't be tagged. */
 function PendingTurn({ content }: { content: string }) {
   return (
-    <div className="chat-bubble chat-user">
-      <span className="chat-role">Tú (lead)</span>
-      <div className="chat-content">{content}</div>
+    <div className="chat-turn turn-lead">
+      <span className="chat-turn-role">Tú (lead)</span>
+      <div className="chat-msg">
+        <div className="chat-content">{content}</div>
+      </div>
     </div>
   );
 }
 
 function TypingIndicator() {
   return (
-    <div className="chat-bubble chat-assistant">
-      <span className="chat-role">Bot del cliente</span>
-      <div className="chat-content chat-typing">
-        Escribiendo
-        <span className="typing-dots" aria-hidden="true">
-          <span />
-          <span />
-          <span />
-        </span>
+    <div className="chat-turn turn-bot">
+      <span className="chat-turn-role">Bot del cliente</span>
+      <div className="chat-msg">
+        <div className="chat-content chat-typing">
+          Escribiendo
+          <span className="typing-dots" aria-hidden="true">
+            <span />
+            <span />
+            <span />
+          </span>
+        </div>
       </div>
     </div>
   );
