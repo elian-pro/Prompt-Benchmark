@@ -3629,3 +3629,31 @@ body[data-theme="light"] .dot-grid::after {
   border-style: dashed;
   opacity: 0.85;
 }
+
+/* Jump-to-bottom button in the session chat (Sprint 9, T7). */
+.chat-shell {
+  position: relative;
+}
+.chat-jump-btn {
+  position: absolute;
+  bottom: 130px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 5;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  border: 0.5px solid var(--border2);
+  background: var(--surface);
+  color: var(--fg);
+  cursor: pointer;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.28);
+  transition: background 0.15s ease, color 0.15s ease;
+}
+.chat-jump-btn:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}

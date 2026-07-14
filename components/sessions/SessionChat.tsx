@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import {
   IconArrowLeft,
+  IconChevronDown,
   IconCopy,
   IconFileText,
   IconPaperclip,
@@ -113,6 +114,8 @@ export function SessionChat({
   const [toast, setToast] = useState<string | null>(null);
   const [draftOpen, setDraftOpen] = useState(false);
   const [dragging, setDragging] = useState(false);
+  // Whether the chat is scrolled near the bottom (hides the jump button).
+  const [atBottom, setAtBottom] = useState(true);
 
   // Manual draft editing (Editor only): edit the working draft by hand, no
   // AI turn. draftInput holds the in-progress text; findOpen toggles the
@@ -145,10 +148,22 @@ export function SessionChat({
     load();
   }, [load]);
 
-  // Keep the conversation scrolled to the latest content.
+  // Keep the conversation pinned to the latest content, but only while the
+  // user is already near the bottom, so scrolling up to read isn't yanked back
+  // down by streaming output.
   useEffect(() => {
-    scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight });
-  }, [session?.messages.length, pendingUser, streamingText]);
+    if (atBottom) scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight });
+  }, [session?.messages.length, pendingUser, streamingText, atBottom]);
+
+  function onStreamScroll() {
+    const el = scrollRef.current;
+    if (!el) return;
+    const distance = el.scrollHeight - el.scrollTop - el.clientHeight;
+    setAtBottom(distance < 80);
+  }
+  function scrollToBottom() {
+    scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
+  }
 
   // Escape steps out one layer at a time: the find bar first (if open), then
   // the drawer. Otherwise Escape inside find/replace would close the whole
@@ -474,7 +489,7 @@ export function SessionChat({
         </div>
       </div>
 
-      <div className="chat-stream" ref={scrollRef}>
+      <div className="chat-stream" ref={scrollRef} onScroll={onStreamScroll}>
         <div className="chat-stream-inner">
           {session.messages.length === 0 && !pendingUser && !autoSend && (
             <p className="empty-hint">{EMPTY_HINT[mode]}</p>
@@ -501,6 +516,18 @@ export function SessionChat({
           )}
         </div>
       </div>
+
+      {!atBottom && (
+        <button
+          type="button"
+          className="chat-jump-btn"
+          onClick={scrollToBottom}
+          aria-label="Bajar al final"
+          title="Bajar al final"
+        >
+          <IconChevronDown size={18} />
+        </button>
+      )}
 
       <div className="chat-composer-zone">
         <div
