@@ -112,8 +112,8 @@ function splitBubbles(text: string): string[] {
  *
  * Crucially, line-break splitting is ONLY applied to genuine readable text
  * (plain prose, or the message extracted from a valid envelope). Content that
- * looks like JSON but fails to parse is NEVER split — that would explode raw
- * braces into one bubble per line. Such content is reported as `malformed` so
+ * looks like JSON but fails to parse is NEVER split (that would explode raw
+ * braces into one bubble per line). Such content is reported as `malformed` so
  * the caller can show a clean fallback instead of the raw envelope.
  * `messages` empty + not malformed = a valid envelope with only an estado.
  */
