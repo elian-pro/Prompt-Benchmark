@@ -13,7 +13,7 @@ import type { Attachment } from "@/lib/db/chat-sessions";
 import {
   buildEditorSystemPrompt,
   extractPromptFromReply,
-  hasUnclosedFence,
+  hasUnclosedPromptBlock,
 } from "@/lib/prompts/editor-persona";
 import { buildCreatorSystemPrompt } from "@/lib/prompts/creator-persona";
 import { streamChat, type ChatMessage, type MessageAttachment } from "@/lib/providers";
@@ -198,7 +198,7 @@ export async function POST(req: NextRequest, { params }: Params) {
             tokensIn,
             tokensOut,
           });
-          const draftBroken = hasUnclosedFence(fullText);
+          const draftBroken = hasUnclosedPromptBlock(fullText);
           const newDraft = draftBroken ? null : extractPromptFromReply(fullText);
           if (newDraft) await updateDraft(id, newDraft);
 

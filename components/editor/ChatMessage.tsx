@@ -3,7 +3,7 @@
 import { useState, type ReactNode } from "react";
 import { IconCheck, IconCopy, IconFileText, IconPaperclip } from "@tabler/icons-react";
 import type { MessageRole, Attachment } from "@/lib/db/chat-sessions";
-import { hasUnclosedFence } from "@/lib/prompts/editor-persona";
+import { hasUnclosedPromptBlock, splitPromptBlock } from "@/lib/prompts/editor-persona";
 import { Button } from "@/components/ui/Button";
 
 type Mode = "editor" | "creator";
@@ -23,22 +23,6 @@ function renderBold(text: string): ReactNode[] {
   return text
     .split(/\*\*([^*]+)\*\*/g)
     .map((part, i) => (i % 2 === 1 ? <strong key={i}>{part}</strong> : part));
-}
-
-/**
- * Splits a reply around its single fenced prompt block, mirroring the
- * server's extractPromptFromReply (same closed-fence rule): a message only
- * ever collapses into a card here when the draft actually did (or would)
- * update from it. No closed fence → `block` is null and the whole text is
- * `before`, so plain replies (a clarifying question) render exactly as before.
- */
-function splitPromptBlock(text: string): { before: string; block: string | null; after: string } {
-  const match = text.match(/```[^\n]*\n([\s\S]*?)```/);
-  if (!match || match.index === undefined) return { before: text, block: null, after: "" };
-  const before = text.slice(0, match.index);
-  const after = text.slice(match.index + match[0].length);
-  const block = match[1].trim();
-  return { before, block: block.length > 0 ? block : null, after };
 }
 
 /** The collapsed "here's the updated draft" card that replaces the raw fenced
@@ -105,7 +89,7 @@ export function ChatMessage({
   // by character) and show a typing indicator instead — the same treatment
   // the Adversarial Lab uses for its "Escribiendo…" state. Once the fence
   // closes (live or already persisted), it renders as the card below instead.
-  const midBlock = streaming && block === null && hasUnclosedFence(content);
+  const midBlock = streaming && block === null && hasUnclosedPromptBlock(content);
 
   return (
     <div className={`chat-bubble chat-${role}`}>
