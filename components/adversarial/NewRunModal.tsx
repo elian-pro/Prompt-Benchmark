@@ -33,6 +33,7 @@ export function NewRunModal({ open, onClose }: { open: boolean; onClose: () => v
   const [intensity, setIntensity] = useState<Intensity>(2);
   const [maxTurns, setMaxTurns] = useState(12);
   const [starter, setStarter] = useState<"bot" | "lead">("bot");
+  const [leadBrief, setLeadBrief] = useState("");
   const [loading, setLoading] = useState(true);
   const [creating, setCreating] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -78,7 +79,15 @@ export function NewRunModal({ open, onClose }: { open: boolean; onClose: () => v
       const res = await fetch("/api/runs", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ clientId, versionId, preset, intensity, maxTurns, starter }),
+        body: JSON.stringify({
+          clientId,
+          versionId,
+          preset,
+          intensity,
+          maxTurns,
+          starter,
+          leadBrief: leadBrief.trim() || undefined,
+        }),
       });
       if (!res.ok) throw new Error((await res.json()).error ?? "No se pudo crear la prueba.");
       const run = await res.json();
@@ -198,6 +207,23 @@ export function NewRunModal({ open, onClose }: { open: boolean; onClose: () => v
             <option value="lead">Lead</option>
           </select>
         </div>
+      </div>
+
+      <div className="field">
+        <label className="field-label">Situación del lead (opcional)</label>
+        <textarea
+          className="textarea"
+          rows={2}
+          maxLength={300}
+          placeholder="Ej: Eres un empresario, tienes un presupuesto de 20mdp y quieres una casa."
+          value={leadBrief}
+          onChange={(e) => setLeadBrief(e.target.value)}
+        />
+        <p className="field-hint">
+          Dale al lead datos concretos para que responda con coherencia cuando el agente le
+          pida detalles, en vez de improvisar y quedar fuera de perfil. No se comparte con el
+          agente bajo prueba.
+        </p>
       </div>
 
       {error && <p className="form-error">{error}</p>}

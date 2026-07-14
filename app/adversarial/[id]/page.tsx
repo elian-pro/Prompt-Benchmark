@@ -243,6 +243,11 @@ export default function RunDetailPage() {
               {run.version_number_snapshot} · {relativeTimeEs(run.created_at)}
             </span>
           </div>
+          {run.lead_brief && (
+            <p className="muted" style={{ fontSize: 12, marginTop: 4 }}>
+              Lead: {run.lead_brief}
+            </p>
+          )}
         </div>
       </div>
 

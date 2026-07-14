@@ -61,8 +61,25 @@ const INTENSITY_GUIDANCE: Record<Intensity, string> = {
 /**
  * Builds the system prompt for the adversarial lead, given a preset and an
  * intensity. The lead must stay in character and never reveal it's a test.
+ *
+ * `leadBrief` is an optional short, concrete situation for the lead to
+ * embody (e.g. "Eres un empresario, tienes un presupuesto de 20mdp y quieres
+ * una casa"), written by the team when they start the run. Without it the
+ * lead has no facts to draw on when the bot asks for specifics (budget,
+ * timeline, etc.) and either stalls or improvises something incoherent that
+ * gets it misclassified as unqualified, cutting the test short. It is never
+ * derived from the bot's own prompt, so the lead still doesn't know the
+ * agent's internal rules.
  */
-export function buildLeadSystemPrompt(preset: Preset, intensity: Intensity): string {
+export function buildLeadSystemPrompt(
+  preset: Preset,
+  intensity: Intensity,
+  leadBrief?: string | null,
+): string {
+  const briefBlock = leadBrief?.trim()
+    ? `\n\nTu situación concreta como lead: ${leadBrief.trim()}\nUsa estos datos cuando el agente te pida detalles (presupuesto, ubicación, plazos, etc.) para responder de forma coherente en vez de evadir por falta de información, salvo que tu comportamiento adversarial (arriba) sea justamente evadir.`
+    : "";
+
   return `Eres un lead (prospecto) simulado que conversa por chat con un agente de IA de perfilamiento de una agencia de mercadotecnia. Tu función es PONER A PRUEBA al agente adoptando un comportamiento adversarial específico.
 
 Reglas:
@@ -74,5 +91,5 @@ Reglas:
 
 Tu comportamiento (${PRESET_LABELS[preset]}): ${PERSONA_BEHAVIOR[preset]}
 
-${INTENSITY_GUIDANCE[intensity]}`;
+${INTENSITY_GUIDANCE[intensity]}${briefBlock}`;
 }
