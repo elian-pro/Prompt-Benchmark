@@ -10,6 +10,7 @@ import {
   IconPaperclip,
   IconPencil,
   IconReplace,
+  IconRocket,
   IconSend,
   IconX,
 } from "@tabler/icons-react";
@@ -18,6 +19,7 @@ import { isAcceptedFile, uploadAttachment } from "@/lib/attachments";
 import { relativeTimeEs } from "@/lib/format";
 import { Button } from "@/components/ui/Button";
 import { FindReplace } from "@/components/ui/FindReplace";
+import { N8nSyncModal } from "@/components/library/N8nSyncModal";
 import { ChatMessage } from "@/components/editor/ChatMessage";
 import { FileUpload } from "@/components/editor/FileUpload";
 import { FinalizeButton } from "@/components/editor/FinalizeButton";
@@ -133,6 +135,15 @@ export function SessionChat({
   // than this lights the "NEW" badge on "Ver borrador".
   const [seenDraft, setSeenDraft] = useState<string | null>(null);
   const seenInitRef = useRef(false);
+  // The version just created by "Finalizar edición", so the Editor can offer
+  // to promote it (and sync n8n) without leaving for the Library.
+  const [finalizedVersion, setFinalizedVersion] = useState<
+    { id: string; number: string } | null
+  >(null);
+  const [promoting, setPromoting] = useState(false);
+  const [syncTarget, setSyncTarget] = useState<
+    { versionId: string; versionNumber: string; versionContent: string } | null
+  >(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -444,6 +455,33 @@ export function SessionChat({
     setSeenDraft(session?.current_draft_content ?? null);
     setDraftOpen(true);
   }
+
+  // Promotes the just-finalized version to production and, if the client has
+  // n8n bindings, opens the same sync modal the Library uses.
+  async function promoteFromEditor() {
+    if (!finalizedVersion || !session?.client_id || promoting) return;
+    setPromoting(true);
+    try {
+      const res = await fetch(`/api/versions/${finalizedVersion.id}/promote`, { method: "POST" });
+      if (!res.ok) throw new Error((await res.json()).error ?? "No se pudo promover.");
+      showToast(`${finalizedVersion.number} marcada como producción.`);
+      const bRes = await fetch(`/api/clients/${session.client_id}/n8n-bindings`);
+      if (bRes.ok) {
+        const bindings: { mode: string; sync_enabled: boolean }[] = await bRes.json();
+        if (bindings.some((b) => (b.mode === "api" && b.sync_enabled) || b.mode === "manual")) {
+          setSyncTarget({
+            versionId: finalizedVersion.id,
+            versionNumber: finalizedVersion.number,
+            versionContent: session.current_draft_content ?? "",
+          });
+        }
+      }
+    } catch (e) {
+      showToast(e instanceof Error ? e.message : "Error al promover.");
+    } finally {
+      setPromoting(false);
+    }
+  }
   const title =
     mode === "editor"
       ? (session.client_name ?? "Cliente eliminado")
@@ -485,11 +523,22 @@ export function SessionChat({
               sessionId={sessionId}
               disabled={!hasDraft}
               onDone={({ version }) => {
+                setFinalizedVersion({ id: version.id, number: version.version_number });
                 showToast(`Versión ${version.version_number} creada en la Biblioteca.`);
                 load();
               }}
               onError={showToast}
             />
+          )}
+          {mode === "editor" && finalizedVersion && (
+            <Button
+              variant="primary"
+              icon={<IconRocket size={14} />}
+              onClick={promoteFromEditor}
+              disabled={promoting}
+            >
+              {promoting ? "Promoviendo…" : "Promover a producción"}
+            </Button>
           )}
           {isActive && mode === "creator" && (
             <FinalizeCreatorButton
@@ -702,6 +751,18 @@ export function SessionChat({
                     ? session.current_draft_content
                     : DRAFT_EMPTY[mode]}
                 </pre>
+                {mode === "editor" && finalizedVersion && (
+                  <div className="draft-edit-actions">
+                    <Button
+                      variant="primary"
+                      icon={<IconRocket size={14} />}
+                      onClick={promoteFromEditor}
+                      disabled={promoting}
+                    >
+                      {promoting ? "Promoviendo…" : "Promover a producción"}
+                    </Button>
+                  </div>
+                )}
                 {report && (
                   <>
                     <p className="section-label" style={{ margin: "4px 0 0" }}>
@@ -714,6 +775,20 @@ export function SessionChat({
             )}
           </aside>
         </>
+      )}
+
+      {syncTarget && session.client_id && (
+        <N8nSyncModal
+          clientId={session.client_id}
+          versionId={syncTarget.versionId}
+          versionNumber={syncTarget.versionNumber}
+          versionContent={syncTarget.versionContent}
+          onClose={() => setSyncTarget(null)}
+          onDone={({ pushed, failed }) => {
+            if (pushed > 0 && failed === 0) showToast(`Sincronizado con n8n (${pushed}).`);
+            else if (failed > 0) showToast(`Sincronización con ${failed} error(es).`);
+          }}
+        />
       )}
 
       {toast && <div className="toast">{toast}</div>}
