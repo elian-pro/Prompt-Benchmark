@@ -31,8 +31,9 @@ export default async function LoginPage({
         <div className="login-copy">
           <h1>Acceso del equipo</h1>
           <p>
-            Herramienta interna de paid media. Entra con tu cuenta de Google del
-            dominio <strong>@{allowedDomain()}</strong>.
+            Herramienta interna del equipo de Inteligencia Artificial (IA).
+            Entra con tu cuenta de Google del dominio{" "}
+            <strong>@{allowedDomain()}</strong>.
           </p>
         </div>
 
