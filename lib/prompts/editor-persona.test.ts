@@ -8,6 +8,7 @@ import assert from "node:assert/strict";
 import {
   extractPromptFromReply,
   splitPromptBlock,
+  replacePromptBlock,
   hasUnclosedPromptBlock,
   extractChangeSummary,
   PROMPT_START,
@@ -80,4 +81,15 @@ test("legacy hasUnclosedPromptBlock: odd fence count means cut off", () => {
 
 test("extractChangeSummary returns null when there's only a block", () => {
   assert.equal(extractChangeSummary(sentinelReply("solo el prompt", "")), null);
+});
+
+test("replacePromptBlock swaps the block content, keeps the summary", () => {
+  const reply = sentinelReply("viejo", "**CAMBIOS REALIZADOS:**\n- algo");
+  const out = replacePromptBlock(reply, "nuevo v1.8");
+  assert.equal(extractPromptFromReply(out), "nuevo v1.8");
+  assert.match(out, /CAMBIOS REALIZADOS/);
+});
+
+test("replacePromptBlock leaves a reply with no block untouched", () => {
+  assert.equal(replacePromptBlock("¿A qué sección?", "x"), "¿A qué sección?");
 });

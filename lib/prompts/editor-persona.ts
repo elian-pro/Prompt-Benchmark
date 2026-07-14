@@ -140,6 +140,18 @@ export function splitPromptBlock(reply: string): {
 }
 
 /**
+ * Returns the reply with its prompt block's CONTENT replaced by `newContent`,
+ * re-emitted in the sentinel format, keeping the surrounding prose. Used to
+ * stamp the target version number into the block the Studio owns, so the chat
+ * card and the saved draft show the same version. No block -> reply unchanged.
+ */
+export function replacePromptBlock(reply: string, newContent: string): string {
+  const { before, block, after } = splitPromptBlock(reply);
+  if (block === null) return reply;
+  return `${before}${PROMPT_START}\n${newContent}\n${PROMPT_END}${after}`;
+}
+
+/**
  * Whether the reply opened a prompt block that never closed: a strong signal
  * the response was cut off mid-generation (hit max_tokens, dropped connection)
  * rather than the assistant choosing not to emit a prompt. Distinguishes

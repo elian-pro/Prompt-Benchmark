@@ -64,6 +64,12 @@ export async function getVersion(id: string): Promise<Version | null> {
   return (data as Version | null) ?? null;
 }
 
+/** The client's most recently created version number, or null if none. Used
+ *  by the Editor to preview the next version in the working draft. */
+export async function getLatestVersionNumber(clientId: string): Promise<string | null> {
+  return latestVersionNumber(clientId);
+}
+
 async function latestVersionNumber(clientId: string): Promise<string | null> {
   const sb = getSupabase();
   const { data, error } = await sb
