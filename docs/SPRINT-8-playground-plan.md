@@ -77,13 +77,18 @@ y el preview del globo se siguen viendo.
   cliente. Hoy el header solo muestra `version_number_snapshot` como texto.
 - Al elegir otra versión: `PATCH /api/demo-sessions/[id]` actualiza
   `version_id`, `version_number_snapshot` y `prompt_snapshot` a esa
-  versión. Como el `prompt_snapshot` se usa como systemPrompt en cada
-  envío, el cambio afecta los turnos siguientes.
-- **Decisión abierta (ver 6.1):** al cambiar de versión, ¿se inicia una
-  ronda nueva (recomendado, comparación limpia) o se continúa la
-  conversación con el nuevo prompt? Propongo ofrecer "cambiar y reiniciar"
-  como acción principal y "solo cambiar" como secundaria.
-- Un divisor visible en el chat marca el cambio ("Cambiaste a v1.5").
+  versión, y **inicia una ronda nueva** (comparación limpia: el bot no
+  arrastra respuestas de otra versión). Como el `prompt_snapshot` se usa
+  como systemPrompt en cada envío, el cambio aplica de inmediato.
+- **Regla clave (decisión del equipo):** cambiar de versión solo se
+  permite mientras la sesión NO tenga notas. En cuanto existe al menos una
+  nota, el selector se deshabilita y junto a él aparece un icono (i) con
+  el tooltip: "Para cambiar de versión, elimina las notas. Las notas están
+  ligadas a la versión con la que las creaste." Esto garantiza que toda
+  nota pertenece a una sola versión y elimina cualquier ambigüedad sin
+  necesidad de rastrear versión por nota.
+- Como el switch solo ocurre sin notas, nunca hay notas apuntando a
+  mensajes de otra versión.
 
 ### 4.2 Reiniciar conversación (punto 2)
 
@@ -126,10 +131,10 @@ y el preview del globo se siguen viendo.
   - El primer globo lleva la etiqueta "Bot del cliente" (o "Tú (lead)").
   - Los intermedios, solo texto.
   - El último globo del bot muestra el pie de estado JSON.
-- **El tag sigue siendo a nivel de turno** (un `message_id`), no por globo
-  individual: seleccionar la respuesta resalta toda su pila. Taggear globos
-  sueltos exigiría subíndices en `message_ids` y complica el modelo; queda
-  fuera de v1 (ver 6.2).
+- **El tag es a nivel de turno** (un `message_id`), no por globo individual
+  (decisión del equipo): seleccionar la respuesta resalta toda su pila.
+  Taggear globos sueltos exigiría subíndices en `message_ids` y complica el
+  modelo; queda como evolución futura.
 - Tests unitarios para `parseTurnBubbles` (array, `\n`, `\n\n`, no-JSON,
   estado presente/ausente). No se toca `parseTurn` existente (lo usa el Lab
   adversarial), se agrega la variante.
@@ -146,26 +151,29 @@ podrían adelantarse si se quiere ver progreso rápido.
 | S8-T3 | Sección de notas encerrada (punto 4): tarjeta, encabezado, estado vacío. CSS + estructura | Bajo |
 | S8-T4 | Nota en vivo (punto 3): tarjeta de composición con globos de lo seleccionado + check/x, reemplaza el composer inferior | Medio |
 | S8-T5 | Reiniciar conversación (punto 2): botón + confirmación + `POST .../reset`, chat filtra por ronda, notas de rondas viejas con marca | Medio |
-| S8-T6 | Cambiar de versión (punto 1): selector en el header + `PATCH .../[id]`, divisor de cambio, y la decisión reiniciar-vs-continuar | Medio |
+| S8-T6 | Cambiar de versión (punto 1): selector en el header + `PATCH .../[id]` (inicia ronda nueva), deshabilitado con icono (i) + tooltip cuando hay notas | Medio |
 | S8-T7 | Docs: actualizar `SPEC.md` y `ARCHITECTURE.md` (sección Playground) con lo implementado | Bajo |
 
 Sin dependencias nuevas previstas. `SearchableChip` ya existe (Sprint 7).
 
-## 6. Decisiones abiertas (para pulir antes de codear)
+## 6. Decisiones
 
-1. **Al cambiar de versión, ¿reiniciar o continuar la conversación?**
-   Propuesta: acción principal "cambiar y reiniciar" (comparación limpia,
-   el bot no arrastra outputs de otra versión), secundaria "solo cambiar".
-2. **¿Taggear globos individuales o el turno completo?** Propuesta: turno
-   completo en v1 (más simple); globos sueltos como evolución futura.
+1. ~~Al cambiar de versión, ¿reiniciar o continuar?~~ **Decidido:** cambiar
+   de versión inicia una ronda nueva, y solo se permite cuando la sesión no
+   tiene notas (con notas, el selector se bloquea con un icono (i)). Ver 4.1.
+2. ~~¿Taggear globos individuales o el turno completo?~~ **Decidido:** por
+   turno completo. Globos sueltos, evolución futura.
 3. **Modelo de reinicio: rondas (recomendado) vs borrar-y-snapshotear.**
    Propuesta: rondas, por integridad referencial y para conservar pines y
-   "saltar al mensaje". Ver sección 3.
+   "saltar al mensaje". Ver sección 3. (Sigue abierta, aunque rondas es la
+   base del plan.)
 4. **¿Mostrar u ocultar rondas anteriores en el chat?** Propuesta: ocultar
    por defecto (chat = ronda actual), con opción futura de "ver historial".
 5. **¿Registrar la versión por mensaje** (`version_number_snapshot` en
-   demo_messages)? Propuesta: sí, es barato y hace el transcript
-   autoexplicativo cuando se mezcla versión a media conversación.
+   demo_messages)? Con la regla de que las notas bloquean el cambio de
+   versión, es menos necesario, pero sigue siendo barato y útil si en el
+   futuro se permite mezclar. Propuesta: incluir la columna en la migración
+   aunque la UI aún no la explote.
 
 ## 7. Fuera de alcance de este sprint
 
