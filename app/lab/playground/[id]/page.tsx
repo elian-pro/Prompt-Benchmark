@@ -315,9 +315,12 @@ export default function PlaygroundSessionPage() {
 
   const messagesById = useMemo(() => {
     const map = new Map<string, DemoMessageRow>();
+    // Older-round messages referenced by notes are resolved too, so their
+    // bubble previews survive a reset / version switch.
+    session?.note_messages?.forEach((m) => map.set(m.id, m));
     session?.messages.forEach((m) => map.set(m.id, m));
     return map;
-  }, [session?.messages]);
+  }, [session?.messages, session?.note_messages]);
 
   // Every message's pin numbers: which notes (1-indexed, in creation order)
   // reference it. A message can carry more than one pin.

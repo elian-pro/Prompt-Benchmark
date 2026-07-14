@@ -22,6 +22,7 @@ export type DemoSession = {
   prompt_snapshot: string;
   status: DemoSessionStatus;
   editor_session_id: string | null;
+  current_round: number;
   created_at: string;
   updated_at: string;
 };
@@ -30,8 +31,10 @@ export type DemoMessageRow = {
   id: string;
   session_id: string;
   turn_number: number;
+  round: number;
   role: DemoMessageRole;
   content: string;
+  version_number_snapshot: string | null;
   created_at: string;
 };
 
@@ -42,21 +45,29 @@ export type DemoSessionListItem = DemoSession & {
 export type DemoSessionDetail = DemoSessionListItem & {
   messages: DemoMessageRow[];
   notes: DemoNoteRow[];
+  /** Messages referenced by a note that live in an older round (so they are
+   *  not in `messages`). Lets the UI resolve a note's bubble preview without
+   *  showing those messages in the chat. */
+  note_messages: DemoMessageRow[];
 };
 
 const SESSION_COLS =
   "id, client_id, version_id, version_number_snapshot, prompt_snapshot, status, " +
-  "editor_session_id, created_at, updated_at";
-const MESSAGE_COLS = "id, session_id, turn_number, role, content, created_at";
+  "editor_session_id, current_round, created_at, updated_at";
+const MESSAGE_COLS =
+  "id, session_id, turn_number, round, role, content, version_number_snapshot, created_at";
 
 function flattenListItem(row: any): DemoSessionListItem {
   const client = Array.isArray(row.clients) ? row.clients[0] : row.clients;
-  const messages = row.demo_messages;
+  const messages: any[] = Array.isArray(row.demo_messages) ? row.demo_messages : [];
   const { clients: _c, demo_messages: _m, ...session } = row;
+  const currentRound = (session as DemoSession).current_round ?? 1;
+  // Only the active round counts toward the list preview.
+  const count = messages.filter((m) => (m.round ?? 1) === currentRound).length;
   return {
     ...(session as DemoSession),
     client_name: client?.name ?? null,
-    message_count: Array.isArray(messages) ? messages.length : 0,
+    message_count: count,
   };
 }
 
@@ -97,7 +108,9 @@ export async function listSessions({
   clientId,
 }: { clientId?: string } = {}): Promise<DemoSessionListItem[]> {
   const sb = getSupabase();
-  let query = sb.from("demo_sessions").select(`${SESSION_COLS}, clients(name), demo_messages(id)`);
+  let query = sb
+    .from("demo_sessions")
+    .select(`${SESSION_COLS}, clients(name), demo_messages(id, round)`);
   if (clientId) query = query.eq("client_id", clientId);
   query = query.order("created_at", { ascending: false });
 
@@ -116,25 +129,53 @@ export async function getSession(id: string): Promise<DemoSessionDetail | null> 
   if (error) throw new Error(`No se pudo obtener la conversación: ${error.message}`);
   if (!session) return null;
 
+  // Only the active round is shown in the chat; older rounds remain in the
+  // table so note previews keep resolving (see rounds model in the plan).
+  const currentRound = (session as any).current_round ?? 1;
   const { data: messages, error: mErr } = await sb
     .from("demo_messages")
     .select(MESSAGE_COLS)
     .eq("session_id", id)
+    .eq("round", currentRound)
     .order("turn_number", { ascending: true });
   if (mErr) throw new Error(`No se pudieron obtener los mensajes: ${mErr.message}`);
 
   const notes = await listNotes(id);
 
+  // Resolve any note-referenced messages that live in an older round, so the
+  // note previews keep working after a reset/version switch.
+  const currentRoundIds = new Set((messages ?? []).map((m: any) => m.id));
+  const referencedIds = [
+    ...new Set(notes.flatMap((n) => n.message_ids).filter((mid) => !currentRoundIds.has(mid))),
+  ];
+  let noteMessages: DemoMessageRow[] = [];
+  if (referencedIds.length > 0) {
+    const { data: refRows, error: rErr } = await sb
+      .from("demo_messages")
+      .select(MESSAGE_COLS)
+      .eq("session_id", id)
+      .in("id", referencedIds);
+    if (rErr) throw new Error(`No se pudieron obtener los mensajes referenciados: ${rErr.message}`);
+    noteMessages = (refRows ?? []) as unknown as DemoMessageRow[];
+  }
+
   return {
     ...flattenListItem({ ...session, demo_messages: messages ?? [] }),
     messages: (messages ?? []) as unknown as DemoMessageRow[],
     notes,
+    note_messages: noteMessages,
   };
 }
 
 export async function appendMessage(
   sessionId: string,
-  input: { turnNumber: number; role: DemoMessageRole; content: string },
+  input: {
+    turnNumber: number;
+    role: DemoMessageRole;
+    content: string;
+    round: number;
+    versionNumberSnapshot?: string | null;
+  },
 ): Promise<DemoMessageRow> {
   const sb = getSupabase();
   const { data, error } = await sb
@@ -142,8 +183,10 @@ export async function appendMessage(
     .insert({
       session_id: sessionId,
       turn_number: input.turnNumber,
+      round: input.round,
       role: input.role,
       content: input.content,
+      version_number_snapshot: input.versionNumberSnapshot ?? null,
     })
     .select(MESSAGE_COLS)
     .single();
