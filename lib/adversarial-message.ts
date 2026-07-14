@@ -61,12 +61,27 @@ export function extractState(value: unknown): string | null {
 }
 
 /**
+ * Strips a Markdown code fence some models wrap their JSON in despite being
+ * told to reply with raw JSON, e.g. ```json\n{...}\n``` . Without this the
+ * envelope never parses (it starts with a backtick, not `{`) and the raw
+ * braces leak into the transcript. Tolerates a missing closing fence
+ * (truncated / streaming output).
+ */
+export function stripCodeFence(content: string): string {
+  let s = content.trim();
+  if (/^```[^\n`]*\n/.test(s)) {
+    s = s.replace(/^```[^\n`]*\n/, "").replace(/\n?```$/, "");
+  }
+  return s.trim();
+}
+
+/**
  * Splits a turn's content into the readable message and, when the content was a
  * JSON envelope, just the `estado` value (not the whole JSON — the messages are
  * already the bubble text). Non-JSON content is returned as-is with no state.
  */
 export function parseTurn(content: string): { message: string; state: string | null } {
-  const trimmed = content.trim();
+  const trimmed = stripCodeFence(content);
   if (trimmed[0] !== "{" && trimmed[0] !== "[") {
     return { message: content, state: null };
   }
@@ -93,13 +108,35 @@ function splitBubbles(text: string): string[] {
  * Like parseTurn, but returns the message as an ARRAY of bubbles instead of one
  * string, so the Playground can render a bot turn the way n8n delivers it to
  * WhatsApp: one bubble per line break / per `mensajes` array item. `state` is
- * the JSON envelope's estado, meant to hang off the last bubble. A turn with no
- * readable text (e.g. only an estado) yields an empty `messages` array; the
- * caller decides what to show in that case.
+ * the JSON envelope's estado, meant to hang off the last bubble.
+ *
+ * Crucially, line-break splitting is ONLY applied to genuine readable text
+ * (plain prose, or the message extracted from a valid envelope). Content that
+ * looks like JSON but fails to parse is NEVER split — that would explode raw
+ * braces into one bubble per line. Such content is reported as `malformed` so
+ * the caller can show a clean fallback instead of the raw envelope.
+ * `messages` empty + not malformed = a valid envelope with only an estado.
  */
-export function parseTurnBubbles(content: string): { messages: string[]; state: string | null } {
-  const { message, state } = parseTurn(content);
-  return { messages: splitBubbles(message), state };
+export function parseTurnBubbles(content: string): {
+  messages: string[];
+  state: string | null;
+  malformed: boolean;
+} {
+  const stripped = stripCodeFence(content);
+  const looksJson = stripped[0] === "{" || stripped[0] === "[";
+  if (!looksJson) {
+    return { messages: splitBubbles(stripped), state: null, malformed: false };
+  }
+  try {
+    const parsed: unknown = JSON.parse(stripped);
+    return {
+      messages: splitBubbles(extractMessage(parsed)),
+      state: extractState(parsed),
+      malformed: false,
+    };
+  } catch {
+    return { messages: [], state: null, malformed: true };
+  }
 }
 
 // Matches a leading parenthetical paragraph — allowing one level of nested

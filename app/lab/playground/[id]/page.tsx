@@ -61,11 +61,16 @@ function Turn({
 }) {
   const side = role === "bot" ? "turn-bot" : "turn-lead";
   const roleLabel = role === "bot" ? "Bot del cliente" : "Tú (lead)";
-  const { messages, state } = parseTurnBubbles(content);
-  // A turn with no readable text (e.g. the bot only emitted an estado) still
-  // renders a single explanatory bubble, so nothing looks silently dropped.
-  const bubbles = messages.length > 0 ? messages : [emptyBotMessage(state)];
-  const isEmpty = messages.length === 0;
+  const { messages, state, malformed } = parseTurnBubbles(content);
+  // Malformed = the reply looked like JSON but couldn't be parsed (e.g. broken
+  // envelope). Never dump raw braces as bubbles: show one clean error bubble
+  // so a bad prompt output is obvious without garbage on screen.
+  const bubbles = malformed
+    ? ["No se pudo leer la respuesta del bot (formato inesperado)."]
+    : messages.length > 0
+      ? messages
+      : [emptyBotMessage(state)];
+  const isEmpty = malformed || messages.length === 0;
 
   return (
     <div
@@ -103,7 +108,7 @@ function Turn({
       {bubbles.map((b, i) => {
         const isLast = i === bubbles.length - 1;
         return (
-          <div key={i} className="chat-msg">
+          <div key={i} className={`chat-msg${malformed ? " chat-msg-error" : ""}`}>
             <div className={`chat-content${isEmpty ? " chat-empty" : ""}`}>{b}</div>
             {/* The estado hangs off the last bubble, WhatsApp-style. */}
             {state && isLast && !isEmpty && (

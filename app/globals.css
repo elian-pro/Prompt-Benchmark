@@ -3612,3 +3612,14 @@ body[data-theme="light"] .dot-grid::after {
   gap: 8px;
   flex-wrap: wrap;
 }
+
+/* Bot reply that couldn't be parsed (malformed envelope): a clean error
+   bubble instead of raw JSON leaking into the transcript (Sprint 8 fix). */
+.chat-msg-error {
+  border-color: var(--danger);
+  background: color-mix(in srgb, var(--danger) 8%, var(--surface2));
+}
+.chat-msg-error .chat-content {
+  color: var(--danger);
+  font-style: normal;
+}
