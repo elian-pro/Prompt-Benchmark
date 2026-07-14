@@ -196,6 +196,44 @@ from **Settings → System prompts**.
   prompt). The judge has no dynamic part, so its override is used verbatim.
 - "Restaurar original" deletes the row (`DELETE /api/prompt-overrides/:role`).
 
+## Editor output contract
+
+The Editor persona returns the full updated prompt plus a change summary. The
+prompt is delimited by TEXT sentinels, not a Markdown code fence:
+
+```
+===PROMPT ACTUALIZADO===
+<full prompt, may itself contain ```json blocks>
+===FIN DEL PROMPT===
+
+**CAMBIOS REALIZADOS:**
+- exactly 3 short bullets
+```
+
+Why sentinels (Sprint 9): client prompts contain their own ` ``` ` fenced
+blocks (bot output-format examples). The old contract wrapped the prompt in a
+single ` ``` ` block, and a non-greedy extractor stopped at the first inner
+fence, truncating the prompt and leaking the rest into the chat, the change
+summary, and the saved draft. Text sentinels can't appear in a real prompt, so
+inner fences are safe.
+
+All extraction lives in `lib/prompts/editor-persona.ts`, shared by the server
+(`messages/route.ts`, `finalize/route.ts`) and the chat renderer
+(`ChatMessage.tsx`) so there is ONE implementation, not drifting copies:
+- `locatePromptBlock` (private): sentinel-first; a GREEDY outer-fence fallback
+  handles legacy ` ``` `-wrapped replies (spans first fence to last, capturing
+  inner fences). A reply containing PROMPT_START is matched by sentinels only,
+  so a half-streamed reply never mis-triggers on the prompt's inner fences.
+- `extractPromptFromReply`, `splitPromptBlock`, `replacePromptBlock`,
+  `hasUnclosedPromptBlock`, `extractChangeSummary` build on it.
+- `capSummary` keeps the change summary to 3 bullets and 250 chars.
+
+Version display: when an Editor turn produces a draft, the route stamps it with
+the version it will become on finalize (`syncVersionMarkers` to the next minor
+bump) and rewrites the stored assistant message the same way
+(`replacePromptBlock`), so the chat card and the drawer show the same target
+version. The DB's latest version is unchanged until finalize, so no double bump.
+
 ## Adversarial run snapshots
 
 When an Adversarial Lab run is created, the run row stores:

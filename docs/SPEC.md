@@ -96,6 +96,18 @@ A chat interface with Claude Opus.
 - User reviews. When ready, clicks "Finalizar edición" → committed as a
   new minor version in the Library.
 
+In the AI turn the updated prompt appears as a collapsed "Prompt actualizado"
+card (with an "escribiendo..." state while it streams), followed by a short
+CAMBIOS REALIZADOS summary. The full prompt is never dumped as chat text, even
+when the prompt itself contains code blocks. The prompt already shows the
+version it will become (the next minor, e.g. v1.8) so the change is visible
+while editing. The change summary is capped at 3 bullets / 250 characters.
+
+While editing, a "NEW" badge lights on "Ver borrador" when a fresh draft is
+ready. From there (or the topbar) the user can, after finalizing, "Promover a
+producción", which also triggers the n8n sync if the client is bound. A
+jump-to-bottom button appears when the chat is scrolled up.
+
 Editor conversations persist (can be reopened). Uploaded files expire
 after 7 days; the conversation text remains.
 
