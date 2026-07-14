@@ -10,6 +10,8 @@ import {
   IconSend,
   IconTrash,
   IconNotes,
+  IconCheck,
+  IconX,
 } from "@tabler/icons-react";
 import type {
   DemoSessionDetail,
@@ -155,6 +157,7 @@ function NotesPanel({
   onCancelCompose,
   onSaveNote,
   onDeleteNote,
+  onToggleSelect,
   onJumpToMessage,
   registerNoteRef,
   flashNoteId,
@@ -171,6 +174,7 @@ function NotesPanel({
   onCancelCompose: () => void;
   onSaveNote: () => void;
   onDeleteNote: (id: string) => void;
+  onToggleSelect: (id: string) => void;
   onJumpToMessage: (id: string) => void;
   registerNoteRef: (id: string, el: HTMLDivElement | null) => void;
   flashNoteId: string | null;
@@ -252,12 +256,46 @@ function NotesPanel({
         ))}
       </div>
 
-      <div className="note-composer">
-        {selectedIds.length > 0 && (
-          <p className="note-composer-hint">
-            {selectedIds.length} {selectedIds.length === 1 ? "mensaje seleccionado" : "mensajes seleccionados"}
+      <div className={`note-composer${isComposing ? " is-active" : ""}`}>
+        {isComposing && (
+          <p className="note-composer-title">
+            {editingNoteId ? "Editando nota" : "Nueva nota"}
           </p>
         )}
+
+        {/* The tagged bubbles show as soon as messages are selected, before
+            saving, so you see exactly what the note points at. */}
+        {selectedIds.length > 0 && (
+          <div className="note-refs">
+            {selectedIds.map((mid) => {
+              const m = messagesById.get(mid);
+              const { message } = m ? parseTurn(m.content) : { message: "" };
+              const text = message || "(sin mensaje)";
+              const preview = text.length > 60 ? `${text.slice(0, 60)}…` : text;
+              return (
+                <div key={mid} className="note-ref note-ref-draft">
+                  <button
+                    type="button"
+                    className="note-ref-quote"
+                    onClick={() => onJumpToMessage(mid)}
+                    title="Ir al mensaje"
+                  >
+                    “{preview}”
+                  </button>
+                  <button
+                    type="button"
+                    className="note-ref-remove"
+                    onClick={() => onToggleSelect(mid)}
+                    aria-label="Quitar este mensaje de la nota"
+                  >
+                    <IconX size={12} />
+                  </button>
+                </div>
+              );
+            })}
+          </div>
+        )}
+
         <textarea
           className="textarea"
           rows={3}
@@ -272,17 +310,25 @@ function NotesPanel({
         {noteError && <p className="form-error">{noteError}</p>}
         <div className="note-composer-actions">
           {isComposing && (
-            <button type="button" className="btn btn-ghost btn-sm" onClick={onCancelCompose}>
-              Cancelar
+            <button
+              type="button"
+              className="note-act-btn"
+              onClick={onCancelCompose}
+              aria-label="Cancelar nota"
+              title="Cancelar"
+            >
+              <IconX size={16} />
             </button>
           )}
           <button
             type="button"
-            className="btn btn-primary btn-sm"
+            className="note-act-btn note-act-save"
             onClick={onSaveNote}
             disabled={savingNote || !draftText.trim()}
+            aria-label={editingNoteId ? "Guardar cambios" : "Guardar nota"}
+            title={editingNoteId ? "Guardar cambios" : "Guardar nota"}
           >
-            {savingNote ? "Guardando…" : editingNoteId ? "Guardar cambios" : "Guardar nota"}
+            <IconCheck size={16} />
           </button>
         </div>
       </div>
@@ -638,6 +684,7 @@ export default function PlaygroundSessionPage() {
           onCancelCompose={cancelCompose}
           onSaveNote={saveNote}
           onDeleteNote={removeNote}
+          onToggleSelect={toggleSelect}
           onJumpToMessage={jumpToMessage}
           registerNoteRef={registerNoteRef}
           flashNoteId={flashNoteId}

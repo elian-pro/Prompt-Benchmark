@@ -2482,15 +2482,94 @@ a.lab-card:hover {
   gap: 8px;
   border-top: 0.5px solid var(--border2);
   padding-top: 14px;
+  margin-top: 14px;
 }
-.note-composer-hint {
-  font-size: 11px;
+/* When composing, the block reads as a draft note card (Sprint 8, T4). */
+.note-composer.is-active {
+  border: 0.5px solid var(--accent);
+  border-radius: 12px;
+  padding: 12px;
+  margin-top: 4px;
+  background: color-mix(in srgb, var(--accent) 5%, var(--surface));
+}
+.note-composer-title {
+  font-size: 9px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
   color: var(--muted);
 }
 .note-composer-actions {
   display: flex;
   justify-content: flex-end;
   gap: 8px;
+}
+.note-act-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 8px;
+  border: 0.5px solid var(--border2);
+  background: var(--surface);
+  color: var(--muted);
+  cursor: pointer;
+  transition: 0.15s;
+}
+.note-act-btn:hover:not(:disabled) {
+  color: var(--fg);
+  border-color: var(--fg);
+}
+.note-act-save {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #0a0a0a;
+}
+.note-act-save:hover:not(:disabled) {
+  color: #0a0a0a;
+  filter: brightness(1.05);
+}
+.note-act-btn:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+/* A tagged-bubble chip in the draft composer: quote + remove x. */
+.note-ref-draft {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0;
+  background: transparent;
+}
+.note-ref-quote {
+  flex: 1;
+  text-align: left;
+  font-size: 11px;
+  font-style: italic;
+  color: var(--muted);
+  background: var(--surface2);
+  border: none;
+  border-radius: 6px;
+  padding: 5px 8px;
+  cursor: pointer;
+}
+.note-ref-quote:hover {
+  color: var(--fg);
+}
+.note-ref-remove {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 6px;
+  border: none;
+  background: transparent;
+  color: var(--faint);
+  cursor: pointer;
+}
+.note-ref-remove:hover {
+  color: var(--danger);
 }
 
 /* Slide-over drawer holding the working draft (and the Creator's report). */
