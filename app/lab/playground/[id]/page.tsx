@@ -12,6 +12,7 @@ import {
   IconNotes,
   IconCheck,
   IconX,
+  IconRefresh,
 } from "@tabler/icons-react";
 import type {
   DemoSessionDetail,
@@ -22,6 +23,7 @@ import type { DemoNoteRow } from "@/lib/db/demo-notes";
 import { parseTurn, parseTurnBubbles } from "@/lib/adversarial-message";
 import { relativeTimeEs } from "@/lib/format";
 import { Button } from "@/components/ui/Button";
+import { Modal } from "@/components/ui/Modal";
 
 /** Any special state with no readable message names itself explicitly,
  *  e.g. "El bot pasó a estado «humano» y dejó de responder." — this is
@@ -161,6 +163,7 @@ function NotesPanel({
   onJumpToMessage,
   registerNoteRef,
   flashNoteId,
+  currentMessageIds,
 }: {
   notes: DemoNoteRow[];
   selectedIds: string[];
@@ -178,6 +181,7 @@ function NotesPanel({
   onJumpToMessage: (id: string) => void;
   registerNoteRef: (id: string, el: HTMLDivElement | null) => void;
   flashNoteId: string | null;
+  currentMessageIds: Set<string>;
 }) {
   const isComposing = editingNoteId !== null || selectedIds.length > 0 || draftText.trim().length > 0;
 
@@ -237,14 +241,20 @@ function NotesPanel({
                   const { message } = parseTurn(m.content);
                   const text = message || "(sin mensaje)";
                   const preview = text.length > 60 ? `${text.slice(0, 60)}…` : text;
+                  // A ref to a message not in the current round: its preview
+                  // still resolves, but jumping to it in the chat can't (it's
+                  // not shown), so it's inert and marked.
+                  const olderRound = !currentMessageIds.has(mid);
                   return (
                     <button
                       key={mid}
                       type="button"
-                      className="note-ref"
-                      onClick={() => onJumpToMessage(mid)}
+                      className={`note-ref${olderRound ? " note-ref-stale" : ""}`}
+                      onClick={() => !olderRound && onJumpToMessage(mid)}
+                      title={olderRound ? "De una conversación anterior" : "Ir al mensaje"}
                     >
                       “{preview}”
+                      {olderRound && <span className="note-ref-tag">conversación anterior</span>}
                     </button>
                   );
                 })}
@@ -358,6 +368,8 @@ export default function PlaygroundSessionPage() {
   const [flashNoteId, setFlashNoteId] = useState<string | null>(null);
   const [handingOff, setHandingOff] = useState(false);
   const [handoffError, setHandoffError] = useState<string | null>(null);
+  const [resetOpen, setResetOpen] = useState(false);
+  const [resetting, setResetting] = useState(false);
 
   const scrollRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -550,11 +562,31 @@ export default function PlaygroundSessionPage() {
     }
   }
 
+  // Starts a fresh round (keeps notes). Clears any in-progress composition
+  // since its selected messages leave the current view.
+  async function resetConversation() {
+    setResetting(true);
+    try {
+      const res = await fetch(`/api/demo-sessions/${id}/reset`, { method: "POST" });
+      if (!res.ok) throw new Error((await res.json()).error ?? "No se pudo reiniciar.");
+      setResetOpen(false);
+      cancelCompose();
+      await load();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Error al reiniciar la conversación.");
+    } finally {
+      setResetting(false);
+    }
+  }
+
   if (loading) return <p className="empty-hint">Cargando…</p>;
   if (error && !session) return <p className="form-error">{error}</p>;
   if (!session) return <p className="empty-hint">Conversación no encontrada.</p>;
 
   const isActive = session.status === "active";
+  // Message ids visible in the current round, so a note referencing an older
+  // round can be flagged (its bubble preview still resolves via note_messages).
+  const currentMessageIds = new Set(session.messages.map((m) => m.id));
 
   return (
     <div>
@@ -571,6 +603,16 @@ export default function PlaygroundSessionPage() {
           </div>
         </div>
         <div className="detail-actions">
+          {isActive && session.messages.length > 0 && (
+            <Button
+              variant="secondary"
+              icon={<IconRefresh size={14} />}
+              onClick={() => setResetOpen(true)}
+              disabled={resetting}
+            >
+              Reiniciar
+            </Button>
+          )}
           {session.status === "sent_to_editor" && session.editor_session_id ? (
             <Link
               href={`/editor/${session.editor_session_id}`}
@@ -688,8 +730,30 @@ export default function PlaygroundSessionPage() {
           onJumpToMessage={jumpToMessage}
           registerNoteRef={registerNoteRef}
           flashNoteId={flashNoteId}
+          currentMessageIds={currentMessageIds}
         />
       </div>
+
+      <Modal
+        open={resetOpen}
+        onClose={() => !resetting && setResetOpen(false)}
+        title="¿Reiniciar la conversación?"
+        footer={
+          <>
+            <Button variant="ghost" onClick={() => setResetOpen(false)} disabled={resetting}>
+              Cancelar
+            </Button>
+            <Button variant="primary" onClick={resetConversation} disabled={resetting}>
+              {resetting ? "Reiniciando…" : "Reiniciar"}
+            </Button>
+          </>
+        }
+      >
+        <p className="modal-body">
+          El chat empieza de cero. Tus notas se conservan (siguen visibles aunque no sean
+          de la conversación nueva). No se borra nada de forma permanente.
+        </p>
+      </Modal>
     </div>
   );
 }

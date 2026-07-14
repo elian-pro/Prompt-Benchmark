@@ -3589,3 +3589,18 @@ body[data-theme="light"] .dot-grid::after {
 .playground-chat .chat-turn.is-flashed .chat-msg {
   animation: noteFlash 1.6s ease;
 }
+
+/* Note ref pointing at a message from an older round (Sprint 8, T5). */
+.note-ref-stale {
+  cursor: default;
+  opacity: 0.8;
+}
+.note-ref-tag {
+  display: block;
+  margin-top: 3px;
+  font-size: 9px;
+  font-style: normal;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--faint);
+}

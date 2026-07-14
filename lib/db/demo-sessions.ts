@@ -194,6 +194,30 @@ export async function appendMessage(
   return data as unknown as DemoMessageRow;
 }
 
+/**
+ * Starts a fresh conversation round: bumps `current_round`. Old messages stay
+ * in the table (so note previews keep resolving) but drop out of the chat view.
+ * Notes are session-scoped, so they persist across the reset (Sprint 8, T5).
+ */
+export async function resetSession(sessionId: string): Promise<DemoSession> {
+  const sb = getSupabase();
+  const { data: current, error: gErr } = await sb
+    .from("demo_sessions")
+    .select("current_round")
+    .eq("id", sessionId)
+    .single();
+  if (gErr) throw new Error(`No se pudo obtener la conversación: ${gErr.message}`);
+
+  const { data, error } = await sb
+    .from("demo_sessions")
+    .update({ current_round: (current.current_round ?? 1) + 1 })
+    .eq("id", sessionId)
+    .select(SESSION_COLS)
+    .single();
+  if (error) throw new Error(`No se pudo reiniciar la conversación: ${error.message}`);
+  return data as unknown as DemoSession;
+}
+
 /** Marks a Playground session as handed off, linking the Editor session it
  *  spawned (Sprint 6, T4 — "Enviar al Editor"). */
 export async function markSentToEditor(
