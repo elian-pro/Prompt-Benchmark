@@ -5,6 +5,7 @@ import { UnsupportedFileError } from "./db/uploads";
 import { RoleNotConfiguredError } from "./db/runs";
 import { ConnectionInUseError } from "./db/n8n-connections";
 import { N8nApiError } from "./n8n/client";
+import { VersionSwitchBlockedError } from "./db/demo-sessions";
 
 /** JSON error envelope. Messages are in Spanish (user-facing). */
 export function jsonError(message: string, status: number) {
@@ -34,6 +35,9 @@ export function handleError(err: unknown) {
     return jsonError(err.message, 409);
   }
   if (err instanceof ConnectionInUseError) {
+    return jsonError(err.message, 409);
+  }
+  if (err instanceof VersionSwitchBlockedError) {
     return jsonError(err.message, 409);
   }
   if (err instanceof N8nApiError) {

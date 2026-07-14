@@ -194,6 +194,65 @@ export async function appendMessage(
   return data as unknown as DemoMessageRow;
 }
 
+/** Custom error so the API can return 409 when a version switch is blocked. */
+export class VersionSwitchBlockedError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "VersionSwitchBlockedError";
+  }
+}
+
+/**
+ * Switches the session's active version and starts a fresh round (clean
+ * comparison: the bot won't carry another version's replies). Only allowed
+ * while the session has no notes, since notes are tied to the version they
+ * were created against (Sprint 8, T6).
+ */
+export async function updateSessionVersion(
+  sessionId: string,
+  versionId: string,
+): Promise<DemoSession> {
+  const sb = getSupabase();
+
+  const { data: sessionRow, error: sErr } = await sb
+    .from("demo_sessions")
+    .select("client_id, current_round")
+    .eq("id", sessionId)
+    .single();
+  if (sErr) throw new Error(`No se pudo obtener la conversación: ${sErr.message}`);
+
+  const { count, error: nErr } = await sb
+    .from("demo_notes")
+    .select("id", { count: "exact", head: true })
+    .eq("session_id", sessionId);
+  if (nErr) throw new Error(`No se pudieron verificar las notas: ${nErr.message}`);
+  if ((count ?? 0) > 0) {
+    throw new VersionSwitchBlockedError(
+      "Para cambiar de versión, elimina las notas primero. Las notas están ligadas a la versión con la que las creaste.",
+    );
+  }
+
+  const version = await getVersion(versionId);
+  if (!version) throw new Error("La versión a probar no existe.");
+  if (version.client_id !== sessionRow.client_id) {
+    throw new Error("La versión no pertenece al cliente de esta conversación.");
+  }
+
+  const { data, error } = await sb
+    .from("demo_sessions")
+    .update({
+      version_id: version.id,
+      version_number_snapshot: version.version_number,
+      prompt_snapshot: version.content,
+      current_round: (sessionRow.current_round ?? 1) + 1,
+    })
+    .eq("id", sessionId)
+    .select(SESSION_COLS)
+    .single();
+  if (error) throw new Error(`No se pudo cambiar la versión: ${error.message}`);
+  return data as unknown as DemoSession;
+}
+
 /**
  * Starts a fresh conversation round: bumps `current_round`. Old messages stay
  * in the table (so note previews keep resolving) but drop out of the chat view.

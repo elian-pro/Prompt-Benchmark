@@ -3604,3 +3604,11 @@ body[data-theme="light"] .dot-grid::after {
   text-transform: uppercase;
   color: var(--faint);
 }
+
+/* Playground version switcher row in the session header (Sprint 8, T6). */
+.playground-version-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}

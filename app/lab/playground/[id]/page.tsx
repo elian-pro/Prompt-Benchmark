@@ -13,6 +13,7 @@ import {
   IconCheck,
   IconX,
   IconRefresh,
+  IconGitBranch,
 } from "@tabler/icons-react";
 import type {
   DemoSessionDetail,
@@ -22,8 +23,11 @@ import type {
 import type { DemoNoteRow } from "@/lib/db/demo-notes";
 import { parseTurn, parseTurnBubbles } from "@/lib/adversarial-message";
 import { relativeTimeEs } from "@/lib/format";
+import type { VersionListItem } from "@/lib/db/versions";
 import { Button } from "@/components/ui/Button";
 import { Modal } from "@/components/ui/Modal";
+import { SearchableChip } from "@/components/ui/SearchableChip";
+import { InfoHint } from "@/components/ui/InfoHint";
 
 /** Any special state with no readable message names itself explicitly,
  *  e.g. "El bot pasó a estado «humano» y dejó de responder." — this is
@@ -370,6 +374,8 @@ export default function PlaygroundSessionPage() {
   const [handoffError, setHandoffError] = useState<string | null>(null);
   const [resetOpen, setResetOpen] = useState(false);
   const [resetting, setResetting] = useState(false);
+  const [clientVersions, setClientVersions] = useState<VersionListItem[]>([]);
+  const [switchingVersion, setSwitchingVersion] = useState(false);
 
   const scrollRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -385,6 +391,13 @@ export default function PlaygroundSessionPage() {
       const data: DemoSessionDetail = await res.json();
       setSession(data);
       setNotes(data.notes);
+      // Load the client's versions for the switcher (best-effort).
+      if (data.client_id) {
+        fetch(`/api/clients/${data.client_id}/versions`)
+          .then((r) => (r.ok ? r.json() : []))
+          .then((rows: VersionListItem[]) => setClientVersions(rows))
+          .catch(() => setClientVersions([]));
+      }
     } catch (e) {
       setError(e instanceof Error ? e.message : "Error al cargar la conversación.");
     } finally {
@@ -579,6 +592,28 @@ export default function PlaygroundSessionPage() {
     }
   }
 
+  // Switches the version under test and starts a fresh round. Blocked (both
+  // here via the disabled control and on the server) once notes exist.
+  async function switchVersion(versionId: string) {
+    if (versionId === session?.version_id || switchingVersion) return;
+    setSwitchingVersion(true);
+    setError(null);
+    try {
+      const res = await fetch(`/api/demo-sessions/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ version_id: versionId }),
+      });
+      if (!res.ok) throw new Error((await res.json()).error ?? "No se pudo cambiar la versión.");
+      cancelCompose();
+      await load();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Error al cambiar la versión.");
+    } finally {
+      setSwitchingVersion(false);
+    }
+  }
+
   if (loading) return <p className="empty-hint">Cargando…</p>;
   if (error && !session) return <p className="form-error">{error}</p>;
   if (!session) return <p className="empty-hint">Conversación no encontrada.</p>;
@@ -596,9 +631,32 @@ export default function PlaygroundSessionPage() {
             <IconArrowLeft size={13} /> Playground
           </Link>
           <h1 className="detail-title">{session.client_name ?? "Cliente eliminado"}</h1>
-          <div className="detail-sub">
+          <div className="detail-sub playground-version-row">
+            {isActive && notes.length === 0 && clientVersions.length > 0 ? (
+              <SearchableChip
+                icon={<IconGitBranch size={13} />}
+                placeholder={session.version_number_snapshot}
+                searchPlaceholder="Buscar versión…"
+                items={clientVersions.map((v) => ({
+                  id: v.id,
+                  label: v.version_number,
+                  meta: v.is_production ? "Producción" : undefined,
+                }))}
+                value={session.version_id ?? ""}
+                onChange={switchVersion}
+                disabled={switchingVersion}
+                emptyText="Sin versiones."
+              />
+            ) : (
+              <span className="muted" style={{ fontSize: 12, display: "inline-flex", alignItems: "center", gap: 4 }}>
+                {session.version_number_snapshot}
+                {isActive && notes.length > 0 && (
+                  <InfoHint text="Para cambiar de versión, elimina las notas. Las notas están ligadas a la versión con la que las creaste." />
+                )}
+              </span>
+            )}
             <span className="muted" style={{ fontSize: 12 }}>
-              {session.version_number_snapshot} · {relativeTimeEs(session.created_at)}
+              · {relativeTimeEs(session.created_at)}
             </span>
           </div>
         </div>
