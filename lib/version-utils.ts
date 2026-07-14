@@ -29,40 +29,69 @@ export function computeNextNumber(
   return `v${major}.${minor + 1}`;
 }
 
-// Matches a line DEDICATED to declaring the version ("Versión: 1.4",
-// "Version 1.4", with or without the colon) — never a mention embedded in a
-// longer sentence (e.g. a closing "FIN DEL PROMPT ... v1.4" footer), which is
-// too easy to corrupt by editing text inside prose. No `g` flag: only the
-// first (canonical, top-of-file) declaration is ever rewritten.
-const VERSION_LINE = /^([ \t]*Versi[oó]n[ \t]*:?[ \t]*)v?\d+\.\d+[ \t]*$/im;
+// A line DEDICATED to declaring the version in the OLD style ("Versión: 1.4",
+// "Version 1.4", with or without the colon). We no longer keep this line; the
+// version now lives in the title's `vX.Y` token and a closing footer, so any
+// such line is stripped on sync.
+const VERSION_DECL_LINE = /^[ \t]*Versi[oó]n[ \t]*:?[ \t]*v?\d+\.\d+[ \t]*$/i;
+
+// A closing footer heading, e.g. "# FIN DEL PROMPT ... v1.4". Matched so it can
+// be regenerated in sync with the version rather than left to drift.
+const FOOTER_LINE = /^[ \t]*#+[ \t]+FIN DEL\b/i;
+
+// A heading line with content (the title is the first one that isn't a footer).
+const HEADING_LINE = /^[ \t]*#+[ \t]+\S/;
+
+// A "vMAJOR.MINOR" token inside a title, e.g. the "v1.4" in "... COCO IA v1.4".
+const VERSION_TOKEN = /v\d+\.\d+/g;
+
+/** Replaces the last `vX.Y` token in a heading, or appends one if absent. */
+function withVersionToken(line: string, ver: string): string {
+  const matches = [...line.matchAll(VERSION_TOKEN)];
+  if (matches.length === 0) return `${line.replace(/[ \t]+$/, "")} ${ver}`;
+  const last = matches[matches.length - 1];
+  return line.slice(0, last.index) + ver + line.slice(last.index! + last[0].length);
+}
 
 /**
- * Keeps a "Versión: X.Y" declaration line inside a prompt's own text in sync
- * with the DB version number being saved — deterministically, via regex,
- * never via the model (the Editor persona is explicitly forbidden from
- * touching version text; the Studio owns versioning). Lets the team identify
- * a prompt's version just by opening the file outside the app.
+ * Keeps a prompt's own text identifiable by version, deterministically (via
+ * string ops, never the model). Given the DB version number being saved, it:
  *
- * `versionNumber` is the DB's "vX.Y" form; the declaration line convention
- * omits the leading "v" ("Versión: 1.4"), matching the team's own template.
- * If no dedicated line exists yet, one is inserted — right after a leading
- * `# ` title line when the content starts with one, otherwise as the very
- * first line — so every version going forward is identifiable at a glance.
+ * 1. Rewrites the `vX.Y` token in the title (the first heading) to match, or
+ *    appends ` vX.Y` if the title has no version token yet.
+ * 2. Removes any old-style dedicated "Versión: X.Y" declaration line.
+ * 3. Regenerates a closing footer that mirrors the title with a "FIN DEL "
+ *    prefix, e.g. "# FIN DEL PROMPT ... v1.4", as the last line.
+ *
+ * So "# PROMPT CONVERSACIONAL - COCO IA v1.4" + a matching footer replace the
+ * former "Versión: 1.4" line. Idempotent: re-running yields the same text.
+ *
+ * Fallback: a prompt with no heading at all gets a bare "vX.Y" line at the top
+ * and no footer (nothing to derive one from). This is a corner case; real
+ * prompts always open with a `# ` title.
  */
-export function syncVersionLine(content: string, versionNumber: string): string {
-  const bare = versionNumber.replace(/^v/i, "");
+export function syncVersionMarkers(content: string, versionNumber: string): string {
+  const { major, minor } = parseVersion(versionNumber);
+  const ver = `v${major}.${minor}`;
 
-  if (VERSION_LINE.test(content)) {
-    return content.replace(VERSION_LINE, (_match, label: string) => `${label}${bare}`);
+  // Drop old declaration lines and any existing footer (regenerated below).
+  let lines = content
+    .split("\n")
+    .filter((l) => !VERSION_DECL_LINE.test(l) && !FOOTER_LINE.test(l));
+
+  // Tidy the edges the removals may have left behind, without touching
+  // intentional spacing between inner blocks.
+  while (lines.length && lines[0].trim() === "") lines.shift();
+  while (lines.length && lines[lines.length - 1].trim() === "") lines.pop();
+
+  const titleIdx = lines.findIndex((l) => HEADING_LINE.test(l));
+  if (titleIdx === -1) {
+    return [ver, "", ...lines].join("\n");
   }
 
-  const versionLine = `Versión: ${bare}`;
-  const lines = content.split("\n");
-  if (lines[0]?.trimStart().startsWith("#")) {
-    let insertAt = 1;
-    if (lines[insertAt]?.trim() === "") insertAt++;
-    lines.splice(insertAt, 0, versionLine, "");
-    return lines.join("\n");
-  }
-  return `${versionLine}\n\n${content}`;
+  const syncedTitle = withVersionToken(lines[titleIdx], ver);
+  lines[titleIdx] = syncedTitle;
+
+  const footer = syncedTitle.replace(/^([ \t]*#+[ \t]+)/, "$1FIN DEL ");
+  return [...lines, "", footer].join("\n");
 }

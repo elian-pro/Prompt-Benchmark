@@ -13,7 +13,7 @@
  *   oldest non-production version. The insert still returns the new row.
  */
 import { getSupabase } from "../supabase";
-import { computeNextNumber, syncVersionLine, type BumpType } from "../version-utils";
+import { computeNextNumber, syncVersionMarkers, type BumpType } from "../version-utils";
 
 export type { BumpType };
 export type VersionSource = "manual" | "editor_chat" | "creator_chat" | "imported";
@@ -102,16 +102,19 @@ export async function createVersion(
   const { bumpType, source, sourceSessionId, versionNumberOverride, changeSummary } = options;
 
   const latest = await latestVersionNumber(clientId);
-  const versionNumber = computeNextNumber(latest, bumpType, versionNumberOverride);
+  // An explicit override wins for any bump type (manual finalize can set the
+  // number); otherwise it's auto-computed. Imported without an override still
+  // throws inside computeNextNumber, so that requirement is preserved.
+  const versionNumber = versionNumberOverride ?? computeNextNumber(latest, bumpType);
   const isProduction = bumpType === "major" || bumpType === "imported";
 
   // Only one production version per client (unique partial index): clear the
   // current one before inserting a new production version.
   if (isProduction) await unmarkProduction(clientId);
 
-  // Keep the prompt's own "Versión: X.Y" line in sync with what's actually
-  // being saved — deterministic, never left to the model.
-  const syncedContent = syncVersionLine(content, versionNumber);
+  // Keep the prompt's own version markers (title token + closing footer) in
+  // sync with what's actually being saved: deterministic, never the model.
+  const syncedContent = syncVersionMarkers(content, versionNumber);
 
   const { data, error } = await sb
     .from("versions")
@@ -141,9 +144,36 @@ export async function createVersion(
   return data as Version;
 }
 
+/**
+ * Renames a version (manual override, e.g. the prompt was updated outside the
+ * app during beta). Re-syncs the content's version markers to the new number
+ * so the title token and footer stay consistent. Does not touch the
+ * production flag or create a new row.
+ */
+export async function updateVersionNumber(id: string, versionNumber: string): Promise<Version> {
+  const sb = getSupabase();
+  const { data: current, error: gErr } = await sb
+    .from("versions")
+    .select("content")
+    .eq("id", id)
+    .single();
+  if (gErr) throw new Error(`No se pudo obtener la versión: ${gErr.message}`);
+
+  const syncedContent = syncVersionMarkers(current.content as string, versionNumber);
+  const { data, error } = await sb
+    .from("versions")
+    .update({ version_number: versionNumber, content: syncedContent })
+    .eq("id", id)
+    .select(`${SUMMARY_COLS}, content`)
+    .single();
+  if (error) throw new Error(`No se pudo cambiar el número de versión: ${error.message}`);
+  return data as Version;
+}
+
 /** Updates a version's change summary (add it after a quick save, or edit it).
- *  Pass null to clear it. Content and version number are immutable — only the
- *  human-facing "what changed" note can change after the fact. */
+ *  Pass null to clear it. Content is immutable except when the version number
+ *  changes (which re-syncs the markers); only the human-facing note and the
+ *  number itself change after the fact. */
 export async function updateVersionSummary(
   id: string,
   summary: string | null,

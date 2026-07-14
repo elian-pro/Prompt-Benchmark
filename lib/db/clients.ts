@@ -9,7 +9,7 @@
  * - 'archived'   → archived clients only.
  */
 import { getSupabase } from "../supabase";
-import { syncVersionLine } from "../version-utils";
+import { syncVersionMarkers } from "../version-utils";
 import { listVersions } from "./versions";
 import type { VersionListItem, Version, VersionSource } from "./versions";
 
@@ -214,16 +214,16 @@ export async function createClient(input: {
 
   // Seed v1.0 directly (not via createVersion, which always bumps). Not
   // production — a brand-new client is "en edición" until promoted.
-  // Only sync the version line when there's real content (Creator's
+  // Only sync the version markers when there's real content (Creator's
   // finalize) — leave the plain empty default seed untouched so "no draft
-  // yet" stays truly empty rather than gaining a stray "Versión: 1.0" line.
+  // yet" stays truly empty rather than gaining a stray version token.
   const seedContent = input.initialVersion?.content ?? "";
   const { data: version, error: vErr } = await sb
     .from("versions")
     .insert({
       client_id: (client as Client).id,
       version_number: "v1.0",
-      content: seedContent ? syncVersionLine(seedContent, "v1.0") : seedContent,
+      content: seedContent ? syncVersionMarkers(seedContent, "v1.0") : seedContent,
       is_production: false,
       bump_type: null,
       source: input.initialVersion?.source ?? "manual",

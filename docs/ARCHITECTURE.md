@@ -128,10 +128,19 @@ adapter type = a new file in `lib/providers/` + new dispatch case.
 
 - Versions stored in `versions` table, one row per version.
 - `version_number` is a text field formatted `vMAJOR.MINOR`.
-- **Minor bump** (`v3.0 → v3.1`) on every "Finalizar edición". Happens
-  whether the edit was manual or via Editor chat. At `.9` the minor rolls
-  over to the next integer (`v2.9 → v3.0`), so the minor never passes one
-  digit.
+- **Minor bump** (`v3.0 → v3.1`) is the default on every "Finalizar
+  edición". Happens whether the edit was manual or via Editor chat. At `.9`
+  the minor rolls over to the next integer (`v2.9 → v3.0`), so the minor
+  never passes one digit.
+- **Manual version numbers.** The auto-bump is only a default: the finalize
+  modal exposes an editable `vX.Y` field, and an existing version's number
+  can be renamed inline in the Library sidebar
+  (`PATCH /api/versions/[id]` with `versionNumber`, or
+  `versionNumberOverride` on create). Added for beta, when prompts are often
+  updated outside the app and the number has to be set by hand.
+  `createVersion()` honors an explicit override for any bump type;
+  `updateVersionNumber()` renames a row and re-syncs its markers (below).
+  No uniqueness is enforced on `(client_id, version_number)`.
 - **"Promover a producción" does not create a version.** It only moves the
   `is_production` tag to the client's latest version (unmarking any other).
   The old behavior (a major bump creating `v(X+1).0`) was dropped — the
@@ -152,18 +161,21 @@ adapter type = a new file in `lib/providers/` + new dispatch case.
   Creator's first version are null (the UI shows "Primera versión" for the
   oldest, a neutral placeholder otherwise).
 - **The prompt's own text is kept in sync with its version number.**
-  `syncVersionLine()` (`lib/version-utils.ts`) deterministically rewrites a
-  dedicated `"Versión: X.Y"` declaration line inside `content` to match the
-  `version_number` being saved — via regex, never via the model (the Editor
-  persona is explicitly forbidden from touching version text). If no such
-  line exists, one is inserted (after a leading `# ` title if present,
-  otherwise at the very top). This runs in `createVersion()` (Editor
-  finalize, manual Library edit, imports) and in `createClient()`'s seed
-  insert when it carries real content (Creator finalize) — so a prompt
-  copied out of the app for n8n is always identifiable by version without
-  needing the Studio. A line embedded inside a longer sentence (e.g. a
-  closing "FIN DEL PROMPT ... v1.4" footer) is left alone — only a line
-  dedicated to the declaration is ever rewritten.
+  `syncVersionMarkers()` (`lib/version-utils.ts`) deterministically edits the
+  content (string ops, never the model, since the Editor persona is forbidden
+  from touching version text) so a prompt copied out for n8n is always
+  identifiable by version. Given the number being saved it: (1) rewrites the
+  `vX.Y` token in the title (the first heading), or appends ` vX.Y` if the
+  title has none; (2) removes the old dedicated `"Versión: X.Y"` line, which
+  the team dropped in favor of the title token; (3) regenerates a closing
+  footer mirroring the title with a `FIN DEL ` prefix, e.g.
+  `# FIN DEL PROMPT ... v1.4`, as the last line. So the title carries the
+  version and a matching footer bookends the prompt. Idempotent. A prompt
+  with no heading at all (a corner case) gets a bare `vX.Y` line at the top
+  and no footer. This runs in `createVersion()` (Editor finalize, manual
+  Library edit, imports), `updateVersionNumber()` (inline rename), and
+  `createClient()`'s seed insert when it carries real content (Creator
+  finalize).
 
 ## Editable system prompts
 

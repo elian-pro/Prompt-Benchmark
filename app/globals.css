@@ -3369,3 +3369,37 @@ body[data-theme="light"] .dot-grid::after {
   color: var(--faint);
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
 }
+
+/* Inline edit of a version's number (client detail sidebar) */
+.vnum-left {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.vnum-edit-btn {
+  display: inline-flex;
+  align-items: center;
+  background: none;
+  border: none;
+  padding: 2px;
+  color: var(--faint);
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.12s ease, color 0.12s ease;
+}
+.version-item:hover .vnum-edit-btn {
+  opacity: 1;
+}
+.vnum-edit-btn:hover {
+  color: var(--accent);
+}
+.vnum-edit {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.vnum-input {
+  width: 90px;
+  font-feature-settings: "tnum";
+}

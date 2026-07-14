@@ -9,6 +9,7 @@ import {
   IconReplace,
   IconSparkles,
   IconTrash,
+  IconPencil,
 } from "@tabler/icons-react";
 import type { ClientDetail } from "@/lib/db/clients";
 import type { VersionListItem } from "@/lib/db/versions";
@@ -51,6 +52,8 @@ export default function ClientDetailPage() {
   const [finalizeOpen, setFinalizeOpen] = useState(false);
   // What-changed note the user writes when finalizing a manual edit (optional).
   const [changeSummaryInput, setChangeSummaryInput] = useState("");
+  // Editable target number for the new version (defaults to the auto minor bump).
+  const [versionNumberInput, setVersionNumberInput] = useState("");
   // The version being promoted to production (opens the confirm modal).
   const [promoteTarget, setPromoteTarget] = useState<VersionListItem | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<VersionListItem | null>(null);
@@ -64,6 +67,11 @@ export default function ClientDetailPage() {
   const [editingSummaryId, setEditingSummaryId] = useState<string | null>(null);
   const [summaryDraft, setSummaryDraft] = useState("");
   const [savingSummary, setSavingSummary] = useState(false);
+
+  // Inline editing of a version's number (manual override during beta).
+  const [editingNumberId, setEditingNumberId] = useState<string | null>(null);
+  const [numberDraft, setNumberDraft] = useState("");
+  const [savingNumber, setSavingNumber] = useState(false);
 
   // Inline editing of the client name and segment from the detail header.
   const [editingName, setEditingName] = useState(false);
@@ -183,6 +191,7 @@ export default function ClientDetailPage() {
   async function createVersion() {
     setBusy(true);
     try {
+      const desired = versionNumberInput.trim();
       const res = await fetch(`/api/clients/${id}/versions`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -191,6 +200,8 @@ export default function ClientDetailPage() {
           bumpType: "minor",
           source: "manual",
           changeSummary: changeSummaryInput.trim() || undefined,
+          // Send the number only when it differs from the auto minor bump.
+          versionNumberOverride: desired && desired !== nextMinor ? desired : undefined,
         }),
       });
       if (!res.ok) {
@@ -291,6 +302,48 @@ export default function ClientDetailPage() {
     }
   }
 
+  function startEditNumber(v: VersionListItem) {
+    setEditingNumberId(v.id);
+    setNumberDraft(v.version_number);
+  }
+  function cancelEditNumber() {
+    setEditingNumberId(null);
+    setNumberDraft("");
+  }
+  // Renaming a version rewrites the prompt's version markers, so reload to
+  // pull the fresh content and label.
+  async function saveVersionNumber(v: VersionListItem) {
+    const desired = numberDraft.trim();
+    if (!/^v\d+\.\d+$/.test(desired)) {
+      showToast("Formato inválido. Usa vX.Y (p. ej. v2.5).");
+      return;
+    }
+    if (desired === v.version_number) {
+      cancelEditNumber();
+      return;
+    }
+    setSavingNumber(true);
+    try {
+      const res = await fetch(`/api/versions/${v.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ versionNumber: desired }),
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.error ?? "No se pudo cambiar el número.");
+      }
+      setEditingNumberId(null);
+      setNumberDraft("");
+      await load();
+      showToast(`Versión renombrada a ${desired}.`);
+    } catch (e) {
+      showToast(e instanceof Error ? e.message : "Error inesperado.");
+    } finally {
+      setSavingNumber(false);
+    }
+  }
+
   async function removeVersion(target: VersionListItem) {
     setBusy(true);
     try {
@@ -371,6 +424,8 @@ export default function ClientDetailPage() {
   const latestVersion = detail.versions[0] ?? null;
   const latestNumber = latestVersion?.version_number ?? "v1.0";
   const nextMinor = computeNextNumber(latestNumber, "minor");
+  const versionNumberValid = /^v\d+\.\d+$/.test(versionNumberInput.trim());
+  const finalizeLabel = versionNumberValid ? versionNumberInput.trim() : nextMinor;
   const prodLabel = detail.production_version?.version_number ?? "sin producción";
   const hasDraft = Boolean(detail.draft_content?.trim());
   // The version being viewed read-only, if any (null → the draft editor).
@@ -509,15 +564,65 @@ export default function ClientDetailPage() {
                     }
                   }}
                 >
-                  <span className="vnum">
-                    {v.version_number}
-                    <span className="vnum-tags">
-                      {isNewVersion(v.bump_type, v.created_at) && (
-                        <Badge variant="new-version">Nueva versión</Badge>
-                      )}
-                      {v.is_production && <span className="prod-tag">Prod</span>}
+                  {editingNumberId === v.id ? (
+                    <div
+                      className="vnum-edit"
+                      onClick={(e) => e.stopPropagation()}
+                      onKeyDown={(e) => e.stopPropagation()}
+                    >
+                      <input
+                        className="input vnum-input"
+                        value={numberDraft}
+                        autoFocus
+                        onChange={(e) => setNumberDraft(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter") saveVersionNumber(v);
+                          if (e.key === "Escape") cancelEditNumber();
+                        }}
+                        placeholder="v1.5"
+                      />
+                      <Button
+                        variant="primary"
+                        size="sm"
+                        onClick={() => saveVersionNumber(v)}
+                        disabled={savingNumber}
+                      >
+                        {savingNumber ? "…" : "Guardar"}
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={cancelEditNumber}
+                        disabled={savingNumber}
+                      >
+                        Cancelar
+                      </Button>
+                    </div>
+                  ) : (
+                    <span className="vnum">
+                      <span className="vnum-left">
+                        {v.version_number}
+                        <button
+                          type="button"
+                          className="vnum-edit-btn"
+                          title="Editar número de versión"
+                          aria-label={`Editar número de versión ${v.version_number}`}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            startEditNumber(v);
+                          }}
+                        >
+                          <IconPencil size={12} />
+                        </button>
+                      </span>
+                      <span className="vnum-tags">
+                        {isNewVersion(v.bump_type, v.created_at) && (
+                          <Badge variant="new-version">Nueva versión</Badge>
+                        )}
+                        {v.is_production && <span className="prod-tag">Prod</span>}
+                      </span>
                     </span>
-                  </span>
+                  )}
                   <div className="vfoot">
                     <span className="vmeta">
                       {SOURCE_LABELS[v.source ?? ""] ?? "-"} ·{" "}
@@ -730,7 +835,13 @@ export default function ClientDetailPage() {
                 `Autoguardado ${autosavedAt.toLocaleTimeString("es-MX")}`}
             </div>
             <div className="editor-actions">
-              <Button variant="primary" onClick={() => setFinalizeOpen(true)}>
+              <Button
+                variant="primary"
+                onClick={() => {
+                  setVersionNumberInput(nextMinor);
+                  setFinalizeOpen(true);
+                }}
+              >
                 Finalizar edición
               </Button>
             </div>
@@ -749,7 +860,7 @@ export default function ClientDetailPage() {
           setFinalizeOpen(false);
           setChangeSummaryInput("");
         }}
-        title={`¿Crear nueva versión ${nextMinor}?`}
+        title={`¿Crear nueva versión ${finalizeLabel}?`}
         footer={
           <>
             <Button
@@ -762,15 +873,35 @@ export default function ClientDetailPage() {
             >
               Cancelar
             </Button>
-            <Button variant="primary" onClick={createVersion} disabled={busy}>
-              {busy ? "Creando…" : `Crear ${nextMinor}`}
+            <Button
+              variant="primary"
+              onClick={createVersion}
+              disabled={busy || !versionNumberValid}
+            >
+              {busy ? "Creando…" : `Crear ${finalizeLabel}`}
             </Button>
           </>
         }
       >
         <p className="modal-body">
-          Se guardará el borrador actual como una nueva versión menor {nextMinor}.
+          Se guardará el borrador actual como una nueva versión.
         </p>
+        <div className="field" style={{ marginTop: 4 }}>
+          <label className="field-label">Número de versión</label>
+          <input
+            className="input"
+            value={versionNumberInput}
+            onChange={(e) => setVersionNumberInput(e.target.value)}
+            placeholder={nextMinor}
+          />
+          {!versionNumberValid && versionNumberInput.length > 0 && (
+            <p className="form-error">Formato inválido. Usa vX.Y (p. ej. v2.5).</p>
+          )}
+          <p className="field-hint">
+            Por defecto sube la versión menor ({nextMinor}). Cámbialo si
+            actualizaste el prompt por fuera y quieres fijar otro número.
+          </p>
+        </div>
         <div className="field" style={{ marginTop: 4 }}>
           <label className="field-label">
             ¿Qué cambios hiciste? <span className="field-optional">(opcional)</span>
