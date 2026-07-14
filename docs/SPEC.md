@@ -41,7 +41,30 @@ process around n8n.
 
 > As of Sprint 6, Lab is a hub (`/lab`) with two modes: **IA vs IA**
 > (described below, unchanged) and **Playground** (the user converses with
-> the prompt themselves; see `docs/SPRINT-6-archive.md`).
+> the prompt themselves; base behavior in `docs/SPRINT-6-archive.md`, the
+> Sprint 8 redesign below).
+
+#### Playground (Sprint 8 redesign)
+
+The manual test chat where the user plays the lead against a client's prompt.
+Sprint 8 changes:
+
+- **Switch version mid-session.** The session header has a version picker, so
+  one session can test several versions without creating a new session each
+  time. Switching starts a fresh conversation. Once the session has notes the
+  picker locks (with an "i" hint): notes are tied to the version they were
+  written against, so changing it is blocked until they're deleted.
+- **Reset the conversation.** A "Reiniciar" button starts the chat from zero
+  while keeping all notes. Nothing is deleted: the conversation is versioned
+  into rounds and only the current round is shown.
+- **Live note tagging.** Selecting messages shows their tagged-bubble previews
+  in the note composer immediately (each removable), with check / x buttons to
+  save or cancel, instead of only seeing them after saving. The notes panel is
+  its own enclosed section.
+- **WhatsApp-style bubbles.** A bot reply is split into one bubble per line
+  break / `mensajes` array item (the way n8n delivers it to WhatsApp): the
+  first bubble is labeled "Bot del cliente", the estado JSON hangs off the
+  last. Tagging is per turn, not per individual bubble.
 
 Two AIs converse and a judge produces a structured report.
 

@@ -206,6 +206,33 @@ This means even if the source version is later auto-deleted by the
 5-version limit, the run report remains fully legible. The FK
 `runs.version_id` uses `ON DELETE SET NULL`.
 
+## Playground conversation rounds
+
+Sprint 8 (`012_playground_rounds.sql`). A Playground session can be reset or
+have its version switched without losing notes. Instead of deleting messages
+(which would leave `demo_notes.message_ids` dangling), the conversation is
+versioned into rounds:
+
+- `demo_sessions.current_round` is the active round. Reset bumps it;
+  switching version bumps it too (fresh comparison). `demo_messages.round`
+  tags each message; `demo_messages.version_number_snapshot` records which
+  version produced it.
+- `getSession()` returns only the current round's messages for the chat, plus
+  `note_messages`: the rows any note references that live in an older round,
+  so a note's bubble preview keeps resolving. Old rounds are never deleted.
+- Notes are session-scoped, not round-scoped, so they persist across resets.
+  A note referencing an older round is shown but its "jump to message" is
+  inert (that message isn't in the current view).
+- Switching version is refused server-side once the session has any notes
+  (`VersionSwitchBlockedError` → 409); the UI locks the picker with an "i"
+  hint. This keeps every note attributable to a single version without
+  tracking version per note.
+
+Display: `parseTurnBubbles()` (`lib/adversarial-message.ts`) splits a turn's
+readable text into WhatsApp-style bubbles (one per line break / `mensajes`
+array item); the Playground renders the stack with the estado on the last
+bubble. Tagging stays at the turn (message row) level.
+
 ## n8n prompt sync
 
 Sprint 7. "Promover a producción" can also deploy the prompt straight into
