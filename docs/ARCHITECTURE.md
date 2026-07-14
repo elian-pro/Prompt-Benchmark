@@ -5,7 +5,9 @@
 - **Framework**: Next.js 14+ (App Router), TypeScript strict mode.
 - **Database**: Supabase Postgres.
 - **Storage**: Supabase Storage (private bucket `studio-uploads`).
-- **Auth**: HTTP Basic Auth via EasyPanel reverse proxy. NO Supabase Auth.
+- **Auth**: in-app "Entrar con Google" restricted to the company domain
+  (Sprint 10), talking to Google directly with an app-signed session cookie.
+  NO Supabase Auth. Replaced the earlier EasyPanel HTTP Basic Auth.
 - **LLM access**: server-side only, via API routes in `/app/api`.
 - **Deployment**: VPS via EasyPanel.
 
@@ -388,18 +390,34 @@ one).
 
 ## Security model
 
-- **Network perimeter**: EasyPanel HTTP Basic Auth in front of the app.
-  Two `user:password` pairs configured at the reverse proxy level. The
-  app is invisible to anyone without the credentials. HTTPS is mandatory
-  (EasyPanel handles Let's Encrypt automatically).
+- **Network perimeter**: in-app "Entrar con Google" (Sprint 10). Access is
+  restricted to Google accounts in the company domain
+  `@zebradigital.marketing`. HTTPS is mandatory (EasyPanel handles Let's
+  Encrypt automatically). This replaced the previous EasyPanel HTTP Basic
+  Auth, which is removed at the reverse proxy once the login is live.
 
-- **In-app auth**: none. The 2 users share one workspace.
+- **In-app auth (Sprint 10)**: the app owns the whole flow, no external auth
+  service. `middleware.ts` (Edge runtime) guards every route except the login
+  page, the OAuth callback, and `/api/auth/*`. Flow: `/api/auth/google`
+  redirects to Google with a CSRF `state` cookie; Google returns to
+  `/auth/callback`, which exchanges the code server-to-server, reads the
+  `email` / `email_verified` / `hd` claims from the returned `id_token`
+  (trusted because it arrives over TLS directly from Google's token
+  endpoint), and only mints a session if the email is verified and in the
+  allowed domain. The session is a signed cookie (`lib/auth/session.ts`):
+  HMAC-SHA256 over `{email, exp}` via Web Crypto (so the same code runs in
+  the Edge middleware and Node routes), keyed by `AUTH_SESSION_SECRET`. The
+  middleware re-checks the domain on every request, not just the signature,
+  so narrowing the allow-list takes effect immediately. The 2 users still
+  share one workspace; there is no per-user data separation. Relevant env
+  vars: `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `AUTH_SESSION_SECRET`,
+  `AUTH_ALLOWED_DOMAIN`, `AUTH_BASE_URL`.
 
 - **Supabase access**: all calls use the `service_role` key from the
   server side. This bypasses RLS. RLS policies are still set permissive
-  (`to authenticated`) as defense in depth — if the app is ever
-  accidentally exposed without Basic Auth, anonymous calls are still
-  blocked at the DB layer.
+  (`to authenticated`) as defense in depth. If the app is ever accidentally
+  exposed without the login, anonymous calls are still blocked at the DB
+  layer.
 
 - **API key encryption**: stored in `providers.api_key_encrypted` and,
   since Sprint 7, `n8n_connections.api_key_encrypted`, both encrypted with

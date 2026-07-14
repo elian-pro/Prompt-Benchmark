@@ -216,6 +216,11 @@ obvious adjustments before launch, not 100%.
 
 - 2 users (the paid media department).
 - No per-user separation: shared workspace, all see all.
-- App lives on a private VPS behind EasyPanel HTTP Basic Auth (2
-  user:password pairs).
-- No public signup, no in-app login screen.
+- App lives on a private VPS. Access is gated by an in-app "Entrar con
+  Google" login (Sprint 10): only Google accounts in the company domain
+  `@zebradigital.marketing` can enter. The app talks to Google directly and
+  mints its own signed session cookie (no external auth service); the domain
+  is enforced server-side in `middleware.ts`, so a client-side bypass is not
+  possible. This replaces the previous EasyPanel HTTP Basic Auth.
+- No public signup. The login screen only offers Google; there is no
+  password form to manage.
