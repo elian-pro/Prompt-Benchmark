@@ -6,6 +6,7 @@ import {
   IconSparkles,
   IconFlask,
   IconSettings,
+  IconLogout,
 } from "@tabler/icons-react";
 import { ThemeToggle } from "@/components/ui/ThemeToggle";
 import "./globals.css";
@@ -58,6 +59,16 @@ export default function RootLayout({
                 ))}
               </nav>
               <ThemeToggle />
+              <form action="/api/auth/logout" method="post" className="logout-form">
+                <button
+                  type="submit"
+                  className="btn btn-ghost btn-sm logout-btn"
+                  title="Cerrar sesión"
+                  aria-label="Cerrar sesión"
+                >
+                  <IconLogout size={14} stroke={1.5} />
+                </button>
+              </form>
             </div>
           </header>
           <main>{children}</main>

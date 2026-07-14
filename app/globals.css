@@ -3675,3 +3675,83 @@ body[data-theme="light"] .dot-grid::after {
   border-radius: 100px;
   pointer-events: none;
 }
+
+/* ============================================================
+   Login (Sprint 10 - Entrar con Google)
+   ============================================================ */
+
+/* Hide the app chrome on the login screen so it reads as a standalone page
+   (uses :has so the server layout needs no per-route branching). */
+.app-shell:has(.login-screen) .app-header {
+  display: none;
+}
+
+.login-screen {
+  min-height: calc(100vh - 80px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 32px 20px;
+}
+
+.login-card {
+  width: 100%;
+  max-width: 380px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 22px;
+  text-align: center;
+  background: var(--surface);
+  border: 0.5px solid var(--border);
+  border-radius: 18px;
+  padding: 40px 32px;
+}
+
+.login-copy h1 {
+  font-size: 18px;
+  font-weight: 500;
+  margin: 0 0 8px;
+  color: var(--fg);
+}
+
+.login-copy p {
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--muted);
+  margin: 0;
+}
+
+.login-copy strong {
+  color: var(--fg);
+  font-weight: 500;
+}
+
+.login-error {
+  width: 100%;
+  font-size: 12px;
+  line-height: 1.4;
+  color: var(--danger);
+  background: color-mix(in srgb, var(--danger) 10%, transparent);
+  border: 0.5px solid color-mix(in srgb, var(--danger) 40%, transparent);
+  border-radius: 10px;
+  padding: 10px 12px;
+  margin: 0;
+}
+
+.login-google {
+  width: 100%;
+  justify-content: center;
+}
+
+/* Keep the logout button visually quiet next to the theme toggle. */
+.logout-form {
+  display: inline-flex;
+  margin: 0;
+}
+.logout-btn {
+  color: var(--muted);
+}
+.logout-btn:hover:not(:disabled) {
+  color: var(--fg);
+}
