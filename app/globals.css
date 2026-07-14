@@ -3657,3 +3657,22 @@ body[data-theme="light"] .dot-grid::after {
   border-color: var(--accent);
   color: var(--accent);
 }
+
+/* NEW badge on the "Ver borrador" toggle (Sprint 9, T5). */
+.draft-toggle-wrap {
+  position: relative;
+  display: inline-flex;
+}
+.draft-new-badge {
+  position: absolute;
+  top: -7px;
+  right: -8px;
+  background: var(--accent);
+  color: #0a0a0a;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  padding: 1px 5px;
+  border-radius: 100px;
+  pointer-events: none;
+}

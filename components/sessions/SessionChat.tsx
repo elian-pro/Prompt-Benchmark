@@ -129,6 +129,10 @@ export function SessionChat({
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const draftTextareaRef = useRef<HTMLTextAreaElement>(null);
   const autoSentRef = useRef(false);
+  // The draft the user has acknowledged (by opening the drawer). A newer draft
+  // than this lights the "NEW" badge on "Ver borrador".
+  const [seenDraft, setSeenDraft] = useState<string | null>(null);
+  const seenInitRef = useRef(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -136,7 +140,13 @@ export function SessionChat({
     try {
       const res = await fetch(`/api/chat-sessions/${sessionId}`);
       if (!res.ok) throw new Error((await res.json()).error ?? "Error al cargar.");
-      setSession(await res.json());
+      const data: ChatSessionDetail = await res.json();
+      setSession(data);
+      // On first load, treat the existing draft as already seen (no badge).
+      if (!seenInitRef.current) {
+        seenInitRef.current = true;
+        setSeenDraft(data.current_draft_content ?? null);
+      }
     } catch (e) {
       setError(e instanceof Error ? e.message : "Error al cargar la sesión.");
     } finally {
@@ -427,6 +437,13 @@ export function SessionChat({
   const isAbandoned = session.status === "abandoned";
   const isActive = session.status === "active";
   const hasDraft = Boolean(session.current_draft_content?.trim());
+  // A draft newer than what the user last opened lights the NEW badge.
+  const hasNewDraft = hasDraft && session.current_draft_content !== seenDraft;
+
+  function openDraft() {
+    setSeenDraft(session?.current_draft_content ?? null);
+    setDraftOpen(true);
+  }
   const title =
     mode === "editor"
       ? (session.client_name ?? "Cliente eliminado")
@@ -457,13 +474,12 @@ export function SessionChat({
           )}
         </div>
         <div className="chat-topbar-actions">
-          <Button
-            variant="secondary"
-            icon={<IconFileText size={14} />}
-            onClick={() => setDraftOpen(true)}
-          >
-            {DRAFT_TOGGLE[mode]}
-          </Button>
+          <span className="draft-toggle-wrap">
+            <Button variant="secondary" icon={<IconFileText size={14} />} onClick={openDraft}>
+              {DRAFT_TOGGLE[mode]}
+            </Button>
+            {hasNewDraft && <span className="draft-new-badge">NEW</span>}
+          </span>
           {isActive && mode === "editor" && (
             <FinalizeButton
               sessionId={sessionId}
