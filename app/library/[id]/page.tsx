@@ -15,7 +15,7 @@ import type { ClientDetail } from "@/lib/db/clients";
 import type { VersionListItem } from "@/lib/db/versions";
 import { computeNextNumber } from "@/lib/version-utils";
 import { relativeTimeEs } from "@/lib/format";
-import { isNewVersion } from "@/lib/badges";
+import { isNewVersion, N8N_HOST_LABEL } from "@/lib/badges";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { Modal } from "@/components/ui/Modal";
@@ -417,6 +417,17 @@ export default function ClientDetailPage() {
     setEditingSegment(false);
   }
 
+  async function toggleN8nHost() {
+    if (!detail) return;
+    const next = detail.n8n_host === "zebra" ? "own" : "zebra";
+    try {
+      await patchClient({ n8n_host: next });
+      setDetail((d) => (d ? { ...d, n8n_host: next } : d));
+    } catch (e) {
+      showToast(e instanceof Error ? e.message : "No se pudo cambiar el host de n8n.");
+    }
+  }
+
   if (loading) return <p className="empty-hint">Cargando…</p>;
   if (error) return <p className="form-error">{error}</p>;
   if (!detail) return <p className="empty-hint">Cliente no encontrado.</p>;
@@ -498,6 +509,14 @@ export default function ClientDetailPage() {
               {detail.segment ? detail.segment : "Añadir segmento"}
             </button>
           )}
+          <button
+            type="button"
+            className="n8n-host-toggle"
+            title="Clic para cambiar dónde vive el agente"
+            onClick={toggleN8nHost}
+          >
+            <Badge variant="n8n">{N8N_HOST_LABEL[detail.n8n_host]}</Badge>
+          </button>
         </div>
         <div className="header-actions">
           <Button

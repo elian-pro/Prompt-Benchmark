@@ -1485,6 +1485,12 @@ a.lab-card:hover {
   border-radius: 6px;
   letter-spacing: 0.1em;
 }
+.badge-n8n {
+  background: transparent;
+  border: 0.5px solid var(--accent);
+  color: var(--accent);
+  border-radius: 100px;
+}
 
 /* Toast */
 .toast {
@@ -1614,6 +1620,17 @@ a.lab-card:hover {
 .segment-chip-display:hover {
   border-color: var(--accent);
   color: var(--fg);
+}
+/* Editable n8n host tag in the detail header: reuses the .badge-n8n look,
+   the button itself is just an invisible click target around it. */
+.n8n-host-toggle {
+  display: inline-flex;
+  margin-top: 12px;
+  margin-left: 8px;
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
 }
 .segment-edit {
   display: flex;
