@@ -166,6 +166,21 @@ export function hasUnclosedPromptBlock(reply: string): boolean {
 }
 
 /**
+ * The chat-visible prose that precedes an unclosed prompt block. While a
+ * block is still streaming (hasUnclosedPromptBlock is true), splitPromptBlock
+ * can't locate it yet (it needs the closing marker) and falls back to
+ * `before: reply`, which would dump the partial prompt itself as raw chat
+ * text alongside the "escribiendo..." card. This returns only the prose
+ * BEFORE the opening marker, so the renderer can hide everything from there
+ * on and show just the writing card.
+ */
+export function unclosedBlockPreamble(reply: string): string {
+  if (reply.includes(PROMPT_START)) return reply.slice(0, reply.indexOf(PROMPT_START));
+  const fenceIndex = reply.indexOf("```");
+  return fenceIndex === -1 ? reply : reply.slice(0, fenceIndex);
+}
+
+/**
  * Extracts the change summary from an assistant reply: the prose the persona
  * writes AFTER the prompt block (its "CAMBIOS REALIZADOS" report). Used when
  * finalizing an Editor session to persist, per version, what changed. Removes

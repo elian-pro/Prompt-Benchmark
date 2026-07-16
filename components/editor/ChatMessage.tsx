@@ -3,7 +3,11 @@
 import { useState, type ReactNode } from "react";
 import { IconCheck, IconCopy, IconFileText, IconPaperclip } from "@tabler/icons-react";
 import type { MessageRole, Attachment } from "@/lib/db/chat-sessions";
-import { hasUnclosedPromptBlock, splitPromptBlock } from "@/lib/prompts/editor-persona";
+import {
+  hasUnclosedPromptBlock,
+  splitPromptBlock,
+  unclosedBlockPreamble,
+} from "@/lib/prompts/editor-persona";
 import { Button } from "@/components/ui/Button";
 
 type Mode = "editor" | "creator";
@@ -111,14 +115,18 @@ export function ChatMessage({
   // full prompt "type" into the chat character by character. Show the card
   // right away in its "escribiendo..." state instead of the raw partial block;
   // once the block closes (live or persisted) the same card shows the line
-  // count. The raw prompt text never renders as chat prose.
+  // count. `before` from splitPromptBlock is the WHOLE reply while unclosed
+  // (it can't locate the block without its closing marker), so it would leak
+  // the partial prompt as raw chat text right next to the writing card.
+  // Swap it for just the prose before the opening marker instead.
   const midBlock = streaming && block === null && hasUnclosedPromptBlock(content);
+  const shownBefore = midBlock ? unclosedBlockPreamble(content) : before;
 
   return (
     <div className={`chat-bubble chat-${role}`}>
       <span className="chat-role">{role === "user" ? "Tú" : "Opus"}</span>
       <div className="chat-content">
-        {before.trim() && renderBold(before)}
+        {shownBefore.trim() && renderBold(shownBefore)}
         {midBlock && <PromptBlockCard label={BLOCK_LABEL[mode]} writing />}
         {block && <PromptBlockCard label={BLOCK_LABEL[mode]} block={block} />}
         {after.trim() && renderBold(after)}

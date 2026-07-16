@@ -10,6 +10,7 @@ import {
   splitPromptBlock,
   replacePromptBlock,
   hasUnclosedPromptBlock,
+  unclosedBlockPreamble,
   extractChangeSummary,
   capSummary,
   PROMPT_START,
@@ -114,4 +115,24 @@ test("extractChangeSummary caps a runaway summary to 3 bullets", () => {
   );
   const summary = extractChangeSummary(reply) ?? "";
   assert.equal((summary.match(/^- /gm) ?? []).length, 3);
+});
+
+test("unclosedBlockPreamble returns only the prose before the opening sentinel", () => {
+  const reply = `Claro, aquí va:\n\n${PROMPT_START}\n# PROMPT\nAlgo de con`;
+  assert.equal(unclosedBlockPreamble(reply), "Claro, aquí va:\n\n");
+});
+
+test("unclosedBlockPreamble hides the entire partial prompt, not just up to the last newline", () => {
+  const reply = `${PROMPT_START}\n# PROMPT CONVERSACIONAL\n### SECCION A\nTexto que sigue escribiéndose`;
+  assert.equal(unclosedBlockPreamble(reply), "");
+});
+
+test("unclosedBlockPreamble falls back to the legacy fence marker when no sentinel is present", () => {
+  const reply = "Aquí tienes:\n\n```\n# PROMPT\nsigue escribiendo";
+  assert.equal(unclosedBlockPreamble(reply), "Aquí tienes:\n\n");
+});
+
+test("unclosedBlockPreamble returns the whole reply when no block has started yet", () => {
+  const reply = "Antes de editar, ¿me confirmas el alcance?";
+  assert.equal(unclosedBlockPreamble(reply), reply);
 });
