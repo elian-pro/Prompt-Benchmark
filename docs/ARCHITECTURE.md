@@ -258,6 +258,24 @@ improvising something incoherent. Also since Sprint 11, the judge receives
 and scope-failure findings are checked against what the agent was actually
 told to do rather than inferred from the conversation alone.
 
+## n8n host tag
+
+Sprint 13 (`014_add_n8n_host_to_clients.sql`). `clients.n8n_host` is a plain
+`'zebra' | 'own'` column, not null, default `'zebra'` (existing rows
+backfilled: per docs/SPEC.md, most clients already live in Zebra's own n8n).
+
+It is deliberately a separate, always-set field rather than being derived
+from `n8n_bindings.mode`: a client's detailed binding (connection + workflow
++ node for `mode='api'`, or a free-text label for `mode='manual'`) is an
+optional step that can be configured later or skipped, but the Library's
+yellow host tag must never be missing. `createClientSchema` makes `n8nHost`
+required, so both "+ Nuevo cliente" and "+ Importar existente" (the only two
+callers of `POST /api/clients`) always ask; the `PATCH /api/clients/:id`
+route accepts `n8n_host` too, editable any time from a click on the tag in
+the client detail page. Callers that don't go through those two modals (the
+Creator's `finalize` flow, which calls `createClient()` directly) fall back
+to the DB default instead of being forced to ask.
+
 ## Playground conversation rounds
 
 Sprint 8 (`012_playground_rounds.sql`). A Playground session can be reset or

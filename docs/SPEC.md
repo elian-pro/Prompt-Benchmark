@@ -153,6 +153,13 @@ Each card shows:
 - Version count (e.g. "3 / 5 versiones").
 - Badges: `NEW` (15 days after creation), `NEW VERSION` (3-5 days after a
   major bump), `LEGACY` (clients imported from production).
+- Since Sprint 13, a yellow "n8n Zebra" / "n8n propio" tag on every card,
+  answering a mandatory question asked when the client is created (either
+  from "+ Nuevo cliente" or "+ Importar existente"): does its agent live in
+  Zebra's own n8n or the client's own. This tag is independent of whether
+  the detailed n8n binding below (connection + workflow + node, or a manual
+  label) has actually been configured yet; it's editable any time by
+  clicking it on the client detail page.
 - A small icon (since Sprint 7) when the client has a manual n8n binding
   that hasn't confirmed the current production version yet, so a pending
   hand-deploy is visible without opening the client.
