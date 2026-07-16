@@ -6,6 +6,8 @@ import { Modal } from "@/components/ui/Modal";
 import { Button } from "@/components/ui/Button";
 import { SegmentPicker } from "@/components/library/SegmentPicker";
 import { BindOnCreateToggle } from "@/components/library/BindOnCreateToggle";
+import { N8nHostPicker } from "@/components/library/N8nHostPicker";
+import type { N8nHost } from "@/lib/db/clients";
 
 const VERSION_RE = /^v\d+\.\d+$/;
 
@@ -15,6 +17,7 @@ export function ImportModal({ open, onClose }: { open: boolean; onClose: () => v
   const [segment, setSegment] = useState("");
   const [content, setContent] = useState("");
   const [versionNumber, setVersionNumber] = useState("v1.0");
+  const [n8nHost, setN8nHost] = useState<N8nHost>("zebra");
   const [bindAfter, setBindAfter] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -35,6 +38,7 @@ export function ImportModal({ open, onClose }: { open: boolean; onClose: () => v
           // The imported version below is the only version this client should
           // have — don't seed an empty v1.0.
           seedInitialVersion: false,
+          n8nHost,
         }),
       });
       if (!cRes.ok) {
@@ -110,6 +114,7 @@ export function ImportModal({ open, onClose }: { open: boolean; onClose: () => v
           placeholder="Pega aquí el prompt de producción"
         />
       </div>
+      <N8nHostPicker value={n8nHost} onChange={setN8nHost} />
       <BindOnCreateToggle checked={bindAfter} onChange={setBindAfter} />
       {error && <p className="form-error">{error}</p>}
     </Modal>
