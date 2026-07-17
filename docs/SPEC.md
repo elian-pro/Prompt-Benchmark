@@ -65,6 +65,14 @@ Sprint 8 changes:
   break / `mensajes` array item (the way n8n delivers it to WhatsApp): the
   first bubble is labeled "Bot del cliente", the estado JSON hangs off the
   last. Tagging is per turn, not per individual bubble.
+- **Opening message (Sprint 14).** Starting a conversation can optionally
+  include a canned bot message (e.g. a WhatsApp-style greeting), so the chat
+  opens with the bot having already "spoken" instead of always waiting on
+  the human to send the first message. Optional: sessions without one behave
+  exactly as before. It's replayed as turn 1 whenever the conversation
+  starts a fresh round, not just at creation: "Reiniciar" and switching
+  version both already start a clean round, so the greeting reappears there
+  too for consistency.
 
 Two AIs converse and a judge produces a structured report.
 

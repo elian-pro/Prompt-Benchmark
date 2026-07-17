@@ -303,6 +303,16 @@ readable text into WhatsApp-style bubbles (one per line break / `mensajes`
 array item); the Playground renders the stack with the estado on the last
 bubble. Tagging stays at the turn (message row) level.
 
+**Opening message (Sprint 14, `015_add_opening_message_to_demo_sessions.sql`).**
+`demo_sessions.opening_message` is an optional plain-text bot greeting, set
+when the session is created. It bypasses the LLM entirely: `seedOpeningMessage()`
+inserts it directly as the round's turn 1 `bot` message (role/content only,
+no `chat()` call), so it renders through the normal bubble-splitting path
+like any other bot turn. Shared by `createSession`, `resetSession` and
+`updateSessionVersion`, the three places that start a fresh round, so the
+greeting reappears every time the chat "starts from zero", not just once at
+creation.
+
 ## n8n prompt sync
 
 Sprint 7. "Promover a producción" can also deploy the prompt straight into
