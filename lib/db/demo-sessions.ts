@@ -23,6 +23,10 @@ export type DemoSession = {
   status: DemoSessionStatus;
   editor_session_id: string | null;
   current_round: number;
+  /** Optional canned bot message replayed as turn 1 whenever a fresh round
+   *  starts (creation, reset, version switch), so the chat can open with the
+   *  bot having already "spoken" instead of always waiting on the human. */
+  opening_message: string | null;
   created_at: string;
   updated_at: string;
 };
@@ -53,7 +57,7 @@ export type DemoSessionDetail = DemoSessionListItem & {
 
 const SESSION_COLS =
   "id, client_id, version_id, version_number_snapshot, prompt_snapshot, status, " +
-  "editor_session_id, current_round, created_at, updated_at";
+  "editor_session_id, current_round, opening_message, created_at, updated_at";
 const MESSAGE_COLS =
   "id, session_id, turn_number, round, role, content, version_number_snapshot, created_at";
 
@@ -71,9 +75,31 @@ function flattenListItem(row: any): DemoSessionListItem {
   };
 }
 
+/** Replays `openingMessage`, if set, as the fresh round's turn 1 bot message.
+ *  Shared by createSession, resetSession and updateSessionVersion, the three
+ *  places that start a "clean" round, so a configured greeting shows up
+ *  consistently every time the chat starts from zero, not just on creation. */
+async function seedOpeningMessage(
+  sessionId: string,
+  round: number,
+  openingMessage: string | null,
+  versionNumberSnapshot: string,
+): Promise<void> {
+  if (!openingMessage) return;
+  await appendMessage(sessionId, {
+    turnNumber: 1,
+    round,
+    role: "bot",
+    content: openingMessage,
+    versionNumberSnapshot,
+  });
+}
+
 export async function createSession(input: {
   clientId: string;
   versionId: string;
+  /** Optional canned bot message shown as soon as the chat opens (Sprint 14). */
+  openingMessage?: string;
 }): Promise<DemoSession> {
   const version = await getVersion(input.versionId);
   if (!version) throw new Error("La versión a probar no existe.");
@@ -88,6 +114,7 @@ export async function createSession(input: {
     );
   }
 
+  const openingMessage = input.openingMessage?.trim() || null;
   const sb = getSupabase();
   const { data, error } = await sb
     .from("demo_sessions")
@@ -97,11 +124,15 @@ export async function createSession(input: {
       version_number_snapshot: version.version_number,
       prompt_snapshot: version.content,
       status: "active",
+      opening_message: openingMessage,
     })
     .select(SESSION_COLS)
     .single();
   if (error) throw new Error(`No se pudo crear la conversación: ${error.message}`);
-  return data as unknown as DemoSession;
+  const session = data as unknown as DemoSession;
+
+  await seedOpeningMessage(session.id, session.current_round, openingMessage, version.version_number);
+  return session;
 }
 
 export async function listSessions({
@@ -250,7 +281,15 @@ export async function updateSessionVersion(
     .select(SESSION_COLS)
     .single();
   if (error) throw new Error(`No se pudo cambiar la versión: ${error.message}`);
-  return data as unknown as DemoSession;
+  const session = data as unknown as DemoSession;
+
+  await seedOpeningMessage(
+    session.id,
+    session.current_round,
+    session.opening_message,
+    session.version_number_snapshot,
+  );
+  return session;
 }
 
 /**
@@ -274,7 +313,15 @@ export async function resetSession(sessionId: string): Promise<DemoSession> {
     .select(SESSION_COLS)
     .single();
   if (error) throw new Error(`No se pudo reiniciar la conversación: ${error.message}`);
-  return data as unknown as DemoSession;
+  const session = data as unknown as DemoSession;
+
+  await seedOpeningMessage(
+    session.id,
+    session.current_round,
+    session.opening_message,
+    session.version_number_snapshot,
+  );
+  return session;
 }
 
 /** Marks a Playground session as handed off, linking the Editor session it
