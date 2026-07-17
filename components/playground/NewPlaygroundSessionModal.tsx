@@ -26,6 +26,7 @@ export function NewPlaygroundSessionModal({
   const [clientId, setClientId] = useState("");
   const [versions, setVersions] = useState<VersionListItem[]>([]);
   const [versionId, setVersionId] = useState("");
+  const [openingMessage, setOpeningMessage] = useState("");
   const [loading, setLoading] = useState(true);
   const [creating, setCreating] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -71,7 +72,11 @@ export function NewPlaygroundSessionModal({
       const res = await fetch("/api/demo-sessions", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ clientId, versionId }),
+        body: JSON.stringify({
+          clientId,
+          versionId,
+          openingMessage: openingMessage.trim() || undefined,
+        }),
       });
       if (!res.ok) throw new Error((await res.json()).error ?? "No se pudo crear la conversación.");
       const session = await res.json();
@@ -137,6 +142,22 @@ export function NewPlaygroundSessionModal({
           </select>
         </div>
       )}
+
+      <div className="field">
+        <label className="field-label">Mensaje de inicio del bot (opcional)</label>
+        <textarea
+          className="textarea"
+          rows={2}
+          maxLength={2000}
+          placeholder="Ej: ¡Hola! Soy el asistente de Vero Lozano. ¿En qué propiedad estás interesado?"
+          value={openingMessage}
+          onChange={(e) => setOpeningMessage(e.target.value)}
+        />
+        <p className="field-hint">
+          Si lo llenas, el chat abre con este mensaje ya enviado por el bot, en vez de
+          esperar a que tú escribas primero.
+        </p>
+      </div>
 
       {error && <p className="form-error">{error}</p>}
     </Modal>
