@@ -2804,6 +2804,48 @@ a.lab-card:hover {
 .attachment-remove:hover {
   color: var(--fg);
 }
+/* Smart Paste (Sprint 15): the extra chip actions (expand, revert) shown only
+   on paste-generated attachments, plus their read-only preview panel. */
+.attachment-chip-pasted {
+  border-color: var(--accent);
+}
+.attachment-chip-meta {
+  color: var(--muted);
+  font-size: 10px;
+}
+.attachment-chip-action {
+  display: inline-flex;
+  align-items: center;
+  background: none;
+  border: none;
+  color: var(--muted);
+  cursor: pointer;
+  padding: 0;
+}
+.attachment-chip-action:hover {
+  color: var(--accent);
+}
+.attachment-chip-action svg {
+  transition: transform 0.15s ease;
+}
+.attachment-chevron-open {
+  transform: rotate(180deg);
+}
+.smart-paste-preview {
+  max-height: 160px;
+  overflow-y: auto;
+  margin: 0;
+  padding: 10px 12px;
+  background: var(--surface2);
+  border: 0.5px solid var(--border);
+  border-radius: 10px;
+  font-family: inherit;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--muted);
+  white-space: pre-wrap;
+  word-break: break-word;
+}
 .chat-attachments {
   display: flex;
   flex-wrap: wrap;

@@ -15,7 +15,9 @@ import {
   IconX,
 } from "@tabler/icons-react";
 import type { ChatSessionDetail, Attachment } from "@/lib/db/chat-sessions";
+import type { ComposerSettings } from "@/lib/db/composer-settings";
 import { isAcceptedFile, uploadAttachment } from "@/lib/attachments";
+import { nextPasteName } from "@/lib/smart-paste";
 import { relativeTimeEs } from "@/lib/format";
 import { Button } from "@/components/ui/Button";
 import { FindReplace } from "@/components/ui/FindReplace";
@@ -109,6 +111,12 @@ export function SessionChat({
 
   const [input, setInput] = useState("");
   const [attachments, setAttachments] = useState<Attachment[]>([]);
+  // Smart Paste (Sprint 15): shared team setting fetched once, and the
+  // original text behind any pending paste-generated attachment (so its chip
+  // can be expanded or converted back to plain text before the message is
+  // sent). Attachments from already-sent messages never appear here.
+  const [composerSettings, setComposerSettings] = useState<ComposerSettings | null>(null);
+  const [smartPasteText, setSmartPasteText] = useState<Record<string, string>>({});
   const [pendingUser, setPendingUser] = useState<string | null>(null);
   const [pendingAttachments, setPendingAttachments] = useState<Attachment[]>([]);
   const [streamingText, setStreamingText] = useState<string | null>(null);
@@ -170,6 +178,21 @@ export function SessionChat({
   useEffect(() => {
     load();
   }, [load]);
+
+  // Smart Paste settings are shared team-wide (no per-user accounts), so a
+  // single fetch on mount is enough; a value never changes mid-session.
+  useEffect(() => {
+    let alive = true;
+    fetch("/api/composer-settings")
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data: ComposerSettings | null) => {
+        if (alive && data) setComposerSettings(data);
+      })
+      .catch(() => {});
+    return () => {
+      alive = false;
+    };
+  }, []);
 
   // Keep the conversation pinned to the latest content, but only while the
   // user is already near the bottom, so scrolling up to read isn't yanked back
@@ -387,6 +410,75 @@ export function SessionChat({
       }
     }
     if (added.length > 0) setAttachments((prev) => [...prev, ...added]);
+  }
+
+  // Inserts `text` at the composer's current cursor position (falls back to
+  // appending when the textarea ref isn't available). Used both to restore a
+  // paste that failed to upload, and to undo a Smart Paste conversion.
+  function insertAtCursor(text: string) {
+    const el = textareaRef.current;
+    if (!el) {
+      setInput((prev) => prev + text);
+      return;
+    }
+    const start = el.selectionStart ?? input.length;
+    const end = el.selectionEnd ?? input.length;
+    const next = input.slice(0, start) + text + input.slice(end);
+    setInput(next);
+    requestAnimationFrame(() => {
+      el.style.height = "auto";
+      el.style.height = Math.min(el.scrollHeight, 200) + "px";
+      el.selectionStart = el.selectionEnd = start + text.length;
+      el.focus();
+    });
+  }
+
+  // Smart Paste (Sprint 15): intercepts a paste into the composer. Below the
+  // team's configured threshold, nothing happens here and the browser's
+  // default paste goes through unmodified. At or above it, the raw text never
+  // touches the input: it becomes a removable .txt attachment instead, using
+  // the exact same upload pipeline as a manually attached file.
+  async function onComposerPaste(e: React.ClipboardEvent<HTMLTextAreaElement>) {
+    if (!composerSettings?.smart_paste_enabled || isAbandoned) return;
+    const text = e.clipboardData.getData("text/plain");
+    if (!text || text.length < composerSettings.smart_paste_threshold) return;
+    e.preventDefault();
+
+    const existingNames = [
+      ...(session?.messages.flatMap((m) => (m.attachments ?? []).map((a) => a.filename)) ?? []),
+      ...attachments.map((a) => a.filename),
+    ];
+    const filename = nextPasteName(existingNames);
+
+    try {
+      const file = new File([text], filename, { type: "text/plain" });
+      const attachment = await uploadAttachment(sessionId, file);
+      setAttachments((prev) => [...prev, attachment]);
+      setSmartPasteText((prev) => ({ ...prev, [attachment.uploadId]: text }));
+    } catch {
+      // Never silently lose the user's pasted content: fall back to a normal
+      // insert if the upload fails.
+      showToast("No se pudo convertir el texto pegado en adjunto; se insertó tal cual.");
+      insertAtCursor(text);
+    }
+  }
+
+  // Undoes a Smart Paste conversion: removes the attachment and puts its
+  // original text back in the composer, exactly where "eliminar" would leave
+  // it plus the text. Only ever called for chips present in smartPasteText.
+  async function revertSmartPaste(att: Attachment) {
+    const text = smartPasteText[att.uploadId];
+    setAttachments((prev) => prev.filter((a) => a.uploadId !== att.uploadId));
+    setSmartPasteText((prev) => {
+      const { [att.uploadId]: _omit, ...rest } = prev;
+      return rest;
+    });
+    if (text) insertAtCursor(text);
+    try {
+      await fetch(`/api/uploads/${att.uploadId}`, { method: "DELETE" });
+    } catch {
+      // Ignore: the TTL cron is the backstop.
+    }
   }
 
   async function copyDraft() {
@@ -622,6 +714,8 @@ export function SessionChat({
               attachments={attachments}
               onChange={setAttachments}
               disabled={sending}
+              pastedTextByUploadId={smartPasteText}
+              onRevertPaste={revertSmartPaste}
             />
           )}
           <textarea
@@ -630,6 +724,7 @@ export function SessionChat({
             rows={1}
             value={input}
             onChange={onInputChange}
+            onPaste={onComposerPaste}
             onKeyDown={(e) => {
               if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
                 e.preventDefault();
