@@ -258,6 +258,41 @@ improvising something incoherent. Also since Sprint 11, the judge receives
 and scope-failure findings are checked against what the agent was actually
 told to do rather than inferred from the conversation alone.
 
+## Smart Paste
+
+Sprint 15 (`016_composer_settings.sql`). `composer_settings` is a singleton
+table (`id boolean primary key default true check (id)`, one seeded row):
+`smart_paste_enabled` and `smart_paste_threshold` (int, 200-10000, default
+1000). It's a single shared row for the whole team, not per-user, since this
+app has no per-user accounts (see CLAUDE.md). `lib/db/composer-settings.ts`
+reads/writes it; `GET`/`PATCH /api/composer-settings` expose it;
+`ComposerSettingsCard` (Settings) edits it, clamping an out-of-range typed
+value to the nearest limit on blur with a toast, rather than blocking save.
+
+The composer (`SessionChat.tsx`, shared by Editor and Creator) fetches the
+setting once on mount and wires an `onPaste` handler on the message textarea
+(NOT the separate manual-draft-edit textarea, which Smart Paste doesn't
+touch). Below the threshold, `preventDefault()` is never called and the
+browser's normal paste goes through untouched. At or above it, the pasted
+text is synthesized into an in-memory `File` (`text/plain`, named
+`"Texto pegado N.txt"`) and pushed through the *exact same* upload pipeline
+as a manually attached file (`uploadAttachment()` → `POST /api/uploads` →
+Supabase Storage bucket `studio-uploads`, same 7-day TTL): no new backend
+path. `lib/smart-paste.ts`'s `nextPasteName()` computes N by scanning every
+filename already used in the conversation (sent messages' attachments plus
+the pending ones still in the composer), so numbers are never reused even
+after a paste is removed.
+
+The chip UI (`FileUpload.tsx`) only gets the extra "expand to preview" /
+"convertir a texto plano" actions for chips created this way; a client-only
+map (`SessionChat`'s `smartPasteText`, keyed by `uploadId`) holds the
+original text so those actions don't need to re-download anything. This map
+only ever covers *pending* (not-yet-sent) attachments: once a message is
+sent, its attachments render through the existing static
+`ChatMessage.tsx` chip, unchanged. Reverting re-inserts the text at the
+composer's cursor position and best-effort deletes the upload, mirroring a
+normal remove plus a normal paste.
+
 ## n8n host tag
 
 Sprint 13 (`014_add_n8n_host_to_clients.sql`). `clients.n8n_host` is a plain

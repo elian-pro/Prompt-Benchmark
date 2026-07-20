@@ -136,6 +136,18 @@ Also supports **direct manual editing** of the prompt textarea — no AI
 needed. Use case: client says "change 16% to 15%", you Ctrl+F and replace.
 Autosaves as a draft; "Finalizar edición" commits as new version.
 
+**Smart Paste (Sprint 15).** Pasting a long block of text into the Editor or
+Creator chat composer (not the manual draft editor) converts it into a
+removable `.txt` attachment instead of dumping raw text into the message
+field, so a huge pasted conversation or brief doesn't make the composer
+unreadable. The chip can be expanded to preview the pasted text (read-only)
+or "convertido de vuelta a texto plano" to undo it before sending; either
+way it uses the same upload pipeline as a manually attached file. The
+activation threshold (characters, `>=` triggers conversion) and an on/off
+switch are configured once for the whole team in Settings → Composición de
+mensajes (this app has no per-user accounts, so it's a shared setting, not
+per-user).
+
 ### 3. Creator (chat-driven creation)
 
 A chat interface with Claude Opus.
