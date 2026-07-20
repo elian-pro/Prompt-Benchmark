@@ -6,6 +6,7 @@ import type { MaskedProvider } from "@/lib/db/providers";
 import type { RoleDefault } from "@/lib/db/role-defaults";
 import type { PromptOverride } from "@/lib/db/prompt-overrides";
 import type { MaskedConnection } from "@/lib/db/n8n-connections";
+import type { ComposerSettings } from "@/lib/db/composer-settings";
 import { Button } from "@/components/ui/Button";
 import { CollapsibleCard } from "@/components/ui/CollapsibleCard";
 import { EmptyState } from "@/components/ui/EmptyState";
@@ -17,6 +18,7 @@ import { RoleAssignments } from "@/components/settings/RoleAssignments";
 import { SystemPromptCard } from "@/components/settings/SystemPromptCard";
 import { N8nConnectionRow } from "@/components/settings/N8nConnectionRow";
 import { N8nConnectionFormModal } from "@/components/settings/N8nConnectionFormModal";
+import { ComposerSettingsCard } from "@/components/settings/ComposerSettingsCard";
 import { EDITOR_PERSONA } from "@/lib/prompts/editor-persona";
 import { CREATOR_PERSONA } from "@/lib/prompts/creator-persona";
 import { buildJudgeSystemPrompt } from "@/lib/prompts/judge";
@@ -26,6 +28,7 @@ export default function SettingsPage() {
   const [roleDefaults, setRoleDefaults] = useState<RoleDefault[]>([]);
   const [overrides, setOverrides] = useState<Record<string, string>>({});
   const [connections, setConnections] = useState<MaskedConnection[]>([]);
+  const [composerSettings, setComposerSettings] = useState<ComposerSettings | null>(null);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
 
@@ -49,16 +52,20 @@ export default function SettingsPage() {
     setLoading(true);
     setLoadError(null);
     try {
-      const [pRes, rRes, oRes, cRes] = await Promise.all([
+      const [pRes, rRes, oRes, cRes, csRes] = await Promise.all([
         fetch("/api/providers"),
         fetch("/api/role-defaults"),
         fetch("/api/prompt-overrides"),
         fetch("/api/integrations/n8n"),
+        fetch("/api/composer-settings"),
       ]);
       if (!pRes.ok) throw new Error((await pRes.json()).error ?? "Error al cargar proveedores.");
       if (!rRes.ok) throw new Error((await rRes.json()).error ?? "Error al cargar roles.");
       if (!oRes.ok) throw new Error((await oRes.json()).error ?? "Error al cargar los prompts.");
       if (!cRes.ok) throw new Error((await cRes.json()).error ?? "Error al cargar las conexiones n8n.");
+      if (!csRes.ok) {
+        throw new Error((await csRes.json()).error ?? "Error al cargar Smart Paste.");
+      }
       setProviders(await pRes.json());
       setRoleDefaults(await rRes.json());
       const overrideRows: PromptOverride[] = await oRes.json();
@@ -66,6 +73,7 @@ export default function SettingsPage() {
         Object.fromEntries(overrideRows.map((o) => [o.role, o.content])),
       );
       setConnections(await cRes.json());
+      setComposerSettings(await csRes.json());
     } catch (e) {
       setLoadError(e instanceof Error ? e.message : "Error al cargar los datos.");
     } finally {
@@ -229,6 +237,14 @@ export default function SettingsPage() {
           />
         )}
       </CollapsibleCard>
+
+      {!loading && !loadError && composerSettings && (
+        <ComposerSettingsCard
+          settings={composerSettings}
+          onSaved={setComposerSettings}
+          onToast={showToast}
+        />
+      )}
 
       <p className="section-label settings-group-label">System prompts</p>
 
