@@ -48,6 +48,12 @@ function extensionOf(name: string): string {
 /** Validation error surfaced to the API as a 400. */
 export class UnsupportedFileError extends Error {}
 
+/** Thrown when an attachment referenced by a message can't be loaded anymore
+ *  (row deleted, TTL expired, or a Storage read failure). Surfaced as a 400
+ *  instead of silently sending the model a message that's missing the file
+ *  the user thinks they attached. */
+export class AttachmentUnavailableError extends Error {}
+
 export function assertAllowed(filename: string, mimeType: string, size: number): void {
   const ext = extensionOf(filename);
   if (!ALLOWED_MIME.has(mimeType) && !ALLOWED_EXT.has(ext)) {

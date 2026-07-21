@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { ZodError } from "zod";
 import { ProviderInUseError } from "./db/providers";
-import { UnsupportedFileError } from "./db/uploads";
+import { UnsupportedFileError, AttachmentUnavailableError } from "./db/uploads";
 import { RoleNotConfiguredError } from "./db/runs";
 import { ConnectionInUseError } from "./db/n8n-connections";
 import { N8nApiError } from "./n8n/client";
@@ -14,9 +14,10 @@ export function jsonError(message: string, status: number) {
 
 /**
  * Maps thrown errors to the right HTTP status:
- * - ZodError               → 400 (validation)
- * - UnsupportedFileError    → 400 (validation)
- * - RoleNotConfiguredError  → 400 (validation)
+ * - ZodError                 → 400 (validation)
+ * - UnsupportedFileError     → 400 (validation)
+ * - AttachmentUnavailableError → 400 (validation)
+ * - RoleNotConfiguredError   → 400 (validation)
  * - ProviderInUseError      → 409 (conflict)
  * - everything else         → 500 (internal)
  */
@@ -26,6 +27,9 @@ export function handleError(err: unknown) {
     return jsonError(`Datos inválidos: ${msg}`, 400);
   }
   if (err instanceof UnsupportedFileError) {
+    return jsonError(err.message, 400);
+  }
+  if (err instanceof AttachmentUnavailableError) {
     return jsonError(err.message, 400);
   }
   if (err instanceof RoleNotConfiguredError) {

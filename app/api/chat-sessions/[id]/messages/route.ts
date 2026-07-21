@@ -6,7 +6,7 @@ import {
 } from "@/lib/db/chat-sessions";
 import { getRoleDefault } from "@/lib/db/role-defaults";
 import { getPromptOverride } from "@/lib/db/prompt-overrides";
-import { downloadUploadBytes } from "@/lib/db/uploads";
+import { downloadUploadBytes, AttachmentUnavailableError } from "@/lib/db/uploads";
 import { getVersion, getLatestVersionNumber } from "@/lib/db/versions";
 import { computeNextNumber, syncVersionMarkers } from "@/lib/version-utils";
 import { appendMessageSchema } from "@/lib/schemas/chat-sessions";
@@ -40,6 +40,11 @@ const EDITOR_CREATOR_MAX_TOKENS = 32000;
  * Downloads each attachment from Storage and shapes it for the model: images
  * and PDFs as base64, text/markdown decoded inline. Only the current turn's
  * files are sent (historical attachments may have expired).
+ *
+ * Throws AttachmentUnavailableError if a file can't be loaded (deleted,
+ * expired, Storage failure) instead of silently sending the turn without it.
+ * Otherwise the model truthfully reports it has no file while the user
+ * believes they attached one.
  */
 async function loadAttachmentsForModel(
   attachments: Attachment[],
@@ -47,7 +52,11 @@ async function loadAttachmentsForModel(
   const out: MessageAttachment[] = [];
   for (const a of attachments) {
     const dl = await downloadUploadBytes(a.uploadId);
-    if (!dl) continue;
+    if (!dl) {
+      throw new AttachmentUnavailableError(
+        `No se pudo cargar el archivo adjunto "${a.filename}". Puede haber expirado o haber sido eliminado; vuelve a adjuntarlo e intenta de nuevo.`,
+      );
+    }
     const mediaType = dl.upload.mime_type ?? a.mimeType ?? "";
     if (mediaType.startsWith("image/")) {
       out.push({ filename: dl.upload.filename, mediaType, kind: "image", data: dl.bytes.toString("base64") });
