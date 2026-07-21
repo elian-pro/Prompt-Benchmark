@@ -22,6 +22,7 @@ export function FileUpload({
   disabled,
   pastedTextByUploadId,
   onRevertPaste,
+  onBusyChange,
 }: {
   sessionId: string;
   attachments: Attachment[];
@@ -29,6 +30,10 @@ export function FileUpload({
   disabled?: boolean;
   pastedTextByUploadId?: Record<string, string>;
   onRevertPaste?: (attachment: Attachment) => void;
+  /** Reports whether an upload is in flight, so the parent can hold off
+   *  sending until the file the user just picked has actually attached
+   *  (otherwise a fast send races the upload and goes out with no file). */
+  onBusyChange?: (busy: boolean) => void;
 }) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [busy, setBusy] = useState(false);
@@ -41,6 +46,7 @@ export function FileUpload({
     if (files.length === 0) return;
 
     setBusy(true);
+    onBusyChange?.(true);
     setError(null);
     const added: Attachment[] = [];
     try {
@@ -53,6 +59,7 @@ export function FileUpload({
       onChange([...attachments, ...added]); // keep whatever uploaded before the failure
     } finally {
       setBusy(false);
+      onBusyChange?.(false);
     }
   }
 

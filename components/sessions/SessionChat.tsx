@@ -121,6 +121,11 @@ export function SessionChat({
   const [pendingAttachments, setPendingAttachments] = useState<Attachment[]>([]);
   const [streamingText, setStreamingText] = useState<string | null>(null);
   const [sending, setSending] = useState(false);
+  // True while any attachment (attach button, drag-drop, or Smart Paste) is
+  // still uploading, so `send` can refuse to fire until it lands in
+  // `attachments`. Otherwise a fast send races the upload and the message
+  // goes out with no file at all.
+  const [attachmentsBusy, setAttachmentsBusy] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
   const [draftOpen, setDraftOpen] = useState(false);
   const [dragging, setDragging] = useState(false);
@@ -268,7 +273,7 @@ export function SessionChat({
   const send = useCallback(
     async (explicit?: { content: string; attachments: Attachment[] }) => {
       const content = (explicit?.content ?? input).trim();
-      if (!content || sending) return;
+      if (!content || sending || attachmentsBusy) return;
       const sent = explicit?.attachments ?? attachments;
       setSending(true);
       setError(null);
@@ -347,7 +352,7 @@ export function SessionChat({
         setStreamingText(null);
       }
     },
-    [sessionId, input, attachments, sending, load],
+    [sessionId, input, attachments, sending, attachmentsBusy, load],
   );
 
   // Fire the message the user already typed on the idle composer, the instant
@@ -401,15 +406,27 @@ export function SessionChat({
     if (accepted.length < files.length) {
       showToast("Algunos archivos no son compatibles (usa texto, PDF o imagen).");
     }
+    setAttachmentsBusy(true);
     const added: Attachment[] = [];
-    for (const file of accepted) {
-      try {
-        added.push(await uploadAttachment(sessionId, file));
-      } catch (e) {
-        showToast(e instanceof Error ? e.message : "No se pudo subir el archivo.");
+    try {
+      for (const file of accepted) {
+        try {
+          added.push(await uploadAttachment(sessionId, file));
+        } catch (e) {
+          showToast(e instanceof Error ? e.message : "No se pudo subir el archivo.");
+        }
       }
+      if (added.length > 0) {
+        setAttachments((prev) => [...prev, ...added]);
+        showToast(
+          added.length === 1
+            ? `${added[0].filename} listo para enviar.`
+            : `${added.length} archivos listos para enviar.`,
+        );
+      }
+    } finally {
+      setAttachmentsBusy(false);
     }
-    if (added.length > 0) setAttachments((prev) => [...prev, ...added]);
   }
 
   // Inserts `text` at the composer's current cursor position (falls back to
@@ -450,6 +467,7 @@ export function SessionChat({
     ];
     const filename = nextPasteName(existingNames);
 
+    setAttachmentsBusy(true);
     try {
       const file = new File([text], filename, { type: "text/plain" });
       const attachment = await uploadAttachment(sessionId, file);
@@ -460,6 +478,8 @@ export function SessionChat({
       // insert if the upload fails.
       showToast("No se pudo convertir el texto pegado en adjunto; se insertó tal cual.");
       insertAtCursor(text);
+    } finally {
+      setAttachmentsBusy(false);
     }
   }
 
@@ -716,6 +736,7 @@ export function SessionChat({
               disabled={sending}
               pastedTextByUploadId={smartPasteText}
               onRevertPaste={revertSmartPaste}
+              onBusyChange={setAttachmentsBusy}
             />
           )}
           <textarea
@@ -736,13 +757,17 @@ export function SessionChat({
           />
           <div className="idle-composer-footrow">
             <span className="idle-composer-hint">
-              {sending ? "Enviando…" : "⌘/Ctrl + Enter para enviar"}
+              {sending
+                ? "Enviando…"
+                : attachmentsBusy
+                  ? "Subiendo archivo…"
+                  : "⌘/Ctrl + Enter para enviar"}
             </span>
             <button
               type="button"
               className="idle-send-btn"
               onClick={() => send()}
-              disabled={sending || isAbandoned || !input.trim()}
+              disabled={sending || isAbandoned || attachmentsBusy || !input.trim()}
               aria-label="Enviar"
             >
               <IconSend size={14} />
