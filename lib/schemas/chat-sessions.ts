@@ -38,12 +38,29 @@ export const attachmentSchema = z.object({
   mimeType: z.string().nullable(),
 });
 
+// Structured selection for a message that answers an options block. UI-only:
+// persisted so a reopened block shows the exact choices. Kept permissive but
+// typed; mirrors the MessageAnswer shape in lib/db/chat-sessions.ts.
+export const answerSchema = z.object({
+  sourceMessageId: z.string().uuid(),
+  selections: z
+    .array(
+      z.object({
+        questionId: z.string().min(1),
+        type: z.enum(["single_select", "multi_select", "rank"]),
+        value: z.union([z.string(), z.array(z.string())]),
+      }),
+    )
+    .min(1),
+});
+
 export const appendMessageSchema = z.object({
   content: z
     .string({ required_error: "El mensaje es obligatorio." })
     .trim()
     .min(1, "El mensaje es obligatorio."),
   attachments: z.array(attachmentSchema).optional(),
+  answer: answerSchema.optional(),
 });
 
 // Manual edit of the session's working draft (no AI turn). Empty string is

@@ -128,6 +128,9 @@ export async function POST(req: NextRequest, { params }: Params) {
       role: "user",
       content: input.content,
       attachments: input.attachments ?? null,
+      // Structured options selection (UI-only): persisted so a reopened block
+      // shows the exact choices. The model only sees input.content as history.
+      answer: input.answer ?? null,
     });
 
     // The persona may be overridden from Settings; absent → code default.

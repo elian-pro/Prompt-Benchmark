@@ -25,12 +25,28 @@ export type Attachment = {
   mimeType: string | null;
 };
 
+/** The user's structured selection for a message that answers a selectable
+ *  options block. `sourceMessageId` is the assistant message that emitted the
+ *  block, so the renderer can resolve answered-state by id (not by position).
+ *  `value` is a string for single_select, an array for multi_select (any order)
+ *  and rank (ordered by priority). UI-only: the model reads the human summary
+ *  in `content`, never this. */
+export type MessageAnswer = {
+  sourceMessageId: string;
+  selections: Array<{
+    questionId: string;
+    type: "single_select" | "multi_select" | "rank";
+    value: string | string[];
+  }>;
+};
+
 export type ChatMessageRow = {
   id: string;
   session_id: string;
   role: MessageRole;
   content: string;
   attachments: Attachment[] | null;
+  answer: MessageAnswer | null;
   tokens_in: number | null;
   tokens_out: number | null;
   created_at: string;
@@ -67,7 +83,7 @@ const SESSION_COLS =
   "created_at, updated_at, finalized_at";
 
 const MESSAGE_COLS =
-  "id, session_id, role, content, attachments, tokens_in, tokens_out, created_at";
+  "id, session_id, role, content, attachments, answer, tokens_in, tokens_out, created_at";
 
 function flattenListItem(row: any): ChatSessionListItem {
   // Supabase returns the joined client as an object or array depending on the
@@ -174,6 +190,7 @@ export async function appendMessage(
     role: MessageRole;
     content: string;
     attachments?: Attachment[] | null;
+    answer?: MessageAnswer | null;
     tokensIn?: number | null;
     tokensOut?: number | null;
   },
@@ -186,6 +203,7 @@ export async function appendMessage(
       role: input.role,
       content: input.content,
       attachments: input.attachments ?? null,
+      answer: input.answer ?? null,
       tokens_in: input.tokensIn ?? null,
       tokens_out: input.tokensOut ?? null,
     })
