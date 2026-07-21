@@ -9,17 +9,21 @@ import {
   IconReplace,
   IconSparkles,
   IconTrash,
+  IconPencil,
 } from "@tabler/icons-react";
 import type { ClientDetail } from "@/lib/db/clients";
 import type { VersionListItem } from "@/lib/db/versions";
 import { computeNextNumber } from "@/lib/version-utils";
 import { relativeTimeEs } from "@/lib/format";
-import { isNewVersion } from "@/lib/badges";
+import { isNewVersion, N8N_HOST_LABEL } from "@/lib/badges";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { Modal } from "@/components/ui/Modal";
 import { FindReplace } from "@/components/ui/FindReplace";
 import { SegmentPicker } from "@/components/library/SegmentPicker";
+import { N8nDeploymentCard } from "@/components/library/N8nDeploymentCard";
+import { N8nSyncHistory } from "@/components/library/N8nSyncHistory";
+import { N8nSyncModal } from "@/components/library/N8nSyncModal";
 
 const SOURCE_LABELS: Record<string, string> = {
   manual: "Manual",
@@ -48,15 +52,26 @@ export default function ClientDetailPage() {
   const [finalizeOpen, setFinalizeOpen] = useState(false);
   // What-changed note the user writes when finalizing a manual edit (optional).
   const [changeSummaryInput, setChangeSummaryInput] = useState("");
+  // Editable target number for the new version (defaults to the auto minor bump).
+  const [versionNumberInput, setVersionNumberInput] = useState("");
   // The version being promoted to production (opens the confirm modal).
   const [promoteTarget, setPromoteTarget] = useState<VersionListItem | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<VersionListItem | null>(null);
+  // Opens the n8n sync modal after a promotion, when the client has bindings.
+  const [syncTarget, setSyncTarget] = useState<
+    { versionId: string; versionNumber: string; versionContent: string } | null
+  >(null);
   const [busy, setBusy] = useState(false);
 
   // Inline editing of a version's change summary (add it after a quick save).
   const [editingSummaryId, setEditingSummaryId] = useState<string | null>(null);
   const [summaryDraft, setSummaryDraft] = useState("");
   const [savingSummary, setSavingSummary] = useState(false);
+
+  // Inline editing of a version's number (manual override during beta).
+  const [editingNumberId, setEditingNumberId] = useState<string | null>(null);
+  const [numberDraft, setNumberDraft] = useState("");
+  const [savingNumber, setSavingNumber] = useState(false);
 
   // Inline editing of the client name and segment from the detail header.
   const [editingName, setEditingName] = useState(false);
@@ -176,6 +191,7 @@ export default function ClientDetailPage() {
   async function createVersion() {
     setBusy(true);
     try {
+      const desired = versionNumberInput.trim();
       const res = await fetch(`/api/clients/${id}/versions`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -184,6 +200,8 @@ export default function ClientDetailPage() {
           bumpType: "minor",
           source: "manual",
           changeSummary: changeSummaryInput.trim() || undefined,
+          // Send the number only when it differs from the auto minor bump.
+          versionNumberOverride: desired && desired !== nextMinor ? desired : undefined,
         }),
       });
       if (!res.ok) {
@@ -222,6 +240,18 @@ export default function ClientDetailPage() {
       // Keep the just-promoted version in view (load() would default to latest).
       setSelectedVersionId(v.id);
       showToast(`${v.version_number} marcada como producción.`);
+      // If the client has any n8n bindings (API or manual), offer to deploy now.
+      try {
+        const bRes = await fetch(`/api/clients/${id}/n8n-bindings`);
+        if (bRes.ok) {
+          const bindings: { mode: string; sync_enabled: boolean }[] = await bRes.json();
+          if (bindings.some((b) => (b.mode === "api" && b.sync_enabled) || b.mode === "manual")) {
+            setSyncTarget({ versionId: v.id, versionNumber: v.version_number, versionContent: v.content ?? "" });
+          }
+        }
+      } catch {
+        // Non-blocking: promotion already succeeded; sync can be retried later.
+      }
     } catch (e) {
       showToast(e instanceof Error ? e.message : "Error inesperado.");
     } finally {
@@ -269,6 +299,48 @@ export default function ClientDetailPage() {
       showToast(e instanceof Error ? e.message : "Error inesperado.");
     } finally {
       setSavingSummary(false);
+    }
+  }
+
+  function startEditNumber(v: VersionListItem) {
+    setEditingNumberId(v.id);
+    setNumberDraft(v.version_number);
+  }
+  function cancelEditNumber() {
+    setEditingNumberId(null);
+    setNumberDraft("");
+  }
+  // Renaming a version rewrites the prompt's version markers, so reload to
+  // pull the fresh content and label.
+  async function saveVersionNumber(v: VersionListItem) {
+    const desired = numberDraft.trim();
+    if (!/^v\d+\.\d+$/.test(desired)) {
+      showToast("Formato inválido. Usa vX.Y (p. ej. v2.5).");
+      return;
+    }
+    if (desired === v.version_number) {
+      cancelEditNumber();
+      return;
+    }
+    setSavingNumber(true);
+    try {
+      const res = await fetch(`/api/versions/${v.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ versionNumber: desired }),
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.error ?? "No se pudo cambiar el número.");
+      }
+      setEditingNumberId(null);
+      setNumberDraft("");
+      await load();
+      showToast(`Versión renombrada a ${desired}.`);
+    } catch (e) {
+      showToast(e instanceof Error ? e.message : "Error inesperado.");
+    } finally {
+      setSavingNumber(false);
     }
   }
 
@@ -345,6 +417,17 @@ export default function ClientDetailPage() {
     setEditingSegment(false);
   }
 
+  async function toggleN8nHost() {
+    if (!detail) return;
+    const next = detail.n8n_host === "zebra" ? "own" : "zebra";
+    try {
+      await patchClient({ n8n_host: next });
+      setDetail((d) => (d ? { ...d, n8n_host: next } : d));
+    } catch (e) {
+      showToast(e instanceof Error ? e.message : "No se pudo cambiar el host de n8n.");
+    }
+  }
+
   if (loading) return <p className="empty-hint">Cargando…</p>;
   if (error) return <p className="form-error">{error}</p>;
   if (!detail) return <p className="empty-hint">Cliente no encontrado.</p>;
@@ -352,6 +435,8 @@ export default function ClientDetailPage() {
   const latestVersion = detail.versions[0] ?? null;
   const latestNumber = latestVersion?.version_number ?? "v1.0";
   const nextMinor = computeNextNumber(latestNumber, "minor");
+  const versionNumberValid = /^v\d+\.\d+$/.test(versionNumberInput.trim());
+  const finalizeLabel = versionNumberValid ? versionNumberInput.trim() : nextMinor;
   const prodLabel = detail.production_version?.version_number ?? "sin producción";
   const hasDraft = Boolean(detail.draft_content?.trim());
   // The version being viewed read-only, if any (null → the draft editor).
@@ -424,6 +509,14 @@ export default function ClientDetailPage() {
               {detail.segment ? detail.segment : "Añadir segmento"}
             </button>
           )}
+          <button
+            type="button"
+            className="n8n-host-toggle"
+            title="Clic para cambiar dónde vive el agente"
+            onClick={toggleN8nHost}
+          >
+            <Badge variant="n8n">{N8N_HOST_LABEL[detail.n8n_host]}</Badge>
+          </button>
         </div>
         <div className="header-actions">
           <Button
@@ -490,15 +583,65 @@ export default function ClientDetailPage() {
                     }
                   }}
                 >
-                  <span className="vnum">
-                    {v.version_number}
-                    <span className="vnum-tags">
-                      {isNewVersion(v.bump_type, v.created_at) && (
-                        <Badge variant="new-version">Nueva versión</Badge>
-                      )}
-                      {v.is_production && <span className="prod-tag">Prod</span>}
+                  {editingNumberId === v.id ? (
+                    <div
+                      className="vnum-edit"
+                      onClick={(e) => e.stopPropagation()}
+                      onKeyDown={(e) => e.stopPropagation()}
+                    >
+                      <input
+                        className="input vnum-input"
+                        value={numberDraft}
+                        autoFocus
+                        onChange={(e) => setNumberDraft(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter") saveVersionNumber(v);
+                          if (e.key === "Escape") cancelEditNumber();
+                        }}
+                        placeholder="v1.5"
+                      />
+                      <Button
+                        variant="primary"
+                        size="sm"
+                        onClick={() => saveVersionNumber(v)}
+                        disabled={savingNumber}
+                      >
+                        {savingNumber ? "…" : "Guardar"}
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={cancelEditNumber}
+                        disabled={savingNumber}
+                      >
+                        Cancelar
+                      </Button>
+                    </div>
+                  ) : (
+                    <span className="vnum">
+                      <span className="vnum-left">
+                        {v.version_number}
+                        <button
+                          type="button"
+                          className="vnum-edit-btn"
+                          title="Editar número de versión"
+                          aria-label={`Editar número de versión ${v.version_number}`}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            startEditNumber(v);
+                          }}
+                        >
+                          <IconPencil size={12} />
+                        </button>
+                      </span>
+                      <span className="vnum-tags">
+                        {isNewVersion(v.bump_type, v.created_at) && (
+                          <Badge variant="new-version">Nueva versión</Badge>
+                        )}
+                        {v.is_production && <span className="prod-tag">Prod</span>}
+                      </span>
                     </span>
-                  </span>
+                  )}
                   <div className="vfoot">
                     <span className="vmeta">
                       {SOURCE_LABELS[v.source ?? ""] ?? "-"} ·{" "}
@@ -599,6 +742,28 @@ export default function ClientDetailPage() {
               );
             })}
           </div>
+
+          <N8nDeploymentCard
+            clientId={id}
+            productionVersion={
+              detail.production_version
+                ? {
+                    id: detail.production_version.id,
+                    version_number: detail.production_version.version_number,
+                    content: detail.production_version.content,
+                  }
+                : null
+            }
+            onRequestSync={() => {
+              if (!detail.production_version) return;
+              setSyncTarget({
+                versionId: detail.production_version.id,
+                versionNumber: detail.production_version.version_number,
+                versionContent: detail.production_version.content,
+              });
+            }}
+          />
+          <N8nSyncHistory clientId={id} />
         </aside>
 
         {viewingVersion ? (
@@ -689,7 +854,13 @@ export default function ClientDetailPage() {
                 `Autoguardado ${autosavedAt.toLocaleTimeString("es-MX")}`}
             </div>
             <div className="editor-actions">
-              <Button variant="primary" onClick={() => setFinalizeOpen(true)}>
+              <Button
+                variant="primary"
+                onClick={() => {
+                  setVersionNumberInput(nextMinor);
+                  setFinalizeOpen(true);
+                }}
+              >
                 Finalizar edición
               </Button>
             </div>
@@ -708,7 +879,7 @@ export default function ClientDetailPage() {
           setFinalizeOpen(false);
           setChangeSummaryInput("");
         }}
-        title={`¿Crear nueva versión ${nextMinor}?`}
+        title={`¿Crear nueva versión ${finalizeLabel}?`}
         footer={
           <>
             <Button
@@ -721,15 +892,35 @@ export default function ClientDetailPage() {
             >
               Cancelar
             </Button>
-            <Button variant="primary" onClick={createVersion} disabled={busy}>
-              {busy ? "Creando…" : `Crear ${nextMinor}`}
+            <Button
+              variant="primary"
+              onClick={createVersion}
+              disabled={busy || !versionNumberValid}
+            >
+              {busy ? "Creando…" : `Crear ${finalizeLabel}`}
             </Button>
           </>
         }
       >
         <p className="modal-body">
-          Se guardará el borrador actual como una nueva versión menor {nextMinor}.
+          Se guardará el borrador actual como una nueva versión.
         </p>
+        <div className="field" style={{ marginTop: 4 }}>
+          <label className="field-label">Número de versión</label>
+          <input
+            className="input"
+            value={versionNumberInput}
+            onChange={(e) => setVersionNumberInput(e.target.value)}
+            placeholder={nextMinor}
+          />
+          {!versionNumberValid && versionNumberInput.length > 0 && (
+            <p className="form-error">Formato inválido. Usa vX.Y (p. ej. v2.5).</p>
+          )}
+          <p className="field-hint">
+            Por defecto sube la versión menor ({nextMinor}). Cámbialo si
+            actualizaste el prompt por fuera y quieres fijar otro número.
+          </p>
+        </div>
         <div className="field" style={{ marginTop: 4 }}>
           <label className="field-label">
             ¿Qué cambios hiciste? <span className="field-optional">(opcional)</span>
@@ -802,6 +993,20 @@ export default function ClientDetailPage() {
           deshacer.
         </p>
       </Modal>
+
+      {syncTarget && (
+        <N8nSyncModal
+          clientId={id}
+          versionId={syncTarget.versionId}
+          versionNumber={syncTarget.versionNumber}
+          versionContent={syncTarget.versionContent}
+          onClose={() => setSyncTarget(null)}
+          onDone={({ pushed, failed }) => {
+            if (pushed > 0 && failed === 0) showToast(`Sincronizado con n8n (${pushed}).`);
+            else if (failed > 0) showToast(`Sincronización con ${failed} error(es).`);
+          }}
+        />
+      )}
 
       {toast && <div className="toast">{toast}</div>}
     </div>

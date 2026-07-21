@@ -7,54 +7,132 @@ import assert from "node:assert/strict";
 
 import {
   extractPromptFromReply,
-  hasUnclosedFence,
+  splitPromptBlock,
+  replacePromptBlock,
+  hasUnclosedPromptBlock,
+  unclosedBlockPreamble,
   extractChangeSummary,
+  capSummary,
+  PROMPT_START,
+  PROMPT_END,
 } from "./editor-persona.ts";
 
-test("extractPromptFromReply reads the fenced block", () => {
-  const reply = "Aquí tienes el prompt:\n```\nEl contenido del prompt\n```\n\n**CAMBIOS:** ninguno";
-  assert.equal(extractPromptFromReply(reply), "El contenido del prompt");
+// A prompt that itself contains ```json blocks: the exact shape that broke the
+// old non-greedy extractor (it truncated at the first inner fence).
+const PROMPT_WITH_FENCES = [
+  "# PROMPT CONVERSACIONAL - COCO IA",
+  "```json",
+  '{ "estado": "por-perfilar", "mensajes": ["Hola"] }',
+  "```",
+  "### LOS 7 ESTADOS",
+  "Texto final del prompt.",
+].join("\n");
+
+function sentinelReply(prompt: string, summary: string): string {
+  return `${PROMPT_START}\n${prompt}\n${PROMPT_END}\n\n${summary}`;
+}
+
+test("extracts a sentinel-delimited prompt that contains inner ```json fences", () => {
+  const reply = sentinelReply(PROMPT_WITH_FENCES, "**CAMBIOS REALIZADOS:**\n- algo");
+  assert.equal(extractPromptFromReply(reply), PROMPT_WITH_FENCES);
 });
 
-test("extractPromptFromReply returns null with no fence (a clarifying question)", () => {
+test("splitPromptBlock keeps the whole prompt in the block, summary in after", () => {
+  const reply = sentinelReply(PROMPT_WITH_FENCES, "**CAMBIOS REALIZADOS:**\n- algo");
+  const { before, block, after } = splitPromptBlock(reply);
+  assert.equal(before.trim(), "");
+  assert.equal(block, PROMPT_WITH_FENCES);
+  assert.match(after, /CAMBIOS REALIZADOS/);
+  // The inner json must NOT have leaked past the block into `after`.
+  assert.doesNotMatch(after, /LOS 7 ESTADOS/);
+});
+
+test("change summary does not leak the fenced prompt body", () => {
+  const reply = sentinelReply(
+    PROMPT_WITH_FENCES,
+    "**CAMBIOS REALIZADOS:**\n- Sección: Precios\n\n**SIN CAMBIOS:**\n- Resto igual.",
+  );
+  const summary = extractChangeSummary(reply);
+  assert.equal(summary, "CAMBIOS REALIZADOS:\n- Sección: Precios");
+  assert.doesNotMatch(summary ?? "", /LOS 7 ESTADOS|estado/);
+});
+
+test("returns null with no block (a clarifying question)", () => {
   assert.equal(extractPromptFromReply("¿A qué sección te refieres exactamente?"), null);
 });
 
-test("extractPromptFromReply returns null on a cut-off (unclosed) fence", () => {
-  const reply = "```\nEl contenido del prompt que se corta a la mitad";
-  assert.equal(extractPromptFromReply(reply), null);
+test("hasUnclosedPromptBlock: sentinel opened but not closed (cut off)", () => {
+  assert.equal(hasUnclosedPromptBlock(`${PROMPT_START}\nprompt a medias`), true);
 });
 
-test("hasUnclosedFence is false for a normal reply with no fence", () => {
-  assert.equal(hasUnclosedFence("¿A qué sección te refieres exactamente?"), false);
+test("hasUnclosedPromptBlock: false for a complete sentinel block", () => {
+  assert.equal(hasUnclosedPromptBlock(sentinelReply("x", "y")), false);
 });
 
-test("hasUnclosedFence is false for a properly closed fence", () => {
-  assert.equal(hasUnclosedFence("```\ncontenido\n```"), false);
+// --- Legacy fallback: replies from before the sentinel contract used ``` ---
+
+test("legacy greedy fallback captures an outer ``` block with inner fences", () => {
+  const reply = "```\n" + PROMPT_WITH_FENCES + "\n```\n\n**CAMBIOS:** algo";
+  assert.equal(extractPromptFromReply(reply), PROMPT_WITH_FENCES);
 });
 
-test("hasUnclosedFence is true when the reply is cut off mid-block", () => {
-  assert.equal(hasUnclosedFence("```\ncontenido que se corta"), true);
+test("legacy hasUnclosedPromptBlock: odd fence count means cut off", () => {
+  assert.equal(hasUnclosedPromptBlock("```\ncontenido que se corta"), true);
+  assert.equal(hasUnclosedPromptBlock("```\ncontenido\n```"), false);
 });
 
-test("extractChangeSummary keeps the changes prose, strips bold and SIN CAMBIOS", () => {
-  const reply =
-    "```\nEl prompt completo\n```\n\n**CAMBIOS REALIZADOS:**\n- Sección modificada: Precios\n- Tipo de cambio: se actualizó el mínimo\n\n**SIN CAMBIOS:**\n- Todo lo demás permanece idéntico.";
-  assert.equal(
-    extractChangeSummary(reply),
-    "CAMBIOS REALIZADOS:\n- Sección modificada: Precios\n- Tipo de cambio: se actualizó el mínimo",
+test("extractChangeSummary returns null when there's only a block", () => {
+  assert.equal(extractChangeSummary(sentinelReply("solo el prompt", "")), null);
+});
+
+test("replacePromptBlock swaps the block content, keeps the summary", () => {
+  const reply = sentinelReply("viejo", "**CAMBIOS REALIZADOS:**\n- algo");
+  const out = replacePromptBlock(reply, "nuevo v1.8");
+  assert.equal(extractPromptFromReply(out), "nuevo v1.8");
+  assert.match(out, /CAMBIOS REALIZADOS/);
+});
+
+test("replacePromptBlock leaves a reply with no block untouched", () => {
+  assert.equal(replacePromptBlock("¿A qué sección?", "x"), "¿A qué sección?");
+});
+
+test("capSummary keeps at most 3 bullets", () => {
+  const out = capSummary("Header\n- a\n- b\n- c\n- d\n- e");
+  assert.equal(out, "Header\n- a\n- b\n- c");
+});
+
+test("capSummary truncates to 250 chars with an ellipsis", () => {
+  const long = "- " + "x".repeat(400);
+  const out = capSummary(long);
+  assert.ok(out.length <= 250);
+  assert.ok(out.endsWith("…"));
+});
+
+test("extractChangeSummary caps a runaway summary to 3 bullets", () => {
+  const reply = sentinelReply(
+    "prompt",
+    "**CAMBIOS REALIZADOS:**\n- uno\n- dos\n- tres\n- cuatro\n- cinco",
   );
+  const summary = extractChangeSummary(reply) ?? "";
+  assert.equal((summary.match(/^- /gm) ?? []).length, 3);
 });
 
-test("extractChangeSummary returns null when there's only a block and no prose", () => {
-  assert.equal(extractChangeSummary("```\nSolo el prompt\n```"), null);
+test("unclosedBlockPreamble returns only the prose before the opening sentinel", () => {
+  const reply = `Claro, aquí va:\n\n${PROMPT_START}\n# PROMPT\nAlgo de con`;
+  assert.equal(unclosedBlockPreamble(reply), "Claro, aquí va:\n\n");
 });
 
-test("extractChangeSummary returns null for a reply with no block (a question)", () => {
-  // A clarifying question never creates a version, but guard the shape anyway:
-  // with no fenced block the whole text remains, which is the intended fallback.
-  assert.equal(
-    extractChangeSummary("¿A qué sección te refieres?"),
-    "¿A qué sección te refieres?",
-  );
+test("unclosedBlockPreamble hides the entire partial prompt, not just up to the last newline", () => {
+  const reply = `${PROMPT_START}\n# PROMPT CONVERSACIONAL\n### SECCION A\nTexto que sigue escribiéndose`;
+  assert.equal(unclosedBlockPreamble(reply), "");
+});
+
+test("unclosedBlockPreamble falls back to the legacy fence marker when no sentinel is present", () => {
+  const reply = "Aquí tienes:\n\n```\n# PROMPT\nsigue escribiendo";
+  assert.equal(unclosedBlockPreamble(reply), "Aquí tienes:\n\n");
+});
+
+test("unclosedBlockPreamble returns the whole reply when no block has started yet", () => {
+  const reply = "Antes de editar, ¿me confirmas el alcance?";
+  assert.equal(unclosedBlockPreamble(reply), reply);
 });

@@ -53,15 +53,16 @@ const FAILURE_MODE_GUIDE = `- "salida de rol": el agente abandona su personaje/f
 - "fallo con input degradado": maneja mal mensajes con errores, fragmentados o ruidosos.`;
 
 /**
- * Builds the judge system prompt. The full transcript is passed as the user
- * message; the judge must reply with ONLY the JSON object described here.
- * `override`, when given, replaces the whole prompt with the team's saved
- * version from Settings (prompt_overrides) — the judge has no dynamic parts to
- * append, so the override is used verbatim.
+ * Builds the judge system prompt. The user message carries the agent's prompt
+ * (as ground truth) plus the full transcript, built by `formatJudgeInput`; the
+ * judge must reply with ONLY the JSON object described here. `override`, when
+ * given, replaces the whole prompt with the team's saved version from
+ * Settings (prompt_overrides). The judge has no dynamic parts to append, so
+ * the override is used verbatim.
  */
 export function buildJudgeSystemPrompt(override?: string | null): string {
   if (override?.trim()) return override;
-  return `Eres un juez experto que evalúa conversaciones entre un agente de IA de perfilamiento de leads (el "bot bajo prueba") y un lead simulado adversarial. Analizas la conversación completa e identificas dónde falló el agente.
+  return `Eres un juez experto que evalúa conversaciones entre un agente de IA de perfilamiento de leads (el "bot bajo prueba") y un lead simulado adversarial. Recibirás el PROMPT del agente (sus instrucciones reales) y la CONVERSACIÓN completa. Analiza la conversación e identifica dónde falló el agente, usando el prompt como referencia de lo que debía cumplir: contrástalo contra lo que realmente dijo para detectar datos inventados, temas fuera de su alcance, o reglas que cedió indebidamente. No cites el prompt completo ni lo reproduzcas en tu reporte, solo úsalo para fundamentar los hallazgos.
 
 Buscas estos 8 modos de falla:
 ${FAILURE_MODE_GUIDE}
@@ -84,4 +85,20 @@ Responde ÚNICAMENTE con un objeto JSON válido (sin texto adicional, sin markdo
 }
 
 Si el agente no mostró fallas, devuelve "findings" como arreglo vacío. Usa exactamente los textos de categoría y severidad indicados.`;
+}
+
+/**
+ * Builds the judge's user message: the agent's prompt as labeled reference
+ * ground truth, followed by the transcript to evaluate. Passing the prompt
+ * lets the judge actually check claims against the agent's real instructions
+ * instead of guessing at what counts as a hallucination or scope failure.
+ */
+export function formatJudgeInput(promptSnapshot: string, transcript: string): string {
+  return `=== PROMPT DEL AGENTE (referencia: instrucciones que debía cumplir) ===
+${promptSnapshot}
+=== FIN DEL PROMPT ===
+
+=== CONVERSACIÓN A EVALUAR ===
+${transcript}
+=== FIN DE LA CONVERSACIÓN ===`;
 }

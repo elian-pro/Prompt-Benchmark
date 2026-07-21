@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 
-export type BadgeVariant = "new" | "new-version" | "legacy";
+export type BadgeVariant = "new" | "new-version" | "legacy" | "n8n";
 
 export function Badge({
   variant,

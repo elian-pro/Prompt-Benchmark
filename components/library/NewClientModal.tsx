@@ -5,12 +5,17 @@ import { useRouter } from "next/navigation";
 import { Modal } from "@/components/ui/Modal";
 import { Button } from "@/components/ui/Button";
 import { SegmentPicker } from "@/components/library/SegmentPicker";
+import { BindOnCreateToggle } from "@/components/library/BindOnCreateToggle";
+import { N8nHostPicker } from "@/components/library/N8nHostPicker";
+import type { N8nHost } from "@/lib/db/clients";
 
 export function NewClientModal({ open, onClose }: { open: boolean; onClose: () => void }) {
   const router = useRouter();
   const [name, setName] = useState("");
   const [segment, setSegment] = useState("");
   const [notes, setNotes] = useState("");
+  const [n8nHost, setN8nHost] = useState<N8nHost>("zebra");
+  const [bindAfter, setBindAfter] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -25,6 +30,7 @@ export function NewClientModal({ open, onClose }: { open: boolean; onClose: () =
           name: name.trim(),
           segment: segment.trim() || null,
           notes: notes.trim() || null,
+          n8nHost,
         }),
       });
       if (!res.ok) {
@@ -32,7 +38,7 @@ export function NewClientModal({ open, onClose }: { open: boolean; onClose: () =
         throw new Error(data.error ?? "No se pudo crear el cliente.");
       }
       const { client } = await res.json();
-      router.push(`/library/${client.id}`);
+      router.push(`/library/${client.id}${bindAfter ? "?bind=1" : ""}`);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Error inesperado.");
       setSaving(false);
@@ -71,6 +77,8 @@ export function NewClientModal({ open, onClose }: { open: boolean; onClose: () =
           onChange={(e) => setNotes(e.target.value)}
         />
       </div>
+      <N8nHostPicker value={n8nHost} onChange={setN8nHost} />
+      <BindOnCreateToggle checked={bindAfter} onChange={setBindAfter} />
       {error && <p className="form-error">{error}</p>}
     </Modal>
   );

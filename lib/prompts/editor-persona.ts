@@ -40,18 +40,22 @@ El usuario describirá el cambio en lenguaje natural. Internamente, clasifícalo
 - Eliminación: se debe remover contenido del prompt.
 
 FORMATO DE ENTREGA (obligatorio en cada respuesta que modifique el prompt):
-1. Entrega el prompt COMPLETO ya con los cambios integrados, dentro de un único bloque de código markdown (delimitado por triple backtick). El bloque debe contener exclusivamente el prompt, listo para copiar y pegar.
-2. Fuera del bloque de código, al final, incluye este resumen:
+1. Entrega el prompt COMPLETO ya con los cambios integrados, delimitado EXACTAMENTE con estas dos líneas, cada una en su propia línea:
+===PROMPT ACTUALIZADO===
+(aquí va el prompt completo, listo para copiar y pegar)
+===FIN DEL PROMPT===
+No envuelvas el prompt en un bloque de código markdown (triple backtick). El prompt puede CONTENER bloques \`\`\` internos (por ejemplo ejemplos de salida en JSON); por eso los delimitadores son de texto y no backticks. Todo lo que esté entre esas dos líneas se guarda como el prompt, tal cual.
+2. Después de la línea ===FIN DEL PROMPT===, incluye este resumen. EXACTAMENTE 3 viñetas, cada una de una sola línea muy breve. Nada de párrafos ni de pegar partes del prompt:
 
 **CAMBIOS REALIZADOS:**
-- Sección modificada: [nombre]
-- Tipo de cambio: [qué se hizo en una línea]
-- Líneas/elementos afectados: [descripción breve]
+- Sección modificada: [nombre, muy breve]
+- Tipo de cambio: [qué se hizo, una línea]
+- Elementos afectados: [descripción muy breve]
 
 **SIN CAMBIOS:**
 - Todo lo demás del prompt permanece idéntico.
 
-Si el usuario solo hace una pregunta o pide una aclaración sin solicitar una edición, responde con texto normal y NO incluyas el bloque de código ni el resumen.`;
+Si el usuario solo hace una pregunta o pide una aclaración sin solicitar una edición, responde con texto normal y NO incluyas los delimitadores ni el resumen.`;
 
 /**
  * Builds the full system prompt by appending the prompt currently under edit.
@@ -75,49 +79,145 @@ PROMPT EN PRODUCCIÓN (estado actual sobre el que debes trabajar):
 ${draft}`;
 }
 
+// The output contract's delimiters. Text markers (not ``` backticks) so a
+// prompt that itself contains ```json blocks can never break extraction.
+export const PROMPT_START = "===PROMPT ACTUALIZADO===";
+export const PROMPT_END = "===FIN DEL PROMPT===";
+
+// Sentinel block: content between the two markers. Non-greedy is safe because
+// PROMPT_END never appears inside a real prompt.
+const SENTINEL_RE = new RegExp(`${PROMPT_START}[ \\t]*\\n([\\s\\S]*?)\\n?${PROMPT_END}`);
+// Legacy fallback for replies from before the sentinel contract: a single
+// outer ``` block. GREEDY (`[\s\S]*`, no `?`) so it spans from the first ``` to
+// the LAST ```, capturing the whole prompt WITH its inner ```json fences
+// instead of stopping at the first inner fence (the original truncation bug).
+const FENCE_GREEDY_RE = /```[^\n]*\n([\s\S]*)```/;
+
+type BlockLocation = { content: string; start: number; end: number };
+
 /**
- * Extracts the updated prompt from an assistant reply, per the output contract:
- * the full prompt lives inside the first fenced code block. Returns null when
- * the reply has no code block (the assistant only answered a question and did
- * not produce a new draft), so the caller leaves the draft untouched.
+ * Locates the prompt block in an assistant reply. A reply that uses the
+ * sentinel contract (contains PROMPT_START) is matched by sentinels ONLY, so a
+ * half-streamed reply never mis-triggers on the prompt's inner ``` fences.
+ * A legacy reply (no sentinels) falls back to the greedy outer-fence match.
+ * Returns null when there is no complete block yet (a clarifying question, or
+ * output still streaming / cut off).
  */
-export function extractPromptFromReply(reply: string): string | null {
-  // First fenced block; tolerate an optional language tag after the backticks.
-  const match = reply.match(/```[^\n]*\n([\s\S]*?)```/);
-  if (!match) return null;
-  const extracted = match[1].trim();
-  return extracted.length > 0 ? extracted : null;
+function locatePromptBlock(reply: string): BlockLocation | null {
+  const re = reply.includes(PROMPT_START) ? SENTINEL_RE : FENCE_GREEDY_RE;
+  const match = reply.match(re);
+  if (!match || match.index === undefined) return null;
+  const content = match[1].trim();
+  if (content.length === 0) return null;
+  return { content, start: match.index, end: match.index + match[0].length };
 }
 
 /**
- * Whether the reply opened a fenced block that never closed — a strong
- * signal the response was cut off mid-generation (hit max_tokens, dropped
- * connection) rather than the assistant simply choosing not to include a
- * prompt block. extractPromptFromReply already returns null in both cases;
- * this distinguishes "nothing to extract" (fine — a clarifying question)
- * from "extraction failed because the draft got cut" (needs a warning).
- * Heuristic: counts ``` occurrences — an odd count means one never closed.
- * False positives would require literal ``` inside the assistant's own
- * prose, which the persona's output contract never produces.
+ * Extracts the updated prompt from an assistant reply, per the output contract:
+ * the full prompt lives between the PROMPT_START / PROMPT_END markers (or, for
+ * legacy replies, inside the outer fenced block). Returns null when the reply
+ * has no complete block (the assistant only answered a question, or the output
+ * was cut off), so the caller leaves the draft untouched.
  */
-export function hasUnclosedFence(reply: string): boolean {
+export function extractPromptFromReply(reply: string): string | null {
+  return locatePromptBlock(reply)?.content ?? null;
+}
+
+/**
+ * Splits a reply around its prompt block into the prose before it, the block
+ * itself (null when there is no complete block), and the prose after it (the
+ * "CAMBIOS REALIZADOS" summary). Shared by the server and the chat renderer so
+ * both agree on exactly what the block is.
+ */
+export function splitPromptBlock(reply: string): {
+  before: string;
+  block: string | null;
+  after: string;
+} {
+  const loc = locatePromptBlock(reply);
+  if (!loc) return { before: reply, block: null, after: "" };
+  return { before: reply.slice(0, loc.start), block: loc.content, after: reply.slice(loc.end) };
+}
+
+/**
+ * Returns the reply with its prompt block's CONTENT replaced by `newContent`,
+ * re-emitted in the sentinel format, keeping the surrounding prose. Used to
+ * stamp the target version number into the block the Studio owns, so the chat
+ * card and the saved draft show the same version. No block -> reply unchanged.
+ */
+export function replacePromptBlock(reply: string, newContent: string): string {
+  const { before, block, after } = splitPromptBlock(reply);
+  if (block === null) return reply;
+  return `${before}${PROMPT_START}\n${newContent}\n${PROMPT_END}${after}`;
+}
+
+/**
+ * Whether the reply opened a prompt block that never closed: a strong signal
+ * the response was cut off mid-generation (hit max_tokens, dropped connection)
+ * rather than the assistant choosing not to emit a prompt. Distinguishes
+ * "nothing to extract" (fine, a clarifying question) from "extraction failed
+ * because the draft got cut" (needs a warning). Sentinel replies: START without
+ * END. Legacy replies: an odd count of ``` fences.
+ */
+export function hasUnclosedPromptBlock(reply: string): boolean {
+  if (reply.includes(PROMPT_START)) return !reply.includes(PROMPT_END);
   const matches = reply.match(/```/g);
   return (matches?.length ?? 0) % 2 === 1;
 }
 
 /**
- * Extracts the change summary from an assistant reply — the prose the persona
- * writes AFTER the fenced prompt block (its "CAMBIOS REALIZADOS" report). Used
- * when finalizing an Editor session to persist, per version, what changed.
- * Strips `**bold**` markers so the stored text renders cleanly, and drops the
- * boilerplate "SIN CAMBIOS" confirmation (it carries no changelog signal).
+ * The chat-visible prose that precedes an unclosed prompt block. While a
+ * block is still streaming (hasUnclosedPromptBlock is true), splitPromptBlock
+ * can't locate it yet (it needs the closing marker) and falls back to
+ * `before: reply`, which would dump the partial prompt itself as raw chat
+ * text alongside the "escribiendo..." card. This returns only the prose
+ * BEFORE the opening marker, so the renderer can hide everything from there
+ * on and show just the writing card.
+ */
+export function unclosedBlockPreamble(reply: string): string {
+  if (reply.includes(PROMPT_START)) return reply.slice(0, reply.indexOf(PROMPT_START));
+  const fenceIndex = reply.indexOf("```");
+  return fenceIndex === -1 ? reply : reply.slice(0, fenceIndex);
+}
+
+/**
+ * Extracts the change summary from an assistant reply: the prose the persona
+ * writes AFTER the prompt block (its "CAMBIOS REALIZADOS" report). Used when
+ * finalizing an Editor session to persist, per version, what changed. Removes
+ * the prompt block robustly (so a prompt containing ``` never leaks into the
+ * summary), strips `**bold**`, and drops the boilerplate "SIN CAMBIOS" tail.
  * Returns null when there's nothing meaningful after the block.
  */
+export const SUMMARY_MAX_CHARS = 250;
+export const SUMMARY_MAX_BULLETS = 3;
+
+/** Keeps the summary small: at most 3 bullet lines and 250 characters, so the
+ *  Library shows tidy change notes instead of walls of text. Extra bullets are
+ *  dropped; an over-long result is truncated with an ellipsis. */
+export function capSummary(text: string): string {
+  const out: string[] = [];
+  let bullets = 0;
+  for (const line of text.split("\n")) {
+    if (/^\s*[-•*]/.test(line)) {
+      if (bullets >= SUMMARY_MAX_BULLETS) continue;
+      bullets++;
+    }
+    out.push(line);
+  }
+  const result = out.join("\n").trim();
+  return result.length > SUMMARY_MAX_CHARS
+    ? `${result.slice(0, SUMMARY_MAX_CHARS - 1).trimEnd()}…`
+    : result;
+}
+
 export function extractChangeSummary(reply: string): string | null {
-  const withoutBlock = reply.replace(/```[^\n]*\n[\s\S]*?```/, "").trim();
+  const loc = locatePromptBlock(reply);
+  const withoutBlock = (
+    loc ? reply.slice(0, loc.start) + reply.slice(loc.end) : reply
+  ).trim();
   if (!withoutBlock) return null;
   // Cut the trailing "SIN CAMBIOS ..." confirmation, keeping only real changes.
   const trimmed = withoutBlock.replace(/\n*\**\s*SIN CAMBIOS[\s\S]*$/i, "").trim();
-  const cleaned = (trimmed || withoutBlock).replace(/\*\*/g, "").trim();
+  const cleaned = capSummary((trimmed || withoutBlock).replace(/\*\*/g, "").trim());
   return cleaned.length > 0 ? cleaned : null;
 }

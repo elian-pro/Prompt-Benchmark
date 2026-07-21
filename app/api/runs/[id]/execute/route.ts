@@ -7,7 +7,7 @@ import {
   type RunMessageRole,
 } from "@/lib/db/runs";
 import { buildLeadSystemPrompt } from "@/lib/prompts/adversarial-personas";
-import { buildJudgeSystemPrompt, judgeReportSchema } from "@/lib/prompts/judge";
+import { buildJudgeSystemPrompt, formatJudgeInput, judgeReportSchema } from "@/lib/prompts/judge";
 import { getPromptOverride } from "@/lib/db/prompt-overrides";
 import { parseTurn, stripStageDirection } from "@/lib/adversarial-message";
 import { chat, type ChatMessage } from "@/lib/providers";
@@ -130,7 +130,7 @@ export async function POST(_req: NextRequest, { params }: Params) {
       return jsonError("La prueba ya fue ejecutada o está en curso.", 409);
     }
 
-    const leadPrompt = buildLeadSystemPrompt(run.preset, run.intensity);
+    const leadPrompt = buildLeadSystemPrompt(run.preset, run.intensity, run.lead_brief);
     // The judge persona may be overridden from Settings; absent → code default.
     const judgeOverride = await getPromptOverride("judge");
     const encoder = new TextEncoder();
@@ -190,7 +190,9 @@ export async function POST(_req: NextRequest, { params }: Params) {
             providerId: run.judge_config.provider_id,
             modelName: run.judge_config.model_name,
             systemPrompt: buildJudgeSystemPrompt(judgeOverride),
-            messages: [{ role: "user", content: formatTranscript(transcript) }],
+            messages: [
+              { role: "user", content: formatJudgeInput(run.prompt_snapshot, formatTranscript(transcript)) },
+            ],
             temperature: run.judge_config.temperature ?? undefined,
             topP: run.judge_config.top_p ?? undefined,
             maxTokens: run.judge_config.max_tokens ?? undefined,

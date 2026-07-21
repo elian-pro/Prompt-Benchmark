@@ -3,16 +3,31 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
-import { IconArrowLeft, IconArrowRight, IconPencil, IconSend, IconTrash } from "@tabler/icons-react";
+import {
+  IconArrowLeft,
+  IconArrowRight,
+  IconPencil,
+  IconSend,
+  IconTrash,
+  IconNotes,
+  IconCheck,
+  IconX,
+  IconRefresh,
+  IconGitBranch,
+} from "@tabler/icons-react";
 import type {
   DemoSessionDetail,
   DemoMessageRole,
   DemoMessageRow,
 } from "@/lib/db/demo-sessions";
 import type { DemoNoteRow } from "@/lib/db/demo-notes";
-import { parseTurn } from "@/lib/adversarial-message";
+import { parseTurn, parseTurnBubbles } from "@/lib/adversarial-message";
 import { relativeTimeEs } from "@/lib/format";
+import type { VersionListItem } from "@/lib/db/versions";
 import { Button } from "@/components/ui/Button";
+import { Modal } from "@/components/ui/Modal";
+import { SearchableChip } from "@/components/ui/SearchableChip";
+import { InfoHint } from "@/components/ui/InfoHint";
 
 /** Any special state with no readable message names itself explicitly,
  *  e.g. "El bot pasó a estado «humano» y dejó de responder." — this is
@@ -44,12 +59,23 @@ function Turn({
   onJumpToNote: (noteIndex: number) => void;
   registerRef: (id: string, el: HTMLDivElement | null) => void;
 }) {
-  const cls = role === "bot" ? "chat-assistant" : "chat-user";
-  const { message, state } = parseTurn(content);
+  const side = role === "bot" ? "turn-bot" : "turn-lead";
+  const roleLabel = role === "bot" ? "Bot del cliente" : "Tú (lead)";
+  const { messages, state, malformed } = parseTurnBubbles(content);
+  // Malformed = the reply looked like JSON but couldn't be parsed (e.g. broken
+  // envelope). Never dump raw braces as bubbles: show one clean error bubble
+  // so a bad prompt output is obvious without garbage on screen.
+  const bubbles = malformed
+    ? ["No se pudo leer la respuesta del bot (formato inesperado)."]
+    : messages.length > 0
+      ? messages
+      : [emptyBotMessage(state)];
+  const isEmpty = malformed || messages.length === 0;
+
   return (
     <div
       ref={(el) => registerRef(id, el)}
-      className={`chat-bubble ${cls}${selected ? " is-selected" : ""}${flashed ? " is-flashed" : ""}`}
+      className={`chat-turn ${side}${selected ? " is-selected" : ""}${flashed ? " is-flashed" : ""}`}
       onClick={() => onToggleSelect(id)}
       role="button"
       tabIndex={0}
@@ -78,16 +104,22 @@ function Turn({
           ))}
         </div>
       )}
-      <span className="chat-role">{role === "bot" ? "Bot del cliente" : "Tú (lead)"}</span>
-      <div className="chat-content">
-        {message ? message : <span className="chat-empty">{emptyBotMessage(state)}</span>}
-      </div>
-      {state && message && (
-        <div className="chat-state">
-          <span className="chat-state-label">Estado</span>
-          <span className="chat-state-value">{state}</span>
-        </div>
-      )}
+      <span className="chat-turn-role">{roleLabel}</span>
+      {bubbles.map((b, i) => {
+        const isLast = i === bubbles.length - 1;
+        return (
+          <div key={i} className={`chat-msg${malformed ? " chat-msg-error" : ""}`}>
+            <div className={`chat-content${isEmpty ? " chat-empty" : ""}`}>{b}</div>
+            {/* The estado hangs off the last bubble, WhatsApp-style. */}
+            {state && isLast && !isEmpty && (
+              <div className="chat-state">
+                <span className="chat-state-label">Estado</span>
+                <span className="chat-state-value">{state}</span>
+              </div>
+            )}
+          </div>
+        );
+      })}
     </div>
   );
 }
@@ -96,24 +128,28 @@ function Turn({
  *  never persisted yet, so it has no id and can't be tagged. */
 function PendingTurn({ content }: { content: string }) {
   return (
-    <div className="chat-bubble chat-user">
-      <span className="chat-role">Tú (lead)</span>
-      <div className="chat-content">{content}</div>
+    <div className="chat-turn turn-lead">
+      <span className="chat-turn-role">Tú (lead)</span>
+      <div className="chat-msg">
+        <div className="chat-content">{content}</div>
+      </div>
     </div>
   );
 }
 
 function TypingIndicator() {
   return (
-    <div className="chat-bubble chat-assistant">
-      <span className="chat-role">Bot del cliente</span>
-      <div className="chat-content chat-typing">
-        Escribiendo
-        <span className="typing-dots" aria-hidden="true">
-          <span />
-          <span />
-          <span />
-        </span>
+    <div className="chat-turn turn-bot">
+      <span className="chat-turn-role">Bot del cliente</span>
+      <div className="chat-msg">
+        <div className="chat-content chat-typing">
+          Escribiendo
+          <span className="typing-dots" aria-hidden="true">
+            <span />
+            <span />
+            <span />
+          </span>
+        </div>
       </div>
     </div>
   );
@@ -132,9 +168,11 @@ function NotesPanel({
   onCancelCompose,
   onSaveNote,
   onDeleteNote,
+  onToggleSelect,
   onJumpToMessage,
   registerNoteRef,
   flashNoteId,
+  currentMessageIds,
 }: {
   notes: DemoNoteRow[];
   selectedIds: string[];
@@ -148,24 +186,32 @@ function NotesPanel({
   onCancelCompose: () => void;
   onSaveNote: () => void;
   onDeleteNote: (id: string) => void;
+  onToggleSelect: (id: string) => void;
   onJumpToMessage: (id: string) => void;
   registerNoteRef: (id: string, el: HTMLDivElement | null) => void;
   flashNoteId: string | null;
+  currentMessageIds: Set<string>;
 }) {
   const isComposing = editingNoteId !== null || selectedIds.length > 0 || draftText.trim().length > 0;
 
   return (
-    <aside className="notes-panel">
-      <p className="section-label" style={{ marginBottom: 0 }}>
-        Notas
-      </p>
+    <aside className="notes-panel notes-card">
+      <div className="notes-header">
+        <p className="section-label" style={{ margin: 0 }}>
+          Notas
+        </p>
+        {notes.length > 0 && <span className="notes-count">{notes.length}</span>}
+      </div>
 
       <div className="notes-list">
         {notes.length === 0 && (
-          <p className="empty-hint">
-            Haz clic en uno o más mensajes para taggearlos, o escribe una nota general sin
-            seleccionar nada.
-          </p>
+          <div className="notes-empty">
+            <IconNotes size={22} stroke={1.5} />
+            <p>
+              Aún no hay notas. Haz clic en uno o más mensajes para taggearlos, o escribe una
+              nota general sin seleccionar nada.
+            </p>
+          </div>
         )}
         {notes.map((note, i) => (
           <div
@@ -204,14 +250,20 @@ function NotesPanel({
                   const { message } = parseTurn(m.content);
                   const text = message || "(sin mensaje)";
                   const preview = text.length > 60 ? `${text.slice(0, 60)}…` : text;
+                  // A ref to a message not in the current round: its preview
+                  // still resolves, but jumping to it in the chat can't (it's
+                  // not shown), so it's inert and marked.
+                  const olderRound = !currentMessageIds.has(mid);
                   return (
                     <button
                       key={mid}
                       type="button"
-                      className="note-ref"
-                      onClick={() => onJumpToMessage(mid)}
+                      className={`note-ref${olderRound ? " note-ref-stale" : ""}`}
+                      onClick={() => !olderRound && onJumpToMessage(mid)}
+                      title={olderRound ? "De una conversación anterior" : "Ir al mensaje"}
                     >
                       “{preview}”
+                      {olderRound && <span className="note-ref-tag">conversación anterior</span>}
                     </button>
                   );
                 })}
@@ -223,12 +275,46 @@ function NotesPanel({
         ))}
       </div>
 
-      <div className="note-composer">
-        {selectedIds.length > 0 && (
-          <p className="note-composer-hint">
-            {selectedIds.length} {selectedIds.length === 1 ? "mensaje seleccionado" : "mensajes seleccionados"}
+      <div className={`note-composer${isComposing ? " is-active" : ""}`}>
+        {isComposing && (
+          <p className="note-composer-title">
+            {editingNoteId ? "Editando nota" : "Nueva nota"}
           </p>
         )}
+
+        {/* The tagged bubbles show as soon as messages are selected, before
+            saving, so you see exactly what the note points at. */}
+        {selectedIds.length > 0 && (
+          <div className="note-refs">
+            {selectedIds.map((mid) => {
+              const m = messagesById.get(mid);
+              const { message } = m ? parseTurn(m.content) : { message: "" };
+              const text = message || "(sin mensaje)";
+              const preview = text.length > 60 ? `${text.slice(0, 60)}…` : text;
+              return (
+                <div key={mid} className="note-ref note-ref-draft">
+                  <button
+                    type="button"
+                    className="note-ref-quote"
+                    onClick={() => onJumpToMessage(mid)}
+                    title="Ir al mensaje"
+                  >
+                    “{preview}”
+                  </button>
+                  <button
+                    type="button"
+                    className="note-ref-remove"
+                    onClick={() => onToggleSelect(mid)}
+                    aria-label="Quitar este mensaje de la nota"
+                  >
+                    <IconX size={12} />
+                  </button>
+                </div>
+              );
+            })}
+          </div>
+        )}
+
         <textarea
           className="textarea"
           rows={3}
@@ -243,17 +329,25 @@ function NotesPanel({
         {noteError && <p className="form-error">{noteError}</p>}
         <div className="note-composer-actions">
           {isComposing && (
-            <button type="button" className="btn btn-ghost btn-sm" onClick={onCancelCompose}>
-              Cancelar
+            <button
+              type="button"
+              className="note-act-btn"
+              onClick={onCancelCompose}
+              aria-label="Cancelar nota"
+              title="Cancelar"
+            >
+              <IconX size={16} />
             </button>
           )}
           <button
             type="button"
-            className="btn btn-primary btn-sm"
+            className="note-act-btn note-act-save"
             onClick={onSaveNote}
             disabled={savingNote || !draftText.trim()}
+            aria-label={editingNoteId ? "Guardar cambios" : "Guardar nota"}
+            title={editingNoteId ? "Guardar cambios" : "Guardar nota"}
           >
-            {savingNote ? "Guardando…" : editingNoteId ? "Guardar cambios" : "Guardar nota"}
+            <IconCheck size={16} />
           </button>
         </div>
       </div>
@@ -283,14 +377,20 @@ export default function PlaygroundSessionPage() {
   const [flashNoteId, setFlashNoteId] = useState<string | null>(null);
   const [handingOff, setHandingOff] = useState(false);
   const [handoffError, setHandoffError] = useState<string | null>(null);
+  const [resetOpen, setResetOpen] = useState(false);
+  const [resetting, setResetting] = useState(false);
+  const [clientVersions, setClientVersions] = useState<VersionListItem[]>([]);
+  const [switchingVersion, setSwitchingVersion] = useState(false);
 
   const scrollRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const messageRefs = useRef<Record<string, HTMLDivElement | null>>({});
   const noteRefs = useRef<Record<string, HTMLDivElement | null>>({});
 
-  const load = useCallback(async () => {
-    setLoading(true);
+  const load = useCallback(async ({ silent = false }: { silent?: boolean } = {}) => {
+    // Only the first load blanks the screen; refreshes after a message / reset
+    // are silent so the conversation doesn't flash to a loading state.
+    if (!silent) setLoading(true);
     setError(null);
     try {
       const res = await fetch(`/api/demo-sessions/${id}`);
@@ -298,6 +398,13 @@ export default function PlaygroundSessionPage() {
       const data: DemoSessionDetail = await res.json();
       setSession(data);
       setNotes(data.notes);
+      // Load the client's versions for the switcher (best-effort).
+      if (data.client_id) {
+        fetch(`/api/clients/${data.client_id}/versions`)
+          .then((r) => (r.ok ? r.json() : []))
+          .then((rows: VersionListItem[]) => setClientVersions(rows))
+          .catch(() => setClientVersions([]));
+      }
     } catch (e) {
       setError(e instanceof Error ? e.message : "Error al cargar la conversación.");
     } finally {
@@ -315,9 +422,12 @@ export default function PlaygroundSessionPage() {
 
   const messagesById = useMemo(() => {
     const map = new Map<string, DemoMessageRow>();
+    // Older-round messages referenced by notes are resolved too, so their
+    // bubble previews survive a reset / version switch.
+    session?.note_messages?.forEach((m) => map.set(m.id, m));
     session?.messages.forEach((m) => map.set(m.id, m));
     return map;
-  }, [session?.messages]);
+  }, [session?.messages, session?.note_messages]);
 
   // Every message's pin numbers: which notes (1-indexed, in creation order)
   // reference it. A message can carry more than one pin.
@@ -442,7 +552,7 @@ export default function PlaygroundSessionPage() {
         body: JSON.stringify({ content }),
       });
       if (!res.ok) throw new Error((await res.json()).error ?? "No se pudo enviar el mensaje.");
-      await load();
+      await load({ silent: true });
     } catch (e) {
       setError(e instanceof Error ? e.message : "Error al enviar el mensaje.");
       setInput(content);
@@ -472,11 +582,53 @@ export default function PlaygroundSessionPage() {
     }
   }
 
+  // Starts a fresh round (keeps notes). Clears any in-progress composition
+  // since its selected messages leave the current view.
+  async function resetConversation() {
+    setResetting(true);
+    try {
+      const res = await fetch(`/api/demo-sessions/${id}/reset`, { method: "POST" });
+      if (!res.ok) throw new Error((await res.json()).error ?? "No se pudo reiniciar.");
+      setResetOpen(false);
+      cancelCompose();
+      await load({ silent: true });
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Error al reiniciar la conversación.");
+    } finally {
+      setResetting(false);
+    }
+  }
+
+  // Switches the version under test and starts a fresh round. Blocked (both
+  // here via the disabled control and on the server) once notes exist.
+  async function switchVersion(versionId: string) {
+    if (versionId === session?.version_id || switchingVersion) return;
+    setSwitchingVersion(true);
+    setError(null);
+    try {
+      const res = await fetch(`/api/demo-sessions/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ version_id: versionId }),
+      });
+      if (!res.ok) throw new Error((await res.json()).error ?? "No se pudo cambiar la versión.");
+      cancelCompose();
+      await load({ silent: true });
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Error al cambiar la versión.");
+    } finally {
+      setSwitchingVersion(false);
+    }
+  }
+
   if (loading) return <p className="empty-hint">Cargando…</p>;
   if (error && !session) return <p className="form-error">{error}</p>;
   if (!session) return <p className="empty-hint">Conversación no encontrada.</p>;
 
   const isActive = session.status === "active";
+  // Message ids visible in the current round, so a note referencing an older
+  // round can be flagged (its bubble preview still resolves via note_messages).
+  const currentMessageIds = new Set(session.messages.map((m) => m.id));
 
   return (
     <div>
@@ -486,13 +638,46 @@ export default function PlaygroundSessionPage() {
             <IconArrowLeft size={13} /> Playground
           </Link>
           <h1 className="detail-title">{session.client_name ?? "Cliente eliminado"}</h1>
-          <div className="detail-sub">
+          <div className="detail-sub playground-version-row">
+            {isActive && notes.length === 0 && clientVersions.length > 0 ? (
+              <SearchableChip
+                icon={<IconGitBranch size={13} />}
+                placeholder={session.version_number_snapshot}
+                searchPlaceholder="Buscar versión…"
+                items={clientVersions.map((v) => ({
+                  id: v.id,
+                  label: v.version_number,
+                  meta: v.is_production ? "Producción" : undefined,
+                }))}
+                value={session.version_id ?? ""}
+                onChange={switchVersion}
+                disabled={switchingVersion}
+                emptyText="Sin versiones."
+              />
+            ) : (
+              <span className="muted" style={{ fontSize: 12, display: "inline-flex", alignItems: "center", gap: 4 }}>
+                {session.version_number_snapshot}
+                {isActive && notes.length > 0 && (
+                  <InfoHint text="Para cambiar de versión, elimina las notas. Las notas están ligadas a la versión con la que las creaste." />
+                )}
+              </span>
+            )}
             <span className="muted" style={{ fontSize: 12 }}>
-              {session.version_number_snapshot} · {relativeTimeEs(session.created_at)}
+              · {relativeTimeEs(session.created_at)}
             </span>
           </div>
         </div>
         <div className="detail-actions">
+          {isActive && session.messages.length > 0 && (
+            <Button
+              variant="secondary"
+              icon={<IconRefresh size={14} />}
+              onClick={() => setResetOpen(true)}
+              disabled={resetting}
+            >
+              Reiniciar
+            </Button>
+          )}
           {session.status === "sent_to_editor" && session.editor_session_id ? (
             <Link
               href={`/editor/${session.editor_session_id}`}
@@ -606,11 +791,34 @@ export default function PlaygroundSessionPage() {
           onCancelCompose={cancelCompose}
           onSaveNote={saveNote}
           onDeleteNote={removeNote}
+          onToggleSelect={toggleSelect}
           onJumpToMessage={jumpToMessage}
           registerNoteRef={registerNoteRef}
           flashNoteId={flashNoteId}
+          currentMessageIds={currentMessageIds}
         />
       </div>
+
+      <Modal
+        open={resetOpen}
+        onClose={() => !resetting && setResetOpen(false)}
+        title="¿Reiniciar la conversación?"
+        footer={
+          <>
+            <Button variant="ghost" onClick={() => setResetOpen(false)} disabled={resetting}>
+              Cancelar
+            </Button>
+            <Button variant="primary" onClick={resetConversation} disabled={resetting}>
+              {resetting ? "Reiniciando…" : "Reiniciar"}
+            </Button>
+          </>
+        }
+      >
+        <p className="modal-body">
+          El chat empieza de cero. Tus notas se conservan (siguen visibles aunque no sean
+          de la conversación nueva). No se borra nada de forma permanente.
+        </p>
+      </Modal>
     </div>
   );
 }

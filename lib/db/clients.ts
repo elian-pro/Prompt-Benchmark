@@ -9,11 +9,13 @@
  * - 'archived'   → archived clients only.
  */
 import { getSupabase } from "../supabase";
-import { syncVersionLine } from "../version-utils";
+import { syncVersionMarkers } from "../version-utils";
 import { listVersions } from "./versions";
 import type { VersionListItem, Version, VersionSource } from "./versions";
 
 export type ClientFilter = "all" | "production" | "editing" | "legacy" | "archived";
+
+export type N8nHost = "zebra" | "own";
 
 export type Client = {
   id: string;
@@ -23,6 +25,11 @@ export type Client = {
   is_legacy: boolean;
   archived_at: string | null;
   draft_content: string | null;
+  /** Quick "where does this agent live" tag, independent of whether a full
+   *  n8n_bindings row (the detailed connection/workflow/node or manual label)
+   *  has been set up yet. Always set (mandatory at creation, defaults to
+   *  'zebra' for pre-existing rows). Drives the Library's yellow host tag. */
+  n8n_host: N8nHost;
   created_at: string;
   updated_at: string;
 };
@@ -33,7 +40,11 @@ export type ClientSummary = Client & {
   latest_version_created_at: string | null;
   latest_version_bump_type: "major" | "minor" | "imported" | null;
   production_version_number: string | null;
+  production_version_id: string | null;
   last_update_at: string;
+  /** True when a manual n8n binding hasn't confirmed the current production
+   *  version yet (see docs/N8N-SYNC-PLAN.md, "Pendiente de actualizar"). */
+  has_pending_n8n_deploy: boolean;
 };
 
 export type ClientDetail = Client & {
@@ -42,13 +53,14 @@ export type ClientDetail = Client & {
 };
 
 type NestedVersion = {
+  id: string;
   version_number: string;
   created_at: string;
   bump_type: "major" | "minor" | "imported" | null;
   is_production: boolean;
 };
 
-function toSummary(row: any): ClientSummary {
+function toSummary(row: any, pendingClientIds: Set<string>): ClientSummary {
   const versions: NestedVersion[] = row.versions ?? [];
   const sorted = [...versions].sort((a, b) => b.created_at.localeCompare(a.created_at));
   const latest = sorted[0] ?? null;
@@ -61,8 +73,44 @@ function toSummary(row: any): ClientSummary {
     latest_version_created_at: latest?.created_at ?? null,
     latest_version_bump_type: latest?.bump_type ?? null,
     production_version_number: production?.version_number ?? null,
+    production_version_id: production?.id ?? null,
     last_update_at: latest?.created_at ?? row.updated_at,
+    has_pending_n8n_deploy: pendingClientIds.has(row.id),
   };
+}
+
+/**
+ * Client ids with at least one enabled manual n8n binding that hasn't
+ * confirmed the client's current production version. One query for the
+ * whole list (not per-client) to keep listClients cheap.
+ */
+async function pendingN8nDeployClientIds(clientIds: string[]): Promise<Set<string>> {
+  if (clientIds.length === 0) return new Set();
+  const sb = getSupabase();
+
+  const [{ data: bindings, error: bErr }, { data: prodVersions, error: vErr }] = await Promise.all([
+    sb
+      .from("n8n_bindings")
+      .select("client_id, last_deployed_version_id")
+      .eq("mode", "manual")
+      .eq("sync_enabled", true)
+      .in("client_id", clientIds),
+    sb
+      .from("versions")
+      .select("client_id, id")
+      .eq("is_production", true)
+      .in("client_id", clientIds),
+  ]);
+  if (bErr) throw new Error(`No se pudieron calcular los despliegues pendientes: ${bErr.message}`);
+  if (vErr) throw new Error(`No se pudieron calcular los despliegues pendientes: ${vErr.message}`);
+
+  const prodByClient = new Map((prodVersions ?? []).map((v: any) => [v.client_id, v.id]));
+  const pending = new Set<string>();
+  for (const b of bindings ?? []) {
+    const prodId = prodByClient.get(b.client_id as string);
+    if (prodId && b.last_deployed_version_id !== prodId) pending.add(b.client_id as string);
+  }
+  return pending;
 }
 
 export async function listClients({
@@ -75,7 +123,7 @@ export async function listClients({
   const sb = getSupabase();
   let query = sb
     .from("clients")
-    .select("*, versions(version_number, created_at, bump_type, is_production)");
+    .select("*, versions(id, version_number, created_at, bump_type, is_production)");
 
   if (filter === "archived") {
     query = query.not("archived_at", "is", null);
@@ -97,7 +145,8 @@ export async function listClients({
   const { data, error } = await query;
   if (error) throw new Error(`No se pudieron listar los clientes: ${error.message}`);
 
-  let rows = (data ?? []).map(toSummary);
+  const pendingIds = await pendingN8nDeployClientIds((data ?? []).map((r: any) => r.id));
+  let rows = (data ?? []).map((row: any) => toSummary(row, pendingIds));
   if (filter === "production") {
     rows = rows.filter((r) => r.production_version_number !== null);
   } else if (filter === "editing") {
@@ -152,6 +201,11 @@ export async function createClient(input: {
     source: VersionSource;
     sourceSessionId?: string | null;
   };
+  // Where the agent's n8n lives. Required from the "Nuevo cliente" / "Importar
+  // existente" modals (see createClientSchema); omitted here it falls back to
+  // the DB default ('zebra'), which covers callers that don't ask (e.g. the
+  // Creator finalize flow).
+  n8nHost?: N8nHost;
 }): Promise<{ client: Client; version: Version | null }> {
   const sb = getSupabase();
   const { data: client, error } = await sb
@@ -160,6 +214,7 @@ export async function createClient(input: {
       name: input.name,
       segment: input.segment ?? null,
       notes: input.notes ?? null,
+      ...(input.n8nHost ? { n8n_host: input.n8nHost } : {}),
     })
     .select("*")
     .single();
@@ -172,16 +227,16 @@ export async function createClient(input: {
 
   // Seed v1.0 directly (not via createVersion, which always bumps). Not
   // production — a brand-new client is "en edición" until promoted.
-  // Only sync the version line when there's real content (Creator's
+  // Only sync the version markers when there's real content (Creator's
   // finalize) — leave the plain empty default seed untouched so "no draft
-  // yet" stays truly empty rather than gaining a stray "Versión: 1.0" line.
+  // yet" stays truly empty rather than gaining a stray version token.
   const seedContent = input.initialVersion?.content ?? "";
   const { data: version, error: vErr } = await sb
     .from("versions")
     .insert({
       client_id: (client as Client).id,
       version_number: "v1.0",
-      content: seedContent ? syncVersionLine(seedContent, "v1.0") : seedContent,
+      content: seedContent ? syncVersionMarkers(seedContent, "v1.0") : seedContent,
       is_production: false,
       bump_type: null,
       source: input.initialVersion?.source ?? "manual",
@@ -201,6 +256,7 @@ export async function updateClient(
     segment?: string | null;
     notes?: string | null;
     draft_content?: string | null;
+    n8n_host?: N8nHost;
   },
 ): Promise<Client> {
   const sb = getSupabase();
@@ -209,6 +265,7 @@ export async function updateClient(
   if (input.segment !== undefined) patch.segment = input.segment;
   if (input.notes !== undefined) patch.notes = input.notes;
   if (input.draft_content !== undefined) patch.draft_content = input.draft_content;
+  if (input.n8n_host !== undefined) patch.n8n_host = input.n8n_host;
 
   const { data, error } = await sb
     .from("clients")

@@ -1,10 +1,12 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { IconPlus, IconServer } from "@tabler/icons-react";
+import { IconPlus, IconServer, IconPlugConnected } from "@tabler/icons-react";
 import type { MaskedProvider } from "@/lib/db/providers";
 import type { RoleDefault } from "@/lib/db/role-defaults";
 import type { PromptOverride } from "@/lib/db/prompt-overrides";
+import type { MaskedConnection } from "@/lib/db/n8n-connections";
+import type { ComposerSettings } from "@/lib/db/composer-settings";
 import { Button } from "@/components/ui/Button";
 import { CollapsibleCard } from "@/components/ui/CollapsibleCard";
 import { EmptyState } from "@/components/ui/EmptyState";
@@ -14,6 +16,9 @@ import { ProviderFormModal } from "@/components/settings/ProviderFormModal";
 import { ProviderRow } from "@/components/settings/ProviderRow";
 import { RoleAssignments } from "@/components/settings/RoleAssignments";
 import { SystemPromptCard } from "@/components/settings/SystemPromptCard";
+import { N8nConnectionRow } from "@/components/settings/N8nConnectionRow";
+import { N8nConnectionFormModal } from "@/components/settings/N8nConnectionFormModal";
+import { ComposerSettingsCard } from "@/components/settings/ComposerSettingsCard";
 import { EDITOR_PERSONA } from "@/lib/prompts/editor-persona";
 import { CREATOR_PERSONA } from "@/lib/prompts/creator-persona";
 import { buildJudgeSystemPrompt } from "@/lib/prompts/judge";
@@ -22,6 +27,8 @@ export default function SettingsPage() {
   const [providers, setProviders] = useState<MaskedProvider[]>([]);
   const [roleDefaults, setRoleDefaults] = useState<RoleDefault[]>([]);
   const [overrides, setOverrides] = useState<Record<string, string>>({});
+  const [connections, setConnections] = useState<MaskedConnection[]>([]);
+  const [composerSettings, setComposerSettings] = useState<ComposerSettings | null>(null);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
 
@@ -29,6 +36,11 @@ export default function SettingsPage() {
   const [editing, setEditing] = useState<MaskedProvider | null>(null);
 
   const [deleteTarget, setDeleteTarget] = useState<MaskedProvider | null>(null);
+
+  const [connFormOpen, setConnFormOpen] = useState(false);
+  const [connEditing, setConnEditing] = useState<MaskedConnection | null>(null);
+  const [connDeleteTarget, setConnDeleteTarget] = useState<MaskedConnection | null>(null);
+
   const [toast, setToast] = useState<string | null>(null);
 
   function showToast(message: string) {
@@ -40,20 +52,28 @@ export default function SettingsPage() {
     setLoading(true);
     setLoadError(null);
     try {
-      const [pRes, rRes, oRes] = await Promise.all([
+      const [pRes, rRes, oRes, cRes, csRes] = await Promise.all([
         fetch("/api/providers"),
         fetch("/api/role-defaults"),
         fetch("/api/prompt-overrides"),
+        fetch("/api/integrations/n8n"),
+        fetch("/api/composer-settings"),
       ]);
       if (!pRes.ok) throw new Error((await pRes.json()).error ?? "Error al cargar proveedores.");
       if (!rRes.ok) throw new Error((await rRes.json()).error ?? "Error al cargar roles.");
       if (!oRes.ok) throw new Error((await oRes.json()).error ?? "Error al cargar los prompts.");
+      if (!cRes.ok) throw new Error((await cRes.json()).error ?? "Error al cargar las conexiones n8n.");
+      if (!csRes.ok) {
+        throw new Error((await csRes.json()).error ?? "Error al cargar Smart Paste.");
+      }
       setProviders(await pRes.json());
       setRoleDefaults(await rRes.json());
       const overrideRows: PromptOverride[] = await oRes.json();
       setOverrides(
         Object.fromEntries(overrideRows.map((o) => [o.role, o.content])),
       );
+      setConnections(await cRes.json());
+      setComposerSettings(await csRes.json());
     } catch (e) {
       setLoadError(e instanceof Error ? e.message : "Error al cargar los datos.");
     } finally {
@@ -82,6 +102,26 @@ export default function SettingsPage() {
       throw new Error(data.error ?? "No se pudo eliminar el proveedor.");
     }
     setDeleteTarget(null);
+    load();
+  }
+
+  function openConnCreate() {
+    setConnEditing(null);
+    setConnFormOpen(true);
+  }
+
+  function openConnEdit(connection: MaskedConnection) {
+    setConnEditing(connection);
+    setConnFormOpen(true);
+  }
+
+  async function confirmConnDelete(target: MaskedConnection) {
+    const res = await fetch(`/api/integrations/n8n/${target.id}`, { method: "DELETE" });
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}));
+      throw new Error(data.error ?? "No se pudo eliminar la conexión.");
+    }
+    setConnDeleteTarget(null);
     load();
   }
 
@@ -139,6 +179,54 @@ export default function SettingsPage() {
         </div>
       </CollapsibleCard>
 
+      <CollapsibleCard
+        title="Conexiones n8n"
+        hint={
+          loading
+            ? undefined
+            : `${connections.length} ${connections.length === 1 ? "conexión" : "conexiones"}`
+        }
+        actions={
+          <Button
+            variant="secondary"
+            icon={<IconPlus size={14} />}
+            onClick={openConnCreate}
+          >
+            Agregar conexión
+          </Button>
+        }
+      >
+        {loading && <SkeletonRows count={2} />}
+
+        {!loading && !loadError && connections.length === 0 && (
+          <EmptyState
+            icon={<IconPlugConnected size={32} stroke={1.5} />}
+            title="No hay conexiones n8n todavía"
+            description="Conecta una instancia de n8n para sincronizar prompts al promover a producción. Genera la API key en n8n: Ajustes → n8n API."
+            action={
+              <Button
+                variant="primary"
+                icon={<IconPlus size={14} />}
+                onClick={openConnCreate}
+              >
+                Agregar conexión
+              </Button>
+            }
+          />
+        )}
+
+        <div className="provider-list">
+          {connections.map((c) => (
+            <N8nConnectionRow
+              key={c.id}
+              connection={c}
+              onEdit={openConnEdit}
+              onDelete={(conn) => setConnDeleteTarget(conn)}
+            />
+          ))}
+        </div>
+      </CollapsibleCard>
+
       <CollapsibleCard title="Asignación de roles">
         {loading && <SkeletonRows count={3} />}
         {!loading && !loadError && (
@@ -149,6 +237,14 @@ export default function SettingsPage() {
           />
         )}
       </CollapsibleCard>
+
+      {!loading && !loadError && composerSettings && (
+        <ComposerSettingsCard
+          settings={composerSettings}
+          onSaved={setComposerSettings}
+          onToast={showToast}
+        />
+      )}
 
       <p className="section-label settings-group-label">System prompts</p>
 
@@ -205,6 +301,32 @@ export default function SettingsPage() {
             "Esta acción no se puede deshacer.",
           ]}
           confirmPhrase={deleteTarget.name}
+        />
+      )}
+
+      {connFormOpen && (
+        <N8nConnectionFormModal
+          open={connFormOpen}
+          connection={connEditing}
+          onClose={() => setConnFormOpen(false)}
+          onSaved={load}
+        />
+      )}
+
+      {connDeleteTarget && (
+        <DangerConfirmModal
+          onClose={() => setConnDeleteTarget(null)}
+          onConfirm={() => confirmConnDelete(connDeleteTarget)}
+          warning={{
+            title: `¿Eliminar "${connDeleteTarget.name}"?`,
+            body: "Se eliminará la conexión y su API key. Los clientes vinculados a ella deben desvincularse primero.",
+          }}
+          consequences={[
+            "Se eliminará la conexión y su API key.",
+            "Tendrás que volver a pegar la clave si la agregas de nuevo.",
+            "Esta acción no se puede deshacer.",
+          ]}
+          confirmPhrase={connDeleteTarget.name}
         />
       )}
 

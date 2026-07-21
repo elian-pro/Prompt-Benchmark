@@ -20,7 +20,7 @@ export const createVersionSchema = z
       .optional(),
     // Optional user-written "what changed" for manual saves — shown per
     // version in the Library. Empty/whitespace is treated as none.
-    changeSummary: z.string().max(4000, "El resumen es demasiado largo.").optional(),
+    changeSummary: z.string().max(280, "El resumen es demasiado largo (máx. 250).").optional(),
   })
   .refine((v) => v.bumpType !== "imported" || Boolean(v.versionNumberOverride), {
     message: "Una versión importada requiere version_number (vX.Y).",

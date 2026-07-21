@@ -3,6 +3,9 @@ import { ZodError } from "zod";
 import { ProviderInUseError } from "./db/providers";
 import { UnsupportedFileError } from "./db/uploads";
 import { RoleNotConfiguredError } from "./db/runs";
+import { ConnectionInUseError } from "./db/n8n-connections";
+import { N8nApiError } from "./n8n/client";
+import { VersionSwitchBlockedError } from "./db/demo-sessions";
 
 /** JSON error envelope. Messages are in Spanish (user-facing). */
 export function jsonError(message: string, status: number) {
@@ -30,6 +33,16 @@ export function handleError(err: unknown) {
   }
   if (err instanceof ProviderInUseError) {
     return jsonError(err.message, 409);
+  }
+  if (err instanceof ConnectionInUseError) {
+    return jsonError(err.message, 409);
+  }
+  if (err instanceof VersionSwitchBlockedError) {
+    return jsonError(err.message, 409);
+  }
+  if (err instanceof N8nApiError) {
+    // 502: the failure is upstream in n8n, not in our request handling.
+    return jsonError(err.message, 502);
   }
   if (err instanceof SyntaxError) {
     return jsonError("El cuerpo de la petición no es JSON válido.", 400);

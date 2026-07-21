@@ -5,6 +5,7 @@ import {
   listVersions,
   deleteVersion,
   updateVersionSummary,
+  updateVersionNumber,
 } from "@/lib/db/versions";
 import { handleError, jsonError } from "@/lib/http";
 
@@ -12,9 +13,17 @@ export const dynamic = "force-dynamic";
 
 type Params = { params: Promise<{ id: string }> };
 
-const updateVersionSchema = z.object({
-  changeSummary: z.string().max(4000, "El resumen es demasiado largo.").nullable(),
-});
+const updateVersionSchema = z
+  .object({
+    changeSummary: z.string().max(280, "El resumen es demasiado largo (máx. 250).").nullable().optional(),
+    versionNumber: z
+      .string()
+      .regex(/^v\d+\.\d+$/, "El número debe tener formato vX.Y (p. ej. v2.5).")
+      .optional(),
+  })
+  .refine((v) => v.changeSummary !== undefined || v.versionNumber !== undefined, {
+    message: "No se enviaron campos para actualizar.",
+  });
 
 export async function GET(_req: NextRequest, { params }: Params) {
   try {
@@ -32,8 +41,11 @@ export async function PATCH(req: NextRequest, { params }: Params) {
     const { id } = await params;
     const version = await getVersion(id);
     if (!version) return jsonError("Versión no encontrada.", 404);
-    const { changeSummary } = updateVersionSchema.parse(await req.json());
-    const trimmed = changeSummary?.trim() || null;
+    const input = updateVersionSchema.parse(await req.json());
+    if (input.versionNumber !== undefined) {
+      return NextResponse.json(await updateVersionNumber(id, input.versionNumber));
+    }
+    const trimmed = input.changeSummary?.trim() || null;
     return NextResponse.json(await updateVersionSummary(id, trimmed));
   } catch (err) {
     return handleError(err);

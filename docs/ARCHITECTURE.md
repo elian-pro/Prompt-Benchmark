@@ -5,7 +5,9 @@
 - **Framework**: Next.js 14+ (App Router), TypeScript strict mode.
 - **Database**: Supabase Postgres.
 - **Storage**: Supabase Storage (private bucket `studio-uploads`).
-- **Auth**: HTTP Basic Auth via EasyPanel reverse proxy. NO Supabase Auth.
+- **Auth**: in-app "Entrar con Google" restricted to the company domain
+  (Sprint 10), talking to Google directly with an app-signed session cookie.
+  NO Supabase Auth. Replaced the earlier EasyPanel HTTP Basic Auth.
 - **LLM access**: server-side only, via API routes in `/app/api`.
 - **Deployment**: VPS via EasyPanel.
 
@@ -30,10 +32,13 @@
     /page.tsx                  providers + role defaults
   /api/
     /clients/                  CRUD clients
+      /[id]/n8n-bindings/      create/list/delete deploy targets, confirm manual, status (drift)
+      /[id]/n8n-sync/          preview + push to n8n, history, revert
     /versions/                 create version, promote
     /chat-sessions/            editor and creator chats
     /runs/                     adversarial lab
     /providers/                settings, models
+    /integrations/n8n/         connections CRUD, test, list workflows/agents (picker)
     /uploads/                  file upload to Storage
     /role-defaults/            per-role model assignment
 
@@ -46,27 +51,37 @@
     /anthropic.ts              Anthropic native adapter
     /google.ts                 Gemini native adapter
     /openrouter.ts             OpenRouter adapter (wraps openai-compat)
+  /n8n/
+    /client.ts                 REST client for the n8n public API, scoped to one connection
+    /agent-node.ts             read/write an AI Agent node's systemMessage, locate by id/name
+    /sync.ts                   push, drift check (checkDrift), revert (revertPush)
   /db/
     /clients.ts                data access for clients
     /versions.ts               data access for versions
     /chat-sessions.ts
     /runs.ts
     /providers.ts
+    /n8n-connections.ts        n8n instances (encrypted API keys)
+    /n8n-bindings.ts           client deploy targets (API or manual mode)
+    /n8n-sync-events.ts        push/rollback/manual-confirm audit log
   /presets.ts                  adversarial personas (5)
   /failure-modes.ts            judge taxonomy (8 categories)
   /version-utils.ts            bump, compare, diff
 
 /components
   /ui/                         primitives: Button, Card, Modal, Input, Badge
-  /library/                    ClientCard, NewBadge, VersionList, ImportModal
+  /library/                    ClientCard, NewBadge, VersionList, ImportModal,
+                                N8nBindingModal, N8nDeploymentCard, N8nSyncModal, N8nSyncHistory
   /editor/                     ChatMessage, FileUpload, FinalizeButton
   /creator/                    similar
   /adversarial/                ConversationView, ReportCard
+  /settings/                   ..., N8nConnectionFormModal, N8nConnectionRow
 
 /supabase
   /migrations/
     /001_initial.sql           deployed; never edit
-    /002_*.sql                 future migrations
+    /011_n8n_sync.sql          n8n_connections, n8n_bindings, n8n_sync_events
+    /0NN_*.sql                 future migrations
 ```
 
 ## Multi-provider adapter pattern
@@ -115,10 +130,19 @@ adapter type = a new file in `lib/providers/` + new dispatch case.
 
 - Versions stored in `versions` table, one row per version.
 - `version_number` is a text field formatted `vMAJOR.MINOR`.
-- **Minor bump** (`v3.0 → v3.1`) on every "Finalizar edición". Happens
-  whether the edit was manual or via Editor chat. At `.9` the minor rolls
-  over to the next integer (`v2.9 → v3.0`), so the minor never passes one
-  digit.
+- **Minor bump** (`v3.0 → v3.1`) is the default on every "Finalizar
+  edición". Happens whether the edit was manual or via Editor chat. At `.9`
+  the minor rolls over to the next integer (`v2.9 → v3.0`), so the minor
+  never passes one digit.
+- **Manual version numbers.** The auto-bump is only a default: the finalize
+  modal exposes an editable `vX.Y` field, and an existing version's number
+  can be renamed inline in the Library sidebar
+  (`PATCH /api/versions/[id]` with `versionNumber`, or
+  `versionNumberOverride` on create). Added for beta, when prompts are often
+  updated outside the app and the number has to be set by hand.
+  `createVersion()` honors an explicit override for any bump type;
+  `updateVersionNumber()` renames a row and re-syncs its markers (below).
+  No uniqueness is enforced on `(client_id, version_number)`.
 - **"Promover a producción" does not create a version.** It only moves the
   `is_production` tag to the client's latest version (unmarking any other).
   The old behavior (a major bump creating `v(X+1).0`) was dropped — the
@@ -139,18 +163,21 @@ adapter type = a new file in `lib/providers/` + new dispatch case.
   Creator's first version are null (the UI shows "Primera versión" for the
   oldest, a neutral placeholder otherwise).
 - **The prompt's own text is kept in sync with its version number.**
-  `syncVersionLine()` (`lib/version-utils.ts`) deterministically rewrites a
-  dedicated `"Versión: X.Y"` declaration line inside `content` to match the
-  `version_number` being saved — via regex, never via the model (the Editor
-  persona is explicitly forbidden from touching version text). If no such
-  line exists, one is inserted (after a leading `# ` title if present,
-  otherwise at the very top). This runs in `createVersion()` (Editor
-  finalize, manual Library edit, imports) and in `createClient()`'s seed
-  insert when it carries real content (Creator finalize) — so a prompt
-  copied out of the app for n8n is always identifiable by version without
-  needing the Studio. A line embedded inside a longer sentence (e.g. a
-  closing "FIN DEL PROMPT ... v1.4" footer) is left alone — only a line
-  dedicated to the declaration is ever rewritten.
+  `syncVersionMarkers()` (`lib/version-utils.ts`) deterministically edits the
+  content (string ops, never the model, since the Editor persona is forbidden
+  from touching version text) so a prompt copied out for n8n is always
+  identifiable by version. Given the number being saved it: (1) rewrites the
+  `vX.Y` token in the title (the first heading), or appends ` vX.Y` if the
+  title has none; (2) removes the old dedicated `"Versión: X.Y"` line, which
+  the team dropped in favor of the title token; (3) regenerates a closing
+  footer mirroring the title with a `FIN DEL ` prefix, e.g.
+  `# FIN DEL PROMPT ... v1.4`, as the last line. So the title carries the
+  version and a matching footer bookends the prompt. Idempotent. A prompt
+  with no heading at all (a corner case) gets a bare `vX.Y` line at the top
+  and no footer. This runs in `createVersion()` (Editor finalize, manual
+  Library edit, imports), `updateVersionNumber()` (inline rename), and
+  `createClient()`'s seed insert when it carries real content (Creator
+  finalize).
 
 ## Editable system prompts
 
@@ -171,6 +198,44 @@ from **Settings → System prompts**.
   prompt). The judge has no dynamic part, so its override is used verbatim.
 - "Restaurar original" deletes the row (`DELETE /api/prompt-overrides/:role`).
 
+## Editor output contract
+
+The Editor persona returns the full updated prompt plus a change summary. The
+prompt is delimited by TEXT sentinels, not a Markdown code fence:
+
+```
+===PROMPT ACTUALIZADO===
+<full prompt, may itself contain ```json blocks>
+===FIN DEL PROMPT===
+
+**CAMBIOS REALIZADOS:**
+- exactly 3 short bullets
+```
+
+Why sentinels (Sprint 9): client prompts contain their own ` ``` ` fenced
+blocks (bot output-format examples). The old contract wrapped the prompt in a
+single ` ``` ` block, and a non-greedy extractor stopped at the first inner
+fence, truncating the prompt and leaking the rest into the chat, the change
+summary, and the saved draft. Text sentinels can't appear in a real prompt, so
+inner fences are safe.
+
+All extraction lives in `lib/prompts/editor-persona.ts`, shared by the server
+(`messages/route.ts`, `finalize/route.ts`) and the chat renderer
+(`ChatMessage.tsx`) so there is ONE implementation, not drifting copies:
+- `locatePromptBlock` (private): sentinel-first; a GREEDY outer-fence fallback
+  handles legacy ` ``` `-wrapped replies (spans first fence to last, capturing
+  inner fences). A reply containing PROMPT_START is matched by sentinels only,
+  so a half-streamed reply never mis-triggers on the prompt's inner fences.
+- `extractPromptFromReply`, `splitPromptBlock`, `replacePromptBlock`,
+  `hasUnclosedPromptBlock`, `extractChangeSummary` build on it.
+- `capSummary` keeps the change summary to 3 bullets and 250 chars.
+
+Version display: when an Editor turn produces a draft, the route stamps it with
+the version it will become on finalize (`syncVersionMarkers` to the next minor
+bump) and rewrites the stored assistant message the same way
+(`replacePromptBlock`), so the chat card and the drawer show the same target
+version. The DB's latest version is unchanged until finalize, so no double bump.
+
 ## Adversarial run snapshots
 
 When an Adversarial Lab run is created, the run row stores:
@@ -180,6 +245,209 @@ When an Adversarial Lab run is created, the run row stores:
 This means even if the source version is later auto-deleted by the
 5-version limit, the run report remains fully legible. The FK
 `runs.version_id` uses `ON DELETE SET NULL`.
+
+Since Sprint 11 (`013_add_lead_brief_to_runs.sql`) a run can also carry
+`lead_brief`, an optional short situation for the adversarial lead (e.g.
+"Eres un empresario, tienes un presupuesto de 20mdp y quieres una casa"),
+appended to `buildLeadSystemPrompt`'s output. It is never derived from
+`prompt_snapshot`: the lead still doesn't see the bot's own rules, it just
+gets concrete facts to answer profiling questions with instead of
+improvising something incoherent. Also since Sprint 11, the judge receives
+`prompt_snapshot` alongside the transcript (`formatJudgeInput` in
+`lib/prompts/judge.ts`), labeled as reference instructions, so hallucination
+and scope-failure findings are checked against what the agent was actually
+told to do rather than inferred from the conversation alone.
+
+## Smart Paste
+
+Sprint 15 (`016_composer_settings.sql`). `composer_settings` is a singleton
+table (`id boolean primary key default true check (id)`, one seeded row):
+`smart_paste_enabled` and `smart_paste_threshold` (int, 200-10000, default
+1000). It's a single shared row for the whole team, not per-user, since this
+app has no per-user accounts (see CLAUDE.md). `lib/db/composer-settings.ts`
+reads/writes it; `GET`/`PATCH /api/composer-settings` expose it;
+`ComposerSettingsCard` (Settings) edits it, clamping an out-of-range typed
+value to the nearest limit on blur with a toast, rather than blocking save.
+
+The composer (`SessionChat.tsx`, shared by Editor and Creator) fetches the
+setting once on mount and wires an `onPaste` handler on the message textarea
+(NOT the separate manual-draft-edit textarea, which Smart Paste doesn't
+touch). Below the threshold, `preventDefault()` is never called and the
+browser's normal paste goes through untouched. At or above it, the pasted
+text is synthesized into an in-memory `File` (`text/plain`, named
+`"Texto pegado N.txt"`) and pushed through the *exact same* upload pipeline
+as a manually attached file (`uploadAttachment()` → `POST /api/uploads` →
+Supabase Storage bucket `studio-uploads`, same 7-day TTL): no new backend
+path. `lib/smart-paste.ts`'s `nextPasteName()` computes N by scanning every
+filename already used in the conversation (sent messages' attachments plus
+the pending ones still in the composer), so numbers are never reused even
+after a paste is removed.
+
+The chip UI (`FileUpload.tsx`) only gets the extra "expand to preview" /
+"convertir a texto plano" actions for chips created this way; a client-only
+map (`SessionChat`'s `smartPasteText`, keyed by `uploadId`) holds the
+original text so those actions don't need to re-download anything. This map
+only ever covers *pending* (not-yet-sent) attachments: once a message is
+sent, its attachments render through the existing static
+`ChatMessage.tsx` chip, unchanged. Reverting re-inserts the text at the
+composer's cursor position and best-effort deletes the upload, mirroring a
+normal remove plus a normal paste.
+
+## n8n host tag
+
+Sprint 13 (`014_add_n8n_host_to_clients.sql`). `clients.n8n_host` is a plain
+`'zebra' | 'own'` column, not null, default `'zebra'` (existing rows
+backfilled: per docs/SPEC.md, most clients already live in Zebra's own n8n).
+
+It is deliberately a separate, always-set field rather than being derived
+from `n8n_bindings.mode`: a client's detailed binding (connection + workflow
++ node for `mode='api'`, or a free-text label for `mode='manual'`) is an
+optional step that can be configured later or skipped, but the Library's
+yellow host tag must never be missing. `createClientSchema` makes `n8nHost`
+required, so both "+ Nuevo cliente" and "+ Importar existente" (the only two
+callers of `POST /api/clients`) always ask; the `PATCH /api/clients/:id`
+route accepts `n8n_host` too, editable any time from a click on the tag in
+the client detail page. Callers that don't go through those two modals (the
+Creator's `finalize` flow, which calls `createClient()` directly) fall back
+to the DB default instead of being forced to ask.
+
+## Playground conversation rounds
+
+Sprint 8 (`012_playground_rounds.sql`). A Playground session can be reset or
+have its version switched without losing notes. Instead of deleting messages
+(which would leave `demo_notes.message_ids` dangling), the conversation is
+versioned into rounds:
+
+- `demo_sessions.current_round` is the active round. Reset bumps it;
+  switching version bumps it too (fresh comparison). `demo_messages.round`
+  tags each message; `demo_messages.version_number_snapshot` records which
+  version produced it.
+- `getSession()` returns only the current round's messages for the chat, plus
+  `note_messages`: the rows any note references that live in an older round,
+  so a note's bubble preview keeps resolving. Old rounds are never deleted.
+- Notes are session-scoped, not round-scoped, so they persist across resets.
+  A note referencing an older round is shown but its "jump to message" is
+  inert (that message isn't in the current view).
+- Switching version is refused server-side once the session has any notes
+  (`VersionSwitchBlockedError` → 409); the UI locks the picker with an "i"
+  hint. This keeps every note attributable to a single version without
+  tracking version per note.
+
+Display: `parseTurnBubbles()` (`lib/adversarial-message.ts`) splits a turn's
+readable text into WhatsApp-style bubbles (one per line break / `mensajes`
+array item); the Playground renders the stack with the estado on the last
+bubble. Tagging stays at the turn (message row) level.
+
+**Opening message (Sprint 14, `015_add_opening_message_to_demo_sessions.sql`).**
+`demo_sessions.opening_message` is an optional plain-text bot greeting, set
+when the session is created. It bypasses the LLM entirely: `seedOpeningMessage()`
+inserts it directly as the round's turn 1 `bot` message (role/content only,
+no `chat()` call), so it renders through the normal bubble-splitting path
+like any other bot turn. Shared by `createSession`, `resetSession` and
+`updateSessionVersion`, the three places that start a fresh round, so the
+greeting reappears every time the chat "starts from zero", not just once at
+creation.
+
+## n8n prompt sync
+
+Sprint 7. "Promover a producción" can also deploy the prompt straight into
+the n8n workflow node it lives in, so pasting it by hand becomes optional
+instead of the only path. Schema in `011_n8n_sync.sql`; the client-facing
+plan (context, rejected alternatives, open decisions) is
+`docs/N8N-SYNC-PLAN.md`.
+
+**Structural facts this design relies on**: every client prompt lives in a
+node of type `@n8n/n8n-nodes-langchain.agent`, in
+`parameters.options.systemMessage`. A workflow can hold more than one AI
+Agent node, so the app never guesses which one belongs to a client, the
+user picks the workflow and the specific node when binding.
+
+**Three tables**, all in `011_n8n_sync.sql`:
+- `n8n_connections`: reachable n8n instances (base URL + encrypted API
+  key). Zebra's own instance is one row; a client's instance can be added
+  the same way if they ever share credentials. Multi-instance from the
+  first migration, not bolted on later.
+- `n8n_bindings`: a client's deploy targets, one row per target. Two
+  modes, enforced by a `check` constraint:
+  - `mode = 'api'`: `connection_id` + `workflow_id` + `node_id` (the
+    node's stable n8n id, `node_name` cached for a name-fallback lookup
+    and for display). Deployed by the app.
+  - `mode = 'manual'`: just `manual_label` (free text, e.g. "n8n de
+    Kuyabeh, flujo WhatsApp"). Deployed by a human, outside the app,
+    because the app has no credentials for that instance.
+  - Both modes share `last_deployed_version_id` and `last_deployed_at`:
+    written by a successful push (api) or by "Marcar como actualizado"
+    (manual). This is the one field the "pending deploy" reminder reads:
+    a manual binding is pending when it differs from the client's current
+    production version. `last_pushed_hash` (api only) is the sha256 of
+    the raw systemMessage last written, used for drift detection.
+- `n8n_sync_events`: audit log of every push, rollback, drift detection
+  and manual confirmation. A successful push's `previous_content` is the
+  node's exact raw value before the write, which is what "Revertir" plays
+  back; n8n's own workflow version history is an enterprise feature, so
+  this table is the only rollback source available.
+
+**`lib/n8n/agent-node.ts`** is pure (no network, no DB) and does the part
+that needs care: n8n expression handling. A `systemMessage` string that
+starts with `=` is an n8n expression, and its `{{ ... }}` segments are
+interpolated at runtime (e.g. to inject the lead's name); the app must
+preserve that marker on every write (`expression_prefix` on the binding)
+and never blindly overwrite it. `computePushWarnings()` flags two cases
+before a push: the live node interpolates data the new prompt doesn't
+carry (would silently break personalization), or the new prompt contains
+literal `{{ }}` while the field is an expression (n8n would try to
+evaluate them). `locateBoundAgent()` finds the bound node by `node_id`,
+falling back to `node_name` if the workflow was rebuilt by hand (ids
+change, names usually survive); the caller re-confirms and refreshes the
+stored id on a name match. All of this is unit-tested directly
+(`agent-node.test.ts`).
+
+**`lib/n8n/client.ts`** wraps the n8n REST API (`X-N8N-API-KEY` header)
+for one connection: list workflows, get one, update one, test the
+connection. n8n's `PUT /workflows/{id}` replaces the whole workflow (no
+partial update), so `sanitizeForUpdate()` strips read-only fields
+(`id`, `active`, timestamps, `tags`, ...) before every write.
+
+**`lib/n8n/sync.ts`** is the engine, three operations:
+- `previewPush(binding, nextText)`: read-only. Locates the node, computes
+  warnings, and returns current vs. next text plus the workflow's
+  `versionId` at read time, for the confirmation diff.
+- `pushBinding(binding, version, options)`: fresh read, mutate only the
+  target node in memory, write back immediately. If
+  `expectedWorkflowVersionId` is given and the live workflow's
+  `versionId` no longer matches it, the push aborts (someone edited the
+  flow in n8n while the user was looking at the diff). Snapshots the
+  previous raw text, records the new hash on the binding, logs the event.
+- `checkDrift(binding)`: read-only, compares the live node's hash against
+  `last_pushed_hash` to detect a hand-edit in n8n since the last push.
+  A binding that was created but never pushed reports `no_baseline`
+  ("Sin verificar"), not an error.
+- `revertPush(binding, event)`: writes an event's `previous_content` back
+  verbatim (`setRawSystemMessage`, no re-derivation from
+  `expression_prefix`, since the stored value already has any `=` marker
+  baked in). Clears `last_deployed_version_id` on the binding: the
+  restored text predates whatever version was live, so it isn't
+  attributable to a known version.
+
+**Deploy flow**: promoting a version (`POST /api/versions/[id]/promote`)
+only ever flips `is_production` in `versions`, unchanged since before this
+sprint. The client detail page separately checks whether the client has
+any bindings and, if so, opens a confirmation modal: a diff per API
+binding (with warnings, and the option to skip unchanged targets) and a
+copy-and-confirm affordance per manual binding. A partial failure never
+rolls back the promotion, since the Studio's own state already changed;
+a failed API binding is retryable, an unconfirmed manual binding stays
+"Pendiente" until the human confirms.
+
+**API routes**, all server-side, all under `/api/clients/[id]/`:
+`n8n-bindings` (CRUD, `mode` in the POST body selects api vs. manual),
+`n8n-bindings/[bindingId]/confirm` (manual "Marcar como actualizado"),
+`n8n-bindings/status` (drift check for every API binding), `n8n-sync/
+preview` and `n8n-sync` (push), `n8n-sync/history` and `n8n-sync/
+[eventId]/revert`. Picker helpers live under `/api/integrations/n8n/`:
+list connections, list a connection's workflows, list a workflow's AI
+Agent nodes (with a prompt preview, since a workflow can have more than
+one).
 
 ## Uploads TTL
 
@@ -197,24 +465,44 @@ This means even if the source version is later auto-deleted by the
 
 ## Security model
 
-- **Network perimeter**: EasyPanel HTTP Basic Auth in front of the app.
-  Two `user:password` pairs configured at the reverse proxy level. The
-  app is invisible to anyone without the credentials. HTTPS is mandatory
-  (EasyPanel handles Let's Encrypt automatically).
+- **Network perimeter**: in-app "Entrar con Google" (Sprint 10). Access is
+  restricted to Google accounts in the company domain
+  `@zebradigital.marketing`. HTTPS is mandatory (EasyPanel handles Let's
+  Encrypt automatically). This replaced the previous EasyPanel HTTP Basic
+  Auth, which is removed at the reverse proxy once the login is live.
 
-- **In-app auth**: none. The 2 users share one workspace.
+- **In-app auth (Sprint 10)**: the app owns the whole flow, no external auth
+  service. `middleware.ts` (Edge runtime) guards every route except the login
+  page, the OAuth callback, and `/api/auth/*`. Flow: `/api/auth/google`
+  redirects to Google with a CSRF `state` cookie; Google returns to
+  `/auth/callback`, which exchanges the code server-to-server, reads the
+  `email` / `email_verified` / `hd` claims from the returned `id_token`
+  (trusted because it arrives over TLS directly from Google's token
+  endpoint), and only mints a session if the email is verified and in the
+  allowed domain. The session is a signed cookie (`lib/auth/session.ts`):
+  HMAC-SHA256 over `{email, exp}` via Web Crypto (so the same code runs in
+  the Edge middleware and Node routes), keyed by `AUTH_SESSION_SECRET`. The
+  middleware re-checks the domain on every request, not just the signature,
+  so narrowing the allow-list takes effect immediately. The 2 users still
+  share one workspace; there is no per-user data separation. Relevant env
+  vars: `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `AUTH_SESSION_SECRET`,
+  `AUTH_ALLOWED_DOMAIN`, `AUTH_BASE_URL`.
 
 - **Supabase access**: all calls use the `service_role` key from the
   server side. This bypasses RLS. RLS policies are still set permissive
-  (`to authenticated`) as defense in depth — if the app is ever
-  accidentally exposed without Basic Auth, anonymous calls are still
-  blocked at the DB layer.
+  (`to authenticated`) as defense in depth. If the app is ever accidentally
+  exposed without the login, anonymous calls are still blocked at the DB
+  layer.
 
-- **API key encryption**: stored in `providers.api_key_encrypted`,
-  encrypted with AES-256-GCM using Node's built-in `crypto` module. The
-  encryption key is derived from `KEY_ENCRYPTION_SECRET` env var via
-  SHA-256. Random 12-byte IV per encryption, stored alongside ciphertext.
-  Format: `base64(iv):base64(ciphertext):base64(authTag)`.
+- **API key encryption**: stored in `providers.api_key_encrypted` and,
+  since Sprint 7, `n8n_connections.api_key_encrypted`, both encrypted with
+  AES-256-GCM using Node's built-in `crypto` module. The encryption key is
+  derived from `KEY_ENCRYPTION_SECRET` env var via SHA-256. Random 12-byte
+  IV per encryption, stored alongside ciphertext. Format:
+  `base64(iv):base64(ciphertext):base64(authTag)`. An n8n API key can
+  rewrite every workflow in that instance, not just prompts, so the sync
+  engine (`lib/n8n/sync.ts`) only ever calls `GET`/`PUT` on a single
+  workflow, never exercising the rest of what the key can do.
 
 - **Rotation**: rotating `KEY_ENCRYPTION_SECRET` invalidates all stored
   keys. Document this loudly in `crypto.ts`.
@@ -234,6 +522,11 @@ See `.env.example`. Required at runtime:
 | `KEY_ENCRYPTION_SECRET` | 32+ byte secret for AES-256-GCM |
 | `NEXT_PUBLIC_BUILD_TAG` | Optional; shown in footer |
 
+No env var was added for n8n sync: connection URLs and API keys are saved
+through the Settings UI into `n8n_connections`, encrypted with the same
+`KEY_ENCRYPTION_SECRET` as everything else, the same way LLM provider keys
+already work.
+
 ## What lives where: cheat sheet
 
 | Concern | Layer |
@@ -245,3 +538,6 @@ See `.env.example`. Required at runtime:
 | Show a ClientCard | `/components/library/ClientCard.tsx` |
 | Theme tokens | `app/globals.css` (CSS variables on `[data-theme]`) |
 | Schema change | new file in `/supabase/migrations/` |
+| Push a prompt to n8n | `/api/clients/[id]/n8n-sync` → `lib/n8n/sync.ts` |
+| Read/write an AI Agent's prompt | `lib/n8n/agent-node.ts` |
+| Encrypt an n8n connection key | `/app/api/integrations/n8n` → `lib/db/n8n-connections.ts` |

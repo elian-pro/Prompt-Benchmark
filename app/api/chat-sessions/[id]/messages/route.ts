@@ -7,13 +7,15 @@ import {
 import { getRoleDefault } from "@/lib/db/role-defaults";
 import { getPromptOverride } from "@/lib/db/prompt-overrides";
 import { downloadUploadBytes } from "@/lib/db/uploads";
-import { getVersion } from "@/lib/db/versions";
+import { getVersion, getLatestVersionNumber } from "@/lib/db/versions";
+import { computeNextNumber, syncVersionMarkers } from "@/lib/version-utils";
 import { appendMessageSchema } from "@/lib/schemas/chat-sessions";
 import type { Attachment } from "@/lib/db/chat-sessions";
 import {
   buildEditorSystemPrompt,
   extractPromptFromReply,
-  hasUnclosedFence,
+  hasUnclosedPromptBlock,
+  replacePromptBlock,
 } from "@/lib/prompts/editor-persona";
 import { buildCreatorSystemPrompt } from "@/lib/prompts/creator-persona";
 import { streamChat, type ChatMessage, type MessageAttachment } from "@/lib/providers";
@@ -191,15 +193,27 @@ export async function POST(req: NextRequest, { params }: Params) {
             }
           }
 
-          // Persist the assistant turn and capture the new draft if present.
+          const draftBroken = hasUnclosedPromptBlock(fullText);
+          let newDraft = draftBroken ? null : extractPromptFromReply(fullText);
+          let contentToStore = fullText;
+          // Editor: stamp the draft (and the stored message, so the chat card
+          // matches) with the version it WILL become on finalize (the next
+          // minor bump), so the user sees v1.8 while editing instead of the
+          // base v1.7. This does not change the DB's latest version, so
+          // finalize still computes the same number: no double bump.
+          if (newDraft && !isCreator && session.client_id) {
+            const latest = await getLatestVersionNumber(session.client_id);
+            newDraft = syncVersionMarkers(newDraft, computeNextNumber(latest, "minor"));
+            contentToStore = replacePromptBlock(fullText, newDraft);
+          }
+
+          // Persist the assistant turn (version-stamped) and update the draft.
           await appendMessage(id, {
             role: "assistant",
-            content: fullText,
+            content: contentToStore,
             tokensIn,
             tokensOut,
           });
-          const draftBroken = hasUnclosedFence(fullText);
-          const newDraft = draftBroken ? null : extractPromptFromReply(fullText);
           if (newDraft) await updateDraft(id, newDraft);
 
           send({ type: "done", truncated, draftBroken });

@@ -48,8 +48,10 @@ export async function POST(req: NextRequest, { params }: Params) {
     const nextTurn = session.messages.length + 1;
     const humanMessage = await appendMessage(id, {
       turnNumber: nextTurn,
+      round: session.current_round,
       role: "human",
       content: input.content,
+      versionNumberSnapshot: session.version_number_snapshot,
     });
 
     const reply = await chat({
@@ -64,8 +66,10 @@ export async function POST(req: NextRequest, { params }: Params) {
 
     const botMessage = await appendMessage(id, {
       turnNumber: nextTurn + 1,
+      round: session.current_round,
       role: "bot",
       content: reply.content,
+      versionNumberSnapshot: session.version_number_snapshot,
     });
 
     return NextResponse.json({ humanMessage, botMessage });

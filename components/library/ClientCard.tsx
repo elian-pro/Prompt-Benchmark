@@ -1,10 +1,10 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { IconPencil, IconCopy, IconTrash } from "@tabler/icons-react";
+import { IconPencil, IconCopy, IconTrash, IconPlugConnectedX } from "@tabler/icons-react";
 import type { ClientSummary } from "@/lib/db/clients";
 import { relativeTimeEs } from "@/lib/format";
-import { isNewClient, isNewVersion } from "@/lib/badges";
+import { isNewClient, isNewVersion, N8N_HOST_LABEL } from "@/lib/badges";
 import { Badge, type BadgeVariant } from "@/components/ui/Badge";
 
 type Props = {
@@ -71,6 +71,12 @@ export function ClientCard({
   const style =
     index != null ? { animationDelay: `${Math.min(index, 12) * 28}ms` } : undefined;
 
+  const pendingIcon = client.has_pending_n8n_deploy ? (
+    <span className="n8n-pending-icon" title="Despliegue manual pendiente en n8n">
+      <IconPlugConnectedX size={15} />
+    </span>
+  ) : null;
+
   const actions = (
     <div className="card-actions" onClick={(e) => e.stopPropagation()}>
       <button className="icon-btn" title="Editar" onClick={goToDetail} aria-label="Editar">
@@ -101,6 +107,8 @@ export function ClientCard({
         <span className="row-name">
           {client.name}
           {badge && <Badge variant={badge.variant}>{badge.label}</Badge>}
+          <Badge variant="n8n">{N8N_HOST_LABEL[client.n8n_host]}</Badge>
+          {pendingIcon}
         </span>
         <span className="row-segment">{client.segment || "-"}</span>
         <span className="row-version">{versionLabel}</span>
@@ -114,7 +122,11 @@ export function ClientCard({
   return (
     <div className="card client-card" style={style} onClick={goToDetail}>
       <div className="client-card-top">
-        {badge ? <Badge variant={badge.variant}>{badge.label}</Badge> : <span />}
+        <span className="row-between" style={{ gap: 6 }}>
+          {badge && <Badge variant={badge.variant}>{badge.label}</Badge>}
+          <Badge variant="n8n">{N8N_HOST_LABEL[client.n8n_host]}</Badge>
+          {pendingIcon}
+        </span>
         {actions}
       </div>
 

@@ -4,19 +4,24 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import {
   IconArrowLeft,
+  IconChevronDown,
   IconCopy,
   IconFileText,
   IconPaperclip,
   IconPencil,
   IconReplace,
+  IconRocket,
   IconSend,
   IconX,
 } from "@tabler/icons-react";
 import type { ChatSessionDetail, Attachment } from "@/lib/db/chat-sessions";
+import type { ComposerSettings } from "@/lib/db/composer-settings";
 import { isAcceptedFile, uploadAttachment } from "@/lib/attachments";
+import { nextPasteName } from "@/lib/smart-paste";
 import { relativeTimeEs } from "@/lib/format";
 import { Button } from "@/components/ui/Button";
 import { FindReplace } from "@/components/ui/FindReplace";
+import { N8nSyncModal } from "@/components/library/N8nSyncModal";
 import { ChatMessage } from "@/components/editor/ChatMessage";
 import { FileUpload } from "@/components/editor/FileUpload";
 import { FinalizeButton } from "@/components/editor/FinalizeButton";
@@ -106,6 +111,12 @@ export function SessionChat({
 
   const [input, setInput] = useState("");
   const [attachments, setAttachments] = useState<Attachment[]>([]);
+  // Smart Paste (Sprint 15): shared team setting fetched once, and the
+  // original text behind any pending paste-generated attachment (so its chip
+  // can be expanded or converted back to plain text before the message is
+  // sent). Attachments from already-sent messages never appear here.
+  const [composerSettings, setComposerSettings] = useState<ComposerSettings | null>(null);
+  const [smartPasteText, setSmartPasteText] = useState<Record<string, string>>({});
   const [pendingUser, setPendingUser] = useState<string | null>(null);
   const [pendingAttachments, setPendingAttachments] = useState<Attachment[]>([]);
   const [streamingText, setStreamingText] = useState<string | null>(null);
@@ -113,6 +124,8 @@ export function SessionChat({
   const [toast, setToast] = useState<string | null>(null);
   const [draftOpen, setDraftOpen] = useState(false);
   const [dragging, setDragging] = useState(false);
+  // Whether the chat is scrolled near the bottom (hides the jump button).
+  const [atBottom, setAtBottom] = useState(true);
 
   // Manual draft editing (Editor only): edit the working draft by hand, no
   // AI turn. draftInput holds the in-progress text; findOpen toggles the
@@ -126,14 +139,35 @@ export function SessionChat({
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const draftTextareaRef = useRef<HTMLTextAreaElement>(null);
   const autoSentRef = useRef(false);
+  // The draft the user has acknowledged (by opening the drawer). A newer draft
+  // than this lights the "NEW" badge on "Ver borrador".
+  const [seenDraft, setSeenDraft] = useState<string | null>(null);
+  const seenInitRef = useRef(false);
+  // The version just created by "Finalizar edición", so the Editor can offer
+  // to promote it (and sync n8n) without leaving for the Library.
+  const [finalizedVersion, setFinalizedVersion] = useState<
+    { id: string; number: string } | null
+  >(null);
+  const [promoting, setPromoting] = useState(false);
+  const [syncTarget, setSyncTarget] = useState<
+    { versionId: string; versionNumber: string; versionContent: string } | null
+  >(null);
 
-  const load = useCallback(async () => {
-    setLoading(true);
+  const load = useCallback(async ({ silent = false }: { silent?: boolean } = {}) => {
+    // Only the first load blanks the screen with a spinner; refreshes after a
+    // reply are silent so the chat doesn't flash to a loading state.
+    if (!silent) setLoading(true);
     setError(null);
     try {
       const res = await fetch(`/api/chat-sessions/${sessionId}`);
       if (!res.ok) throw new Error((await res.json()).error ?? "Error al cargar.");
-      setSession(await res.json());
+      const data: ChatSessionDetail = await res.json();
+      setSession(data);
+      // On first load, treat the existing draft as already seen (no badge).
+      if (!seenInitRef.current) {
+        seenInitRef.current = true;
+        setSeenDraft(data.current_draft_content ?? null);
+      }
     } catch (e) {
       setError(e instanceof Error ? e.message : "Error al cargar la sesión.");
     } finally {
@@ -145,10 +179,37 @@ export function SessionChat({
     load();
   }, [load]);
 
-  // Keep the conversation scrolled to the latest content.
+  // Smart Paste settings are shared team-wide (no per-user accounts), so a
+  // single fetch on mount is enough; a value never changes mid-session.
   useEffect(() => {
-    scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight });
-  }, [session?.messages.length, pendingUser, streamingText]);
+    let alive = true;
+    fetch("/api/composer-settings")
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data: ComposerSettings | null) => {
+        if (alive && data) setComposerSettings(data);
+      })
+      .catch(() => {});
+    return () => {
+      alive = false;
+    };
+  }, []);
+
+  // Keep the conversation pinned to the latest content, but only while the
+  // user is already near the bottom, so scrolling up to read isn't yanked back
+  // down by streaming output.
+  useEffect(() => {
+    if (atBottom) scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight });
+  }, [session?.messages.length, pendingUser, streamingText, atBottom]);
+
+  function onStreamScroll() {
+    const el = scrollRef.current;
+    if (!el) return;
+    const distance = el.scrollHeight - el.scrollTop - el.clientHeight;
+    setAtBottom(distance < 80);
+  }
+  function scrollToBottom() {
+    scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
+  }
 
   // Escape steps out one layer at a time: the find bar first (if open), then
   // the drawer. Otherwise Escape inside find/replace would close the whole
@@ -258,8 +319,9 @@ export function SessionChat({
             }
           }
         }
-        // Re-sync from the server: canonical messages, token usage, updated draft.
-        await load();
+        // Re-sync from the server: canonical messages, token usage, updated
+        // draft. Silent so the chat doesn't flash to the loading state.
+        await load({ silent: true });
 
         if (draftBroken) {
           showToast(
@@ -350,6 +412,75 @@ export function SessionChat({
     if (added.length > 0) setAttachments((prev) => [...prev, ...added]);
   }
 
+  // Inserts `text` at the composer's current cursor position (falls back to
+  // appending when the textarea ref isn't available). Used both to restore a
+  // paste that failed to upload, and to undo a Smart Paste conversion.
+  function insertAtCursor(text: string) {
+    const el = textareaRef.current;
+    if (!el) {
+      setInput((prev) => prev + text);
+      return;
+    }
+    const start = el.selectionStart ?? input.length;
+    const end = el.selectionEnd ?? input.length;
+    const next = input.slice(0, start) + text + input.slice(end);
+    setInput(next);
+    requestAnimationFrame(() => {
+      el.style.height = "auto";
+      el.style.height = Math.min(el.scrollHeight, 200) + "px";
+      el.selectionStart = el.selectionEnd = start + text.length;
+      el.focus();
+    });
+  }
+
+  // Smart Paste (Sprint 15): intercepts a paste into the composer. Below the
+  // team's configured threshold, nothing happens here and the browser's
+  // default paste goes through unmodified. At or above it, the raw text never
+  // touches the input: it becomes a removable .txt attachment instead, using
+  // the exact same upload pipeline as a manually attached file.
+  async function onComposerPaste(e: React.ClipboardEvent<HTMLTextAreaElement>) {
+    if (!composerSettings?.smart_paste_enabled || isAbandoned) return;
+    const text = e.clipboardData.getData("text/plain");
+    if (!text || text.length < composerSettings.smart_paste_threshold) return;
+    e.preventDefault();
+
+    const existingNames = [
+      ...(session?.messages.flatMap((m) => (m.attachments ?? []).map((a) => a.filename)) ?? []),
+      ...attachments.map((a) => a.filename),
+    ];
+    const filename = nextPasteName(existingNames);
+
+    try {
+      const file = new File([text], filename, { type: "text/plain" });
+      const attachment = await uploadAttachment(sessionId, file);
+      setAttachments((prev) => [...prev, attachment]);
+      setSmartPasteText((prev) => ({ ...prev, [attachment.uploadId]: text }));
+    } catch {
+      // Never silently lose the user's pasted content: fall back to a normal
+      // insert if the upload fails.
+      showToast("No se pudo convertir el texto pegado en adjunto; se insertó tal cual.");
+      insertAtCursor(text);
+    }
+  }
+
+  // Undoes a Smart Paste conversion: removes the attachment and puts its
+  // original text back in the composer, exactly where "eliminar" would leave
+  // it plus the text. Only ever called for chips present in smartPasteText.
+  async function revertSmartPaste(att: Attachment) {
+    const text = smartPasteText[att.uploadId];
+    setAttachments((prev) => prev.filter((a) => a.uploadId !== att.uploadId));
+    setSmartPasteText((prev) => {
+      const { [att.uploadId]: _omit, ...rest } = prev;
+      return rest;
+    });
+    if (text) insertAtCursor(text);
+    try {
+      await fetch(`/api/uploads/${att.uploadId}`, { method: "DELETE" });
+    } catch {
+      // Ignore: the TTL cron is the backstop.
+    }
+  }
+
   async function copyDraft() {
     const text = session?.current_draft_content;
     if (!text) {
@@ -412,6 +543,40 @@ export function SessionChat({
   const isAbandoned = session.status === "abandoned";
   const isActive = session.status === "active";
   const hasDraft = Boolean(session.current_draft_content?.trim());
+  // A draft newer than what the user last opened lights the NEW badge.
+  const hasNewDraft = hasDraft && session.current_draft_content !== seenDraft;
+
+  function openDraft() {
+    setSeenDraft(session?.current_draft_content ?? null);
+    setDraftOpen(true);
+  }
+
+  // Promotes the just-finalized version to production and, if the client has
+  // n8n bindings, opens the same sync modal the Library uses.
+  async function promoteFromEditor() {
+    if (!finalizedVersion || !session?.client_id || promoting) return;
+    setPromoting(true);
+    try {
+      const res = await fetch(`/api/versions/${finalizedVersion.id}/promote`, { method: "POST" });
+      if (!res.ok) throw new Error((await res.json()).error ?? "No se pudo promover.");
+      showToast(`${finalizedVersion.number} marcada como producción.`);
+      const bRes = await fetch(`/api/clients/${session.client_id}/n8n-bindings`);
+      if (bRes.ok) {
+        const bindings: { mode: string; sync_enabled: boolean }[] = await bRes.json();
+        if (bindings.some((b) => (b.mode === "api" && b.sync_enabled) || b.mode === "manual")) {
+          setSyncTarget({
+            versionId: finalizedVersion.id,
+            versionNumber: finalizedVersion.number,
+            versionContent: session.current_draft_content ?? "",
+          });
+        }
+      }
+    } catch (e) {
+      showToast(e instanceof Error ? e.message : "Error al promover.");
+    } finally {
+      setPromoting(false);
+    }
+  }
   const title =
     mode === "editor"
       ? (session.client_name ?? "Cliente eliminado")
@@ -442,23 +607,33 @@ export function SessionChat({
           )}
         </div>
         <div className="chat-topbar-actions">
-          <Button
-            variant="secondary"
-            icon={<IconFileText size={14} />}
-            onClick={() => setDraftOpen(true)}
-          >
-            {DRAFT_TOGGLE[mode]}
-          </Button>
+          <span className="draft-toggle-wrap">
+            <Button variant="secondary" icon={<IconFileText size={14} />} onClick={openDraft}>
+              {DRAFT_TOGGLE[mode]}
+            </Button>
+            {hasNewDraft && <span className="draft-new-badge">NEW</span>}
+          </span>
           {isActive && mode === "editor" && (
             <FinalizeButton
               sessionId={sessionId}
               disabled={!hasDraft}
               onDone={({ version }) => {
+                setFinalizedVersion({ id: version.id, number: version.version_number });
                 showToast(`Versión ${version.version_number} creada en la Biblioteca.`);
-                load();
+                load({ silent: true });
               }}
               onError={showToast}
             />
+          )}
+          {mode === "editor" && finalizedVersion && (
+            <Button
+              variant="primary"
+              icon={<IconRocket size={14} />}
+              onClick={promoteFromEditor}
+              disabled={promoting}
+            >
+              {promoting ? "Promoviendo…" : "Promover a producción"}
+            </Button>
           )}
           {isActive && mode === "creator" && (
             <FinalizeCreatorButton
@@ -466,7 +641,7 @@ export function SessionChat({
               disabled={!hasDraft}
               onDone={({ client, version }) => {
                 showToast(`Cliente "${client.name}" creado como ${version.version_number}.`);
-                load();
+                load({ silent: true });
               }}
               onError={showToast}
             />
@@ -474,7 +649,7 @@ export function SessionChat({
         </div>
       </div>
 
-      <div className="chat-stream" ref={scrollRef}>
+      <div className="chat-stream" ref={scrollRef} onScroll={onStreamScroll}>
         <div className="chat-stream-inner">
           {session.messages.length === 0 && !pendingUser && !autoSend && (
             <p className="empty-hint">{EMPTY_HINT[mode]}</p>
@@ -502,6 +677,18 @@ export function SessionChat({
         </div>
       </div>
 
+      {!atBottom && (
+        <button
+          type="button"
+          className="chat-jump-btn"
+          onClick={scrollToBottom}
+          aria-label="Bajar al final"
+          title="Bajar al final"
+        >
+          <IconChevronDown size={18} />
+        </button>
+      )}
+
       <div className="chat-composer-zone">
         <div
           className={`idle-composer chat-composer${dragging ? " composer-dragging" : ""}`}
@@ -527,6 +714,8 @@ export function SessionChat({
               attachments={attachments}
               onChange={setAttachments}
               disabled={sending}
+              pastedTextByUploadId={smartPasteText}
+              onRevertPaste={revertSmartPaste}
             />
           )}
           <textarea
@@ -535,6 +724,7 @@ export function SessionChat({
             rows={1}
             value={input}
             onChange={onInputChange}
+            onPaste={onComposerPaste}
             onKeyDown={(e) => {
               if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
                 e.preventDefault();
@@ -659,6 +849,18 @@ export function SessionChat({
                     ? session.current_draft_content
                     : DRAFT_EMPTY[mode]}
                 </pre>
+                {mode === "editor" && finalizedVersion && (
+                  <div className="draft-edit-actions">
+                    <Button
+                      variant="primary"
+                      icon={<IconRocket size={14} />}
+                      onClick={promoteFromEditor}
+                      disabled={promoting}
+                    >
+                      {promoting ? "Promoviendo…" : "Promover a producción"}
+                    </Button>
+                  </div>
+                )}
                 {report && (
                   <>
                     <p className="section-label" style={{ margin: "4px 0 0" }}>
@@ -671,6 +873,20 @@ export function SessionChat({
             )}
           </aside>
         </>
+      )}
+
+      {syncTarget && session.client_id && (
+        <N8nSyncModal
+          clientId={session.client_id}
+          versionId={syncTarget.versionId}
+          versionNumber={syncTarget.versionNumber}
+          versionContent={syncTarget.versionContent}
+          onClose={() => setSyncTarget(null)}
+          onDone={({ pushed, failed }) => {
+            if (pushed > 0 && failed === 0) showToast(`Sincronizado con n8n (${pushed}).`);
+            else if (failed > 0) showToast(`Sincronización con ${failed} error(es).`);
+          }}
+        />
       )}
 
       {toast && <div className="toast">{toast}</div>}

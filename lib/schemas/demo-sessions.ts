@@ -7,6 +7,12 @@ export const createDemoSessionSchema = z.object({
   versionId: z
     .string({ required_error: "La versión es obligatoria." })
     .uuid("La versión no es válida."),
+  // Optional canned bot message shown as soon as the chat opens (Sprint 14).
+  openingMessage: z
+    .string()
+    .trim()
+    .max(2000, "El mensaje de inicio no puede pasar de 2000 caracteres.")
+    .optional(),
 });
 
 export const appendDemoMessageSchema = z.object({

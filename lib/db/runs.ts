@@ -37,6 +37,7 @@ export type Run = {
   intensity: Intensity;
   max_turns: number;
   starter: RunStarter;
+  lead_brief: string | null;
   bot_config: RunModelConfig;
   lead_config: RunModelConfig;
   judge_config: RunModelConfig;
@@ -73,7 +74,7 @@ export type RunDetail = RunListItem & {
 
 const RUN_COLS =
   "id, client_id, version_id, version_number_snapshot, prompt_snapshot, preset, " +
-  "intensity, max_turns, starter, bot_config, lead_config, judge_config, status, " +
+  "intensity, max_turns, starter, lead_brief, bot_config, lead_config, judge_config, status, " +
   "error_message, created_at, completed_at";
 
 const MESSAGE_COLS = "id, run_id, turn_number, role, content, created_at";
@@ -126,6 +127,7 @@ export async function createRun(input: {
   intensity: Intensity;
   maxTurns?: number;
   starter?: RunStarter;
+  leadBrief?: string;
 }): Promise<Run> {
   const version = await getVersion(input.versionId);
   if (!version) throw new Error("La versión a probar no existe.");
@@ -155,6 +157,7 @@ export async function createRun(input: {
   };
   if (input.maxTurns !== undefined) row.max_turns = input.maxTurns;
   if (input.starter !== undefined) row.starter = input.starter;
+  if (input.leadBrief) row.lead_brief = input.leadBrief;
 
   const { data, error } = await sb.from("runs").insert(row).select(RUN_COLS).single();
   if (error) throw new Error(`No se pudo crear la prueba: ${error.message}`);

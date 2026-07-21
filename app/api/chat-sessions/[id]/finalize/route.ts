@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getSession, finalizeSession } from "@/lib/db/chat-sessions";
 import { createVersion } from "@/lib/db/versions";
 import { createClient } from "@/lib/db/clients";
-import { extractChangeSummary } from "@/lib/prompts/editor-persona";
+import { extractChangeSummary, extractPromptFromReply } from "@/lib/prompts/editor-persona";
 import { finalizeCreatorSchema } from "@/lib/schemas/chat-sessions";
 import { handleError, jsonError } from "@/lib/http";
 
@@ -49,12 +49,15 @@ export async function POST(req: NextRequest, { params }: Params) {
     if (!session.client_id) {
       return jsonError("La sesión no tiene un cliente asociado.", 409);
     }
-    // The summary belongs to the assistant turn that produced this draft — the
+    // The summary belongs to the assistant turn that produced this draft: the
     // most recent one carrying a prompt block (later turns may be plain Q&A).
+    // extractPromptFromReply recognizes both the sentinel contract (Sprint 9+)
+    // and the legacy ``` fence format, so this matches whichever the message
+    // actually used instead of assuming fences.
     let changeSummary: string | null = null;
     for (let i = session.messages.length - 1; i >= 0; i--) {
       const m = session.messages[i];
-      if (m.role === "assistant" && /```[^\n]*\n[\s\S]*?```/.test(m.content)) {
+      if (m.role === "assistant" && extractPromptFromReply(m.content) !== null) {
         changeSummary = extractChangeSummary(m.content);
         break;
       }
