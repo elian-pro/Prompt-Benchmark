@@ -14,7 +14,7 @@ import {
   IconSend,
   IconX,
 } from "@tabler/icons-react";
-import type { ChatSessionDetail, Attachment } from "@/lib/db/chat-sessions";
+import type { ChatSessionDetail, Attachment, MessageAnswer } from "@/lib/db/chat-sessions";
 import type { ComposerSettings } from "@/lib/db/composer-settings";
 import { isAcceptedFile, uploadAttachment } from "@/lib/attachments";
 import { nextPasteName } from "@/lib/smart-paste";
@@ -256,6 +256,20 @@ export function SessionChat({
     return null;
   }, [mode, session?.messages]);
 
+  // Resolve which assistant options blocks were answered, keyed by the
+  // assistant message id stored inside each answer (not by position), so a
+  // block renders its collapsed read-only summary once answered.
+  const answeredBySource = useMemo(() => {
+    const map = new Map<string, MessageAnswer>();
+    for (const m of session?.messages ?? []) {
+      if (m.answer?.sourceMessageId) map.set(m.answer.sourceMessageId, m.answer);
+    }
+    return map;
+  }, [session?.messages]);
+
+  // The last message in the list: only its (unanswered) options block is live.
+  const lastMessageId = session?.messages.at(-1)?.id ?? null;
+
   function showToast(message: string, durationMs = 2500) {
     setToast(message);
     window.setTimeout(() => setToast(null), durationMs);
@@ -271,10 +285,11 @@ export function SessionChat({
   }
 
   const send = useCallback(
-    async (explicit?: { content: string; attachments: Attachment[] }) => {
+    async (explicit?: { content: string; attachments: Attachment[]; answer?: MessageAnswer }) => {
       const content = (explicit?.content ?? input).trim();
       if (!content || sending || attachmentsBusy) return;
       const sent = explicit?.attachments ?? attachments;
+      const answer = explicit?.answer;
       setSending(true);
       setError(null);
       if (!explicit) {
@@ -292,6 +307,7 @@ export function SessionChat({
           body: JSON.stringify({
             content,
             attachments: sent.length > 0 ? sent : undefined,
+            answer,
           }),
         });
         if (!res.ok || !res.body) {
@@ -353,6 +369,15 @@ export function SessionChat({
       }
     },
     [sessionId, input, attachments, sending, attachmentsBusy, load],
+  );
+
+  // Confirming an options block sends its human-readable summary as a normal
+  // user message plus the structured selection for persistence.
+  const onSubmitOptions = useCallback(
+    (answerText: string, answer: MessageAnswer) => {
+      void send({ content: answerText, attachments: [], answer });
+    },
+    [send],
   );
 
   // Fire the message the user already typed on the idle composer, the instant
@@ -681,6 +706,14 @@ export function SessionChat({
               content={m.content}
               attachments={m.attachments}
               mode={mode}
+              messageId={m.id}
+              answeredSelection={answeredBySource.get(m.id) ?? null}
+              interactive={
+                session.status === "active" &&
+                m.id === lastMessageId &&
+                !answeredBySource.has(m.id)
+              }
+              onSubmitOptions={onSubmitOptions}
             />
           ))}
           {pendingUser && (

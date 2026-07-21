@@ -1,13 +1,19 @@
 "use client";
 
 import { useState, type ReactNode } from "react";
-import { IconCheck, IconCopy, IconFileText, IconPaperclip } from "@tabler/icons-react";
-import type { MessageRole, Attachment } from "@/lib/db/chat-sessions";
+import { IconCheck, IconCopy, IconFileText, IconPaperclip, IconListSearch } from "@tabler/icons-react";
+import type { MessageRole, Attachment, MessageAnswer } from "@/lib/db/chat-sessions";
 import {
   hasUnclosedPromptBlock,
   splitPromptBlock,
   unclosedBlockPreamble,
 } from "@/lib/prompts/editor-persona";
+import {
+  hasUnclosedOptionsBlock,
+  optionsBlockPreamble,
+  splitOptionsBlock,
+} from "@/lib/prompts/options-block";
+import { OptionsBlock } from "@/components/sessions/OptionsBlock";
 import { Button } from "@/components/ui/Button";
 
 type Mode = "editor" | "creator";
@@ -92,13 +98,24 @@ function PromptBlockCard({
 
 /** A single chat bubble. Assistant replies that carry a closed fenced prompt
  *  block collapse that block into a PromptBlockCard instead of dumping the
- *  raw markdown; everything else renders as plain text (whitespace kept). */
+ *  raw markdown. An assistant reply carrying a selectable-options block renders
+ *  the interactive OptionsBlock instead. Everything else is plain text.
+ *
+ *  Precedence: the prompt block wins. It is the draft-affecting, higher-stakes
+ *  path, and the two contracts are mutually exclusive by design, so only when a
+ *  reply has no prompt block (complete or still streaming) do we look for an
+ *  options block. A malformed reply that somehow has both shows the prompt card
+ *  and lets any stray options markers fall through as text. */
 export function ChatMessage({
   role,
   content,
   attachments,
   streaming = false,
   mode = "editor",
+  messageId,
+  answeredSelection = null,
+  interactive = false,
+  onSubmitOptions,
 }: {
   role: MessageRole;
   content: string;
@@ -107,6 +124,14 @@ export function ChatMessage({
   streaming?: boolean;
   /** Editor vs Creator — only used to label a collapsed prompt-block card. */
   mode?: Mode;
+  /** Persisted message id — required for an interactive/answered options block. */
+  messageId?: string;
+  /** The persisted selection that answered this block, if any (read-only view). */
+  answeredSelection?: MessageAnswer | null;
+  /** Whether this is the live turn whose options block accepts input. */
+  interactive?: boolean;
+  /** Sends the options answer as a user message plus its structured selection. */
+  onSubmitOptions?: (answerText: string, answer: MessageAnswer) => void;
 }) {
   const { before, block, after } =
     role === "assistant" ? splitPromptBlock(content) : { before: content, block: null, after: "" };
@@ -120,7 +145,38 @@ export function ChatMessage({
   // the partial prompt as raw chat text right next to the writing card.
   // Swap it for just the prose before the opening marker instead.
   const midBlock = streaming && block === null && hasUnclosedPromptBlock(content);
-  const shownBefore = midBlock ? unclosedBlockPreamble(content) : before;
+  const hasPrompt = block !== null || midBlock;
+
+  // Options block only when there is no prompt block in play (see precedence).
+  const options =
+    role === "assistant" && !hasPrompt
+      ? splitOptionsBlock(content)
+      : { before: content, block: null, after: "" };
+  // While streaming, show the "preparando opciones" placeholder for both the
+  // unclosed case and the just-closed-but-not-yet-persisted case (the preview
+  // has no messageId, so the interactive block can't render until re-sync).
+  const optionsStreaming =
+    role === "assistant" &&
+    !hasPrompt &&
+    streaming &&
+    (hasUnclosedOptionsBlock(content) || options.block !== null);
+  const showOptionsBlock = Boolean(options.block) && !optionsStreaming && Boolean(messageId);
+
+  // Choose the prose shown before/after whichever block (prompt or options) is active.
+  const shownBefore = midBlock
+    ? unclosedBlockPreamble(content)
+    : optionsStreaming
+      ? optionsBlockPreamble(content)
+      : hasPrompt
+        ? before
+        : options.block
+          ? options.before
+          : before;
+  const shownAfter = hasPrompt
+    ? after
+    : options.block && !optionsStreaming
+      ? options.after
+      : "";
 
   return (
     <div className={`chat-bubble chat-${role}`}>
@@ -129,8 +185,20 @@ export function ChatMessage({
         {shownBefore.trim() && renderBold(shownBefore)}
         {midBlock && <PromptBlockCard label={BLOCK_LABEL[mode]} writing />}
         {block && <PromptBlockCard label={BLOCK_LABEL[mode]} block={block} />}
-        {after.trim() && renderBold(after)}
-        {streaming && !midBlock && !block && <span className="chat-caret" aria-hidden />}
+        {optionsStreaming && <OptionsWritingCard />}
+        {showOptionsBlock && options.block && messageId && (
+          <OptionsBlock
+            block={options.block}
+            messageId={messageId}
+            answered={answeredSelection}
+            interactive={interactive}
+            onSubmit={onSubmitOptions ?? (() => {})}
+          />
+        )}
+        {shownAfter.trim() && renderBold(shownAfter)}
+        {streaming && !midBlock && !block && !optionsStreaming && !showOptionsBlock && (
+          <span className="chat-caret" aria-hidden />
+        )}
       </div>
       {attachments && attachments.length > 0 && (
         <div className="chat-attachments">
@@ -142,6 +210,27 @@ export function ChatMessage({
           ))}
         </div>
       )}
+    </div>
+  );
+}
+
+/** The placeholder shown while an options block is still streaming, so the raw
+ *  JSON never types out into the chat (mirrors PromptBlockCard's writing state). */
+function OptionsWritingCard() {
+  return (
+    <div className="prompt-block-card is-writing">
+      <IconListSearch size={16} className="prompt-block-icon" />
+      <div className="prompt-block-info">
+        <span className="prompt-block-title">Opciones</span>
+        <span className="prompt-block-meta chat-typing">
+          preparando opciones
+          <span className="typing-dots" aria-hidden="true">
+            <span />
+            <span />
+            <span />
+          </span>
+        </span>
+      </div>
     </div>
   );
 }

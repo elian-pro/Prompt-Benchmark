@@ -3814,3 +3814,213 @@ body[data-theme="light"] .dot-grid::after {
 .logout-btn:hover:not(:disabled) {
   color: var(--fg);
 }
+
+/* ============================================================
+   Selectable-options block (chat questionnaire). Collapsible card
+   mirroring .collapse-*, with option buttons that borrow the
+   dashed-to-solid + accent-border selected idiom from .select-chip.
+   ============================================================ */
+.options-block {
+  margin: 8px 0;
+  border: 0.5px solid var(--border2);
+  border-radius: 12px;
+  background: var(--surface);
+}
+.options-header {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 11px 13px;
+  background: transparent;
+  border: none;
+  color: var(--fg);
+  font-family: inherit;
+  font-size: 13px;
+  text-align: left;
+  cursor: pointer;
+}
+.options-chevron {
+  flex: none;
+  color: var(--muted);
+  transition: transform 0.2s ease;
+}
+.options-block.is-open .options-chevron {
+  transform: rotate(180deg);
+}
+.options-header-label {
+  min-width: 0;
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.options-answered-tag {
+  flex: none;
+  font-size: 9px;
+  font-weight: 500;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--faint);
+}
+.options-body {
+  display: grid;
+  grid-template-rows: 0fr;
+  transition: grid-template-rows 0.28s cubic-bezier(0.22, 1, 0.36, 1);
+}
+.options-block.is-open .options-body {
+  grid-template-rows: 1fr;
+}
+.options-body-inner {
+  overflow: hidden;
+  min-height: 0;
+}
+.options-body-content {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 4px 14px 16px;
+}
+.options-question {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.options-prompt {
+  margin: 0;
+  font-size: 13px;
+  color: var(--fg);
+}
+.options-choices {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.option-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 44px;
+  padding: 8px 16px;
+  font-family: inherit;
+  font-size: 13px;
+  color: var(--muted);
+  background: transparent;
+  border: 0.5px dashed var(--border2);
+  border-radius: 100px;
+  cursor: pointer;
+  transition:
+    border-color 0.15s ease,
+    background 0.15s ease,
+    color 0.15s ease;
+}
+.option-btn:hover:not(:disabled) {
+  border-color: var(--accent);
+  color: var(--fg);
+}
+.option-btn.is-selected {
+  border-style: solid;
+  border-color: var(--accent);
+  background: var(--surface2);
+  color: var(--fg);
+}
+.option-check {
+  flex: none;
+  color: var(--accent);
+}
+.option-btn:disabled {
+  cursor: default;
+  opacity: 0.55;
+}
+.option-btn.is-selected:disabled {
+  opacity: 0.9;
+}
+/* Rank: an ordered list with up/down reordering (no drag & drop). */
+.options-rank {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.options-rank-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 8px 6px 12px;
+  border: 0.5px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface2);
+}
+.options-rank-index {
+  flex: none;
+  width: 20px;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--accent);
+}
+.options-rank-label {
+  flex: 1;
+  min-width: 0;
+  font-size: 13px;
+  color: var(--fg);
+}
+.options-rank-arrows {
+  flex: none;
+  display: inline-flex;
+  gap: 2px;
+}
+.options-arrow {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  color: var(--muted);
+  background: transparent;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+}
+.options-arrow:hover:not(:disabled) {
+  color: var(--fg);
+  background: var(--surface);
+}
+.options-arrow:disabled {
+  opacity: 0.3;
+  cursor: default;
+}
+.options-actions {
+  display: flex;
+  justify-content: flex-end;
+}
+.options-confirm {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 40px;
+  padding: 9px 18px;
+  font-family: inherit;
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  color: var(--bg);
+  background: var(--accent);
+  border: 0.5px solid var(--accent);
+  border-radius: 100px;
+  cursor: pointer;
+}
+.options-confirm:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+@media (prefers-reduced-motion: reduce) {
+  .options-body,
+  .options-chevron,
+  .option-btn {
+    transition: none;
+  }
+}
