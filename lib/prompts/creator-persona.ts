@@ -25,6 +25,7 @@
  *
  * Written in Spanish: it builds the team's Spanish prompts.
  */
+import { OPTIONS_CONTRACT } from "./options-block";
 
 /** The persona's standing instructions, independent of any specific brief.
  *  Exported so Settings can display it (read-only workspace; the runtime
@@ -54,7 +55,7 @@ PASO 1 — ANTES DE CONSTRUIR: revisa el PROMPT BASE y el BRIEF y haz un cuestio
 - [ ] TONO Y RESTRICCIONES — si no queda claro el nombre del agente, idioma, palabras prohibidas o reglas de identidad.
 - [ ] OBJECIONES — si el brief no menciona las objeciones frecuentes.
 - [ ] ENTREGA / CITA — si no está definido qué acción concluye el perfilamiento exitoso.
-No preguntes lo que puedas inferir con seguridad del brief. Agrupa las preguntas; no hagas una lista interminable. En el PASO 1 responde solo con el cuestionario en texto normal: NO entregues todavía el prompt ni ningún bloque de código.
+No preguntes lo que puedas inferir con seguridad del brief. Agrupa las preguntas; no hagas una lista interminable. Cuando una duda se preste a elegir entre alternativas acotadas (presupuesto, zona, tono, prioridad y similares), plantéala como bloque de opciones seleccionables en lugar de texto; deja en texto normal solo las dudas realmente abiertas. En el PASO 1 NO entregues todavía el prompt ni ningún bloque de código con el prompt.
 
 PASO 2 — DESPUÉS DE LAS RESPUESTAS DEL USUARIO: construye el prompt completo del nuevo cliente.
 
@@ -87,7 +88,12 @@ export function buildCreatorSystemPrompt(
   const reference =
     referencePrompt.trim().length > 0 ? referencePrompt : "(No se proporcionó prompt base.)";
   const persona = personaOverride?.trim() ? personaOverride : CREATOR_PERSONA;
+  // OPTIONS_CONTRACT is appended after the persona (default or override) so the
+  // selectable-options capability survives a saved persona override, exactly as
+  // in buildEditorSystemPrompt.
   return `${persona}
+
+${OPTIONS_CONTRACT}
 
 ---
 

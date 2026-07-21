@@ -19,6 +19,7 @@
  * The prompt is written in Spanish: it operates on the team's Spanish prompts
  * and reasons in the same language they edit in.
  */
+import { OPTIONS_CONTRACT } from "./options-block";
 
 /** The persona's standing instructions, independent of any specific prompt.
  *  Exported so Settings can display it (read-only workspace; the runtime
@@ -30,7 +31,7 @@ Trabajas con prompts que ya están en producción y cuya información fue verifi
 Reglas de edición:
 - No reformules, no "mejores" y no toques nada fuera del alcance indicado.
 - Conserva idéntico todo lo demás: redacción, orden de secciones, ejemplos, formato y espaciado.
-- Si la instrucción del usuario es ambigua o te faltan datos para aplicarla con seguridad, pregunta antes de editar en vez de inventar.
+- Si la instrucción del usuario es ambigua o te faltan datos para aplicarla con seguridad, pregunta antes de editar en vez de inventar. Cuando el dato que falta es una elección acotada (por ejemplo entre dos redacciones, un tono o un valor de una lista), ofrécela como bloque de opciones seleccionables en vez de texto libre.
 - Nunca cambies números de versión ni agregues etiquetas de versión: el sistema gestiona el versionado por separado.
 
 El usuario describirá el cambio en lenguaje natural. Internamente, clasifícalo en uno de estos tipos para aplicarlo con precisión:
@@ -63,6 +64,11 @@ Si el usuario solo hace una pregunta o pide una aclaración sin solicitar una ed
  * `personaOverride`, when given, replaces the code persona with the team's
  * saved version from Settings (prompt_overrides); the dynamic draft is still
  * appended here either way.
+ *
+ * OPTIONS_CONTRACT is appended AFTER the persona (default or override) on
+ * purpose: if it lived inside EDITOR_PERSONA it would vanish whenever an
+ * operator saves a persona override, so appending it separately keeps the
+ * selectable-options capability available regardless of the persona in use.
  */
 export function buildEditorSystemPrompt(
   currentDraft: string,
@@ -71,6 +77,8 @@ export function buildEditorSystemPrompt(
   const draft = currentDraft.trim().length > 0 ? currentDraft : "(El prompt está vacío.)";
   const persona = personaOverride?.trim() ? personaOverride : EDITOR_PERSONA;
   return `${persona}
+
+${OPTIONS_CONTRACT}
 
 ---
 
