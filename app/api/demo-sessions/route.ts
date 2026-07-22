@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { listSessions, createSession } from "@/lib/db/demo-sessions";
+import { listSessions, createSession, deleteAllSessions } from "@/lib/db/demo-sessions";
 import { createDemoSessionSchema } from "@/lib/schemas/demo-sessions";
 import { handleError } from "@/lib/http";
 
@@ -19,6 +19,16 @@ export async function POST(req: NextRequest) {
     const input = createDemoSessionSchema.parse(await req.json());
     const session = await createSession(input);
     return NextResponse.json(session, { status: 201 });
+  } catch (err) {
+    return handleError(err);
+  }
+}
+
+/** Clears the whole Playground history ("vaciar historial"). */
+export async function DELETE() {
+  try {
+    await deleteAllSessions();
+    return new NextResponse(null, { status: 204 });
   } catch (err) {
     return handleError(err);
   }

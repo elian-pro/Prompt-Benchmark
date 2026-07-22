@@ -28,6 +28,7 @@ import { Button } from "@/components/ui/Button";
 import { Modal } from "@/components/ui/Modal";
 import { SearchableChip } from "@/components/ui/SearchableChip";
 import { InfoHint } from "@/components/ui/InfoHint";
+import { DeleteDemoSessionModal } from "@/components/playground/DeleteDemoSessionModal";
 
 /** Any special state with no readable message names itself explicitly,
  *  e.g. "El bot pasó a estado «humano» y dejó de responder." — this is
@@ -403,6 +404,7 @@ export default function PlaygroundSessionPage() {
   const [openingDraft, setOpeningDraft] = useState("");
   const [savingOpening, setSavingOpening] = useState(false);
   const [openingError, setOpeningError] = useState<string | null>(null);
+  const [deleteOpen, setDeleteOpen] = useState(false);
   const [clientVersions, setClientVersions] = useState<VersionListItem[]>([]);
   const [switchingVersion, setSwitchingVersion] = useState(false);
 
@@ -728,6 +730,13 @@ export default function PlaygroundSessionPage() {
           </div>
         </div>
         <div className="detail-actions">
+          <Button
+            variant="ghost"
+            icon={<IconTrash size={14} />}
+            onClick={() => setDeleteOpen(true)}
+          >
+            Eliminar
+          </Button>
           {isActive && session.messages.length > 0 && (
             <Button
               variant="secondary"
@@ -920,6 +929,14 @@ export default function PlaygroundSessionPage() {
         </div>
         {openingError && <p className="form-error">{openingError}</p>}
       </Modal>
+
+      {deleteOpen && (
+        <DeleteDemoSessionModal
+          sessionId={id}
+          onClose={() => setDeleteOpen(false)}
+          onDone={() => router.push("/lab/playground")}
+        />
+      )}
     </div>
   );
 }

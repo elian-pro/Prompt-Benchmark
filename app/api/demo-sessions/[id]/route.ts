@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
-import { getSession, updateSessionVersion } from "@/lib/db/demo-sessions";
+import { getSession, updateSessionVersion, deleteSession } from "@/lib/db/demo-sessions";
 import { handleError, jsonError } from "@/lib/http";
 
 export const dynamic = "force-dynamic";
@@ -32,6 +32,17 @@ export async function PATCH(req: NextRequest, { params }: Params) {
     }
     const { version_id } = patchSchema.parse(await req.json());
     return NextResponse.json(await updateSessionVersion(id, version_id));
+  } catch (err) {
+    return handleError(err);
+  }
+}
+
+/** Permanently deletes the session (cascades to its messages and notes). */
+export async function DELETE(_req: NextRequest, { params }: Params) {
+  try {
+    const { id } = await params;
+    await deleteSession(id);
+    return new NextResponse(null, { status: 204 });
   } catch (err) {
     return handleError(err);
   }

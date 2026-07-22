@@ -324,6 +324,24 @@ export async function resetSession(sessionId: string): Promise<DemoSession> {
   return session;
 }
 
+/** Permanently deletes a Playground session. Its `demo_messages` and
+ *  `demo_notes` are removed by the ON DELETE CASCADE FKs (migrations 008/009);
+ *  there is no Storage tied to Playground, so nothing else to clean up. */
+export async function deleteSession(sessionId: string): Promise<void> {
+  const sb = getSupabase();
+  const { error } = await sb.from("demo_sessions").delete().eq("id", sessionId);
+  if (error) throw new Error(`No se pudo eliminar la conversación: ${error.message}`);
+}
+
+/** Deletes every Playground session ("vaciar historial"). Same cascade as
+ *  deleteSession. */
+export async function deleteAllSessions(): Promise<void> {
+  const sb = getSupabase();
+  // A filter is required; `id is not null` matches every row.
+  const { error } = await sb.from("demo_sessions").delete().not("id", "is", null);
+  if (error) throw new Error(`No se pudo vaciar el historial: ${error.message}`);
+}
+
 /**
  * Edits the opening message after the chat has started (Sprint 15). Updates
  * both the stored `opening_message` (so future rounds replay the new text on

@@ -2,13 +2,15 @@
 
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
-import { IconArrowLeft, IconMessage2, IconPlus } from "@tabler/icons-react";
+import { IconArrowLeft, IconMessage2, IconPlus, IconTrash } from "@tabler/icons-react";
 import type { DemoSessionListItem } from "@/lib/db/demo-sessions";
 import { relativeTimeEs } from "@/lib/format";
 import { Button } from "@/components/ui/Button";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { SkeletonRows } from "@/components/ui/Skeleton";
 import { NewPlaygroundSessionModal } from "@/components/playground/NewPlaygroundSessionModal";
+import { DeleteDemoSessionModal } from "@/components/playground/DeleteDemoSessionModal";
+import { DangerConfirmModal } from "@/components/ui/DangerConfirmModal";
 
 const STATUS_LABELS: Record<string, string> = {
   active: "Activa",
@@ -20,6 +22,8 @@ export default function PlaygroundPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [newOpen, setNewOpen] = useState(false);
+  const [deleteId, setDeleteId] = useState<string | null>(null);
+  const [clearOpen, setClearOpen] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -39,6 +43,16 @@ export default function PlaygroundPage() {
     load();
   }, [load]);
 
+  async function clearHistory() {
+    const res = await fetch("/api/demo-sessions", { method: "DELETE" });
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}));
+      throw new Error(data.error ?? "No se pudo vaciar el historial.");
+    }
+    setClearOpen(false);
+    load();
+  }
+
   const isEmpty = !loading && sessions.length === 0;
 
   return (
@@ -54,6 +68,15 @@ export default function PlaygroundPage() {
           </p>
         </div>
         <div className="header-actions">
+          {sessions.length > 0 && (
+            <Button
+              variant="secondary"
+              icon={<IconTrash size={14} />}
+              onClick={() => setClearOpen(true)}
+            >
+              Vaciar historial
+            </Button>
+          )}
           <Button
             variant="primary"
             icon={<IconPlus size={14} />}
@@ -87,28 +110,64 @@ export default function PlaygroundPage() {
       {!loading && !error && !isEmpty && (
         <div className="session-list">
           {sessions.map((s) => (
-            <Link key={s.id} href={`/lab/playground/${s.id}`} className="session-item">
-              <span className="session-main">
-                <span className="session-client">{s.client_name ?? "Cliente eliminado"}</span>
-                <span className="session-title">
-                  {s.version_number_snapshot} · {s.message_count}{" "}
-                  {s.message_count === 1 ? "mensaje" : "mensajes"}
+            <div key={s.id} className="session-row">
+              <Link href={`/lab/playground/${s.id}`} className="session-item">
+                <span className="session-main">
+                  <span className="session-client">{s.client_name ?? "Cliente eliminado"}</span>
+                  <span className="session-title">
+                    {s.version_number_snapshot} · {s.message_count}{" "}
+                    {s.message_count === 1 ? "mensaje" : "mensajes"}
+                  </span>
                 </span>
-              </span>
-              <span className="session-meta">
-                <span
-                  className={`session-status status-${s.status === "active" ? "active" : "finalized"}`}
-                >
-                  {STATUS_LABELS[s.status] ?? s.status}
+                <span className="session-meta">
+                  <span
+                    className={`session-status status-${s.status === "active" ? "active" : "finalized"}`}
+                  >
+                    {STATUS_LABELS[s.status] ?? s.status}
+                  </span>
+                  <span className="muted">{relativeTimeEs(s.created_at)}</span>
                 </span>
-                <span className="muted">{relativeTimeEs(s.created_at)}</span>
-              </span>
-            </Link>
+              </Link>
+              <button
+                type="button"
+                className="icon-btn danger session-del"
+                onClick={() => setDeleteId(s.id)}
+                aria-label="Eliminar conversación"
+                title="Eliminar conversación"
+              >
+                <IconTrash size={15} />
+              </button>
+            </div>
           ))}
         </div>
       )}
 
       {newOpen && <NewPlaygroundSessionModal open={newOpen} onClose={() => setNewOpen(false)} />}
+
+      {deleteId && (
+        <DeleteDemoSessionModal
+          sessionId={deleteId}
+          onClose={() => setDeleteId(null)}
+          onDone={() => {
+            setDeleteId(null);
+            load();
+          }}
+        />
+      )}
+
+      {clearOpen && (
+        <DangerConfirmModal
+          onClose={() => setClearOpen(false)}
+          onConfirm={clearHistory}
+          confirmTitle="¿Vaciar todo el historial?"
+          consequences={[
+            `Se borrarán las ${sessions.length} conversaciones y sus notas.`,
+            "Esta acción no se puede deshacer.",
+          ]}
+          confirmLabel="Sí, vaciar"
+          busyLabel="Vaciando…"
+        />
+      )}
     </div>
   );
 }
