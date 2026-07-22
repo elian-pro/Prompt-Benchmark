@@ -48,6 +48,7 @@ function Turn({
   onToggleSelect,
   onJumpToNote,
   registerRef,
+  onEditOpening,
 }: {
   id: string;
   role: DemoMessageRole;
@@ -58,6 +59,9 @@ function Turn({
   onToggleSelect: (id: string) => void;
   onJumpToNote: (noteIndex: number) => void;
   registerRef: (id: string, el: HTMLDivElement | null) => void;
+  /** When set, this turn is the editable opening message: shows a pencil that
+   *  opens the edit modal (Sprint 15). */
+  onEditOpening?: () => void;
 }) {
   const side = role === "bot" ? "turn-bot" : "turn-lead";
   const roleLabel = role === "bot" ? "Bot del cliente" : "Tú (lead)";
@@ -104,7 +108,23 @@ function Turn({
           ))}
         </div>
       )}
-      <span className="chat-turn-role">{roleLabel}</span>
+      <span className="chat-turn-role">
+        {roleLabel}
+        {onEditOpening && (
+          <button
+            type="button"
+            className="icon-btn chat-turn-edit"
+            onClick={(e) => {
+              e.stopPropagation();
+              onEditOpening();
+            }}
+            aria-label="Editar mensaje de inicio"
+            title="Editar mensaje de inicio"
+          >
+            <IconPencil size={13} />
+          </button>
+        )}
+      </span>
       {bubbles.map((b, i) => {
         const isLast = i === bubbles.length - 1;
         return (
@@ -379,6 +399,10 @@ export default function PlaygroundSessionPage() {
   const [handoffError, setHandoffError] = useState<string | null>(null);
   const [resetOpen, setResetOpen] = useState(false);
   const [resetting, setResetting] = useState(false);
+  const [openingEditOpen, setOpeningEditOpen] = useState(false);
+  const [openingDraft, setOpeningDraft] = useState("");
+  const [savingOpening, setSavingOpening] = useState(false);
+  const [openingError, setOpeningError] = useState<string | null>(null);
   const [clientVersions, setClientVersions] = useState<VersionListItem[]>([]);
   const [switchingVersion, setSwitchingVersion] = useState(false);
 
@@ -599,6 +623,36 @@ export default function PlaygroundSessionPage() {
     }
   }
 
+  // Opens the edit modal for the opening (welcome) message.
+  function startEditOpening() {
+    setOpeningDraft(session?.opening_message ?? "");
+    setOpeningError(null);
+    setOpeningEditOpen(true);
+  }
+
+  // Saves the edited opening message: the visible bubble and the stored text
+  // (replayed on future resets) update together.
+  async function saveOpeningMessage() {
+    const text = openingDraft.trim();
+    if (!text || savingOpening) return;
+    setSavingOpening(true);
+    setOpeningError(null);
+    try {
+      const res = await fetch(`/api/demo-sessions/${id}/opening-message`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ openingMessage: text }),
+      });
+      if (!res.ok) throw new Error((await res.json()).error ?? "No se pudo actualizar el mensaje.");
+      setOpeningEditOpen(false);
+      await load({ silent: true });
+    } catch (e) {
+      setOpeningError(e instanceof Error ? e.message : "Error al actualizar el mensaje.");
+    } finally {
+      setSavingOpening(false);
+    }
+  }
+
   // Switches the version under test and starts a fresh round. Blocked (both
   // here via the disabled control and on the server) once notes exist.
   async function switchVersion(versionId: string) {
@@ -629,6 +683,12 @@ export default function PlaygroundSessionPage() {
   // Message ids visible in the current round, so a note referencing an older
   // round can be flagged (its bubble preview still resolves via note_messages).
   const currentMessageIds = new Set(session.messages.map((m) => m.id));
+  // The seeded opening message is always turn 1 / bot of the current round. It
+  // is editable only while the session is active.
+  const openingMessageId =
+    isActive && session.opening_message && session.messages[0]?.role === "bot"
+      ? session.messages[0].id
+      : null;
 
   return (
     <div>
@@ -727,6 +787,7 @@ export default function PlaygroundSessionPage() {
                 onToggleSelect={toggleSelect}
                 onJumpToNote={jumpToNote}
                 registerRef={registerMessageRef}
+                onEditOpening={m.id === openingMessageId ? startEditOpening : undefined}
               />
             ))}
             {pendingHuman && <PendingTurn content={pendingHuman} />}
@@ -818,6 +879,46 @@ export default function PlaygroundSessionPage() {
           El chat empieza de cero. Tus notas se conservan (siguen visibles aunque no sean
           de la conversación nueva). No se borra nada de forma permanente.
         </p>
+      </Modal>
+
+      <Modal
+        open={openingEditOpen}
+        onClose={() => !savingOpening && setOpeningEditOpen(false)}
+        title="Editar mensaje de inicio"
+        footer={
+          <>
+            <Button
+              variant="ghost"
+              onClick={() => setOpeningEditOpen(false)}
+              disabled={savingOpening}
+            >
+              Cancelar
+            </Button>
+            <Button
+              variant="primary"
+              onClick={saveOpeningMessage}
+              disabled={savingOpening || !openingDraft.trim()}
+            >
+              {savingOpening ? "Guardando…" : "Guardar"}
+            </Button>
+          </>
+        }
+      >
+        <div className="field">
+          <textarea
+            className="textarea"
+            rows={3}
+            maxLength={2000}
+            value={openingDraft}
+            onChange={(e) => setOpeningDraft(e.target.value)}
+            placeholder="Ej: ¡Hola! Soy el asistente de Vero Lozano. ¿En qué propiedad estás interesado?"
+          />
+          <p className="field-hint">
+            Se actualiza la burbuja de esta conversación y el saludo con el que reabre el
+            chat al reiniciar o cambiar de versión.
+          </p>
+        </div>
+        {openingError && <p className="form-error">{openingError}</p>}
       </Modal>
     </div>
   );

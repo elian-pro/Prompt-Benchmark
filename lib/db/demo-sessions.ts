@@ -324,6 +324,38 @@ export async function resetSession(sessionId: string): Promise<DemoSession> {
   return session;
 }
 
+/**
+ * Edits the opening message after the chat has started (Sprint 15). Updates
+ * both the stored `opening_message` (so future rounds replay the new text on
+ * reset / version switch) and the visible turn-1 bot bubble of the current
+ * round, keeping the two in sync.
+ */
+export async function updateOpeningMessage(
+  sessionId: string,
+  text: string,
+): Promise<DemoSession> {
+  const sb = getSupabase();
+  const { data, error } = await sb
+    .from("demo_sessions")
+    .update({ opening_message: text })
+    .eq("id", sessionId)
+    .select(SESSION_COLS)
+    .single();
+  if (error) throw new Error(`No se pudo actualizar el mensaje de inicio: ${error.message}`);
+  const session = data as unknown as DemoSession;
+
+  const { error: mErr } = await sb
+    .from("demo_messages")
+    .update({ content: text })
+    .eq("session_id", sessionId)
+    .eq("round", session.current_round)
+    .eq("turn_number", 1)
+    .eq("role", "bot");
+  if (mErr) throw new Error(`No se pudo actualizar el mensaje visible: ${mErr.message}`);
+
+  return session;
+}
+
 /** Marks a Playground session as handed off, linking the Editor session it
  *  spawned (Sprint 6, T4 — "Enviar al Editor"). */
 export async function markSentToEditor(

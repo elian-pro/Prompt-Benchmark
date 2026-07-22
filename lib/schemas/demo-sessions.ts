@@ -15,6 +15,15 @@ export const createDemoSessionSchema = z.object({
     .optional(),
 });
 
+export const updateOpeningMessageSchema = z.object({
+  // Editing the opening message after the chat started (Sprint 15).
+  openingMessage: z
+    .string({ required_error: "El mensaje de inicio es obligatorio." })
+    .trim()
+    .min(1, "El mensaje de inicio es obligatorio.")
+    .max(2000, "El mensaje de inicio no puede pasar de 2000 caracteres."),
+});
+
 export const appendDemoMessageSchema = z.object({
   content: z
     .string({ required_error: "El mensaje es obligatorio." })
@@ -23,4 +32,5 @@ export const appendDemoMessageSchema = z.object({
 });
 
 export type CreateDemoSessionInput = z.infer<typeof createDemoSessionSchema>;
+export type UpdateOpeningMessageInput = z.infer<typeof updateOpeningMessageSchema>;
 export type AppendDemoMessageInput = z.infer<typeof appendDemoMessageSchema>;

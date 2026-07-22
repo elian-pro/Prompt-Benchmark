@@ -3606,12 +3606,19 @@ body[data-theme="light"] .dot-grid::after {
   align-items: flex-end;
 }
 .chat-turn-role {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
   font-size: 9px;
   letter-spacing: 0.16em;
   text-transform: uppercase;
   color: var(--muted);
   margin-bottom: 2px;
   padding: 0 2px;
+}
+.chat-turn-edit {
+  padding: 3px;
+  border-radius: 6px;
 }
 .chat-msg {
   padding: 9px 13px;
