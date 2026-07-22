@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import {
   IconArrowLeft,
@@ -277,12 +277,20 @@ export function SessionChat({
 
   function onInputChange(e: React.ChangeEvent<HTMLTextAreaElement>) {
     setInput(e.target.value);
-    const el = textareaRef.current;
-    if (el) {
-      el.style.height = "auto";
-      el.style.height = Math.min(el.scrollHeight, 200) + "px";
-    }
   }
+
+  // Single source of truth for the composer's auto-grow height. Runs after the
+  // new value is committed to the DOM but before paint, so it measures the real
+  // content height for every `input` change, whether typed or set
+  // programmatically (Playground handoff pre-fill, paste restore). Doing this in
+  // a rAF right after setInput used to race the re-render and measure the empty
+  // textarea, leaving a pre-filled draft stuck collapsed until the first keystroke.
+  useLayoutEffect(() => {
+    const el = textareaRef.current;
+    if (!el) return;
+    el.style.height = "auto";
+    el.style.height = Math.min(el.scrollHeight, 200) + "px";
+  }, [input]);
 
   const send = useCallback(
     async (explicit?: { content: string; attachments: Attachment[]; answer?: MessageAnswer }) => {
@@ -402,13 +410,9 @@ export function SessionChat({
     if (session.messages.length > 0) return;
     initialDraftAppliedRef.current = true;
     setInput(initialDraft);
-    requestAnimationFrame(() => {
-      const el = textareaRef.current;
-      if (!el) return;
-      el.style.height = "auto";
-      el.style.height = Math.min(el.scrollHeight, 200) + "px";
-      el.focus();
-    });
+    // Height is handled by the auto-grow layout effect (keyed on `input`); here
+    // we only move focus into the pre-filled composer, once it has rendered.
+    requestAnimationFrame(() => textareaRef.current?.focus());
   }, [initialDraft, session]);
 
   // Leaving a session that never actually changed the prompt shouldn't clutter
