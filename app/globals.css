@@ -1513,6 +1513,94 @@ a.lab-card:hover {
   text-align: center;
 }
 
+/* Bug button + red count badge: a persistent handle for the error log so a
+   fleeting toast can still be reviewed later. */
+.error-bug-btn {
+  position: fixed;
+  bottom: 24px;
+  left: 24px;
+  z-index: 60;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 100px;
+  background: var(--surface2);
+  border: 0.5px solid var(--border2);
+  color: var(--muted);
+  cursor: pointer;
+  transition: color 0.15s ease, border-color 0.15s ease;
+}
+.error-bug-btn:hover {
+  color: var(--fg);
+  border-color: var(--fg);
+}
+.error-bug-badge {
+  position: absolute;
+  top: -4px;
+  right: -4px;
+  min-width: 16px;
+  height: 16px;
+  padding: 0 4px;
+  border-radius: 100px;
+  background: var(--danger);
+  color: #fff;
+  font-size: 10px;
+  font-weight: 600;
+  line-height: 16px;
+  text-align: center;
+}
+.error-log-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  max-height: 55vh;
+  overflow-y: auto;
+}
+.error-log-item {
+  border: 0.5px solid var(--border);
+  border-radius: 10px;
+  padding: 10px 12px;
+}
+.error-log-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 4px;
+}
+.error-log-action {
+  font-size: 11px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.error-log-time {
+  font-size: 11px;
+  color: var(--faint);
+  flex-shrink: 0;
+}
+.error-log-message {
+  margin: 0;
+  font-size: 13px;
+  color: var(--fg);
+  line-height: 1.5;
+}
+.error-log-detail {
+  margin: 8px 0 0;
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: var(--surface2);
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  word-break: break-word;
+  max-height: 180px;
+  overflow-y: auto;
+}
+
 /* Two-step delete modal extras */
 .modal-icon {
   margin-bottom: 12px;

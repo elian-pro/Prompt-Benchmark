@@ -4,6 +4,7 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } fr
 import Link from "next/link";
 import {
   IconArrowLeft,
+  IconBug,
   IconChevronDown,
   IconCopy,
   IconFileText,
@@ -20,6 +21,7 @@ import { isAcceptedFile, uploadAttachment } from "@/lib/attachments";
 import { nextPasteName } from "@/lib/smart-paste";
 import { relativeTimeEs } from "@/lib/format";
 import { Button } from "@/components/ui/Button";
+import { Modal } from "@/components/ui/Modal";
 import { FindReplace } from "@/components/ui/FindReplace";
 import { N8nSyncModal } from "@/components/library/N8nSyncModal";
 import { ChatMessage } from "@/components/editor/ChatMessage";
@@ -28,6 +30,17 @@ import { FinalizeButton } from "@/components/editor/FinalizeButton";
 import { FinalizeCreatorButton } from "@/components/creator/FinalizeCreatorButton";
 
 type Mode = "editor" | "creator";
+
+/** One recorded chat failure, kept so the user can review it after the toast
+ *  is gone. `detail` is the raw technical string (HTTP body or stack) when it
+ *  adds anything over the human message. */
+type ErrorEntry = {
+  id: number;
+  at: string;
+  action: string;
+  message: string;
+  detail?: string;
+};
 
 const STATUS_LABELS: Record<string, string> = {
   active: "Activa",
@@ -127,6 +140,12 @@ export function SessionChat({
   // goes out with no file at all.
   const [attachmentsBusy, setAttachmentsBusy] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
+  // Error log: the toast is fleeting, so every failure is also kept here and
+  // surfaced by a bug button (with a red count badge) that opens a modal, so
+  // the user can read a "network error" and its technical detail at leisure.
+  const [errorLog, setErrorLog] = useState<ErrorEntry[]>([]);
+  const [errorLogOpen, setErrorLogOpen] = useState(false);
+  const errorIdRef = useRef(0);
   const [draftOpen, setDraftOpen] = useState(false);
   const [dragging, setDragging] = useState(false);
   // Whether the chat is scrolled near the bottom (hides the jump button).
@@ -275,6 +294,35 @@ export function SessionChat({
     window.setTimeout(() => setToast(null), durationMs);
   }
 
+  // Reports a failure: shows the fleeting toast AND records it in the error log
+  // so it stays consultable via the bug button. `action` names what failed
+  // (e.g. "Enviar mensaje"); `err` can be an Error, a string, or anything.
+  function reportError(action: string, err: unknown, fallback: string) {
+    const message =
+      err instanceof Error ? err.message : typeof err === "string" ? err : fallback;
+    const rawDetail =
+      err instanceof Error
+        ? (err.stack ?? err.message)
+        : typeof err === "string"
+          ? err
+          : (() => {
+              try {
+                return JSON.stringify(err);
+              } catch {
+                return String(err);
+              }
+            })();
+    const entry: ErrorEntry = {
+      id: ++errorIdRef.current,
+      at: new Date().toISOString(),
+      action,
+      message,
+      detail: rawDetail && rawDetail !== message ? rawDetail : undefined,
+    };
+    setErrorLog((prev) => [entry, ...prev]);
+    showToast(message);
+  }
+
   function onInputChange(e: React.ChangeEvent<HTMLTextAreaElement>) {
     setInput(e.target.value);
   }
@@ -368,7 +416,7 @@ export function SessionChat({
           setInput(content);
           setAttachments(sent);
         }
-        showToast(e instanceof Error ? e.message : "Error al enviar el mensaje.");
+        reportError("Enviar mensaje", e, "Error al enviar el mensaje.");
       } finally {
         setSending(false);
         setPendingUser(null);
@@ -442,7 +490,7 @@ export function SessionChat({
         try {
           added.push(await uploadAttachment(sessionId, file));
         } catch (e) {
-          showToast(e instanceof Error ? e.message : "No se pudo subir el archivo.");
+          reportError("Subir archivo", e, "No se pudo subir el archivo.");
         }
       }
       if (added.length > 0) {
@@ -579,7 +627,7 @@ export function SessionChat({
       setDraftFindOpen(false);
       showToast("Borrador guardado.");
     } catch (e) {
-      showToast(e instanceof Error ? e.message : "No se pudo guardar el borrador.");
+      reportError("Guardar borrador", e, "No se pudo guardar el borrador.");
     } finally {
       setSavingDraft(false);
     }
@@ -621,7 +669,7 @@ export function SessionChat({
         }
       }
     } catch (e) {
-      showToast(e instanceof Error ? e.message : "Error al promover.");
+      reportError("Promover a producción", e, "Error al promover.");
     } finally {
       setPromoting(false);
     }
@@ -671,7 +719,7 @@ export function SessionChat({
                 showToast(`Versión ${version.version_number} creada en la Biblioteca.`);
                 load({ silent: true });
               }}
-              onError={showToast}
+              onError={(msg) => reportError("Finalizar versión", msg, msg)}
             />
           )}
           {mode === "editor" && finalizedVersion && (
@@ -692,7 +740,7 @@ export function SessionChat({
                 showToast(`Cliente "${client.name}" creado como ${version.version_number}.`);
                 load({ silent: true });
               }}
-              onError={showToast}
+              onError={(msg) => reportError("Crear cliente", msg, msg)}
             />
           )}
         </div>
@@ -952,6 +1000,56 @@ export function SessionChat({
       )}
 
       {toast && <div className="toast">{toast}</div>}
+
+      {errorLog.length > 0 && (
+        <button
+          type="button"
+          className="error-bug-btn"
+          onClick={() => setErrorLogOpen(true)}
+          aria-label={`Ver errores (${errorLog.length})`}
+          title="Ver errores"
+        >
+          <IconBug size={18} />
+          <span className="error-bug-badge">{errorLog.length}</span>
+        </button>
+      )}
+
+      <Modal
+        open={errorLogOpen}
+        onClose={() => setErrorLogOpen(false)}
+        title={`Errores de esta sesión (${errorLog.length})`}
+        footer={
+          <>
+            <Button
+              variant="ghost"
+              onClick={() => {
+                setErrorLog([]);
+                setErrorLogOpen(false);
+              }}
+            >
+              Limpiar
+            </Button>
+            <Button variant="secondary" onClick={() => setErrorLogOpen(false)}>
+              Cerrar
+            </Button>
+          </>
+        }
+      >
+        <div className="error-log-list">
+          {errorLog.map((e) => (
+            <div key={e.id} className="error-log-item">
+              <div className="error-log-head">
+                <span className="error-log-action">{e.action}</span>
+                <span className="error-log-time">
+                  {new Date(e.at).toLocaleTimeString("es-MX")}
+                </span>
+              </div>
+              <p className="error-log-message">{e.message}</p>
+              {e.detail && <pre className="error-log-detail">{e.detail}</pre>}
+            </div>
+          ))}
+        </div>
+      </Modal>
     </div>
   );
 }
