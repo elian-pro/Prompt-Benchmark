@@ -92,7 +92,6 @@ export async function previewPush(binding: N8nBinding, nextText: string): Promis
     const warnings = computePushWarnings({
       currentRaw,
       nextText,
-      expressionPrefix: binding.expression_prefix,
     });
     const nextRaw = toRawSystemMessage(nextText, binding.expression_prefix);
     return {

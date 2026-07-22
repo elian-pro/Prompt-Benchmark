@@ -34,8 +34,6 @@ type Outcome = { binding_id: string; status: "success" | "error"; message?: stri
 const WARNING_COPY: Record<PushWarning, string> = {
   drops_interpolation:
     "El nodo interpola datos con {{ }} y el prompt nuevo no los incluye: se perdería esa inyección.",
-  new_braces_evaluated:
-    "El prompt nuevo contiene {{ }} y el campo es una expresión: n8n intentará evaluarlos.",
 };
 
 type Props = {

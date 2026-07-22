@@ -133,25 +133,22 @@ test("computePushWarnings flags dropped interpolation", () => {
   const w = computePushWarnings({
     currentRaw: "=Hola {{ $json.name }}",
     nextText: "Hola cliente",
-    expressionPrefix: true,
   });
   assert.deepEqual(w, ["drops_interpolation"]);
 });
 
-test("computePushWarnings flags new literal braces in an expression field", () => {
+test("computePushWarnings does not flag a prompt that keeps its {{ }}", () => {
   const w = computePushWarnings({
-    currentRaw: "=Hola",
-    nextText: "Usa el formato {{clave}}",
-    expressionPrefix: true,
+    currentRaw: "=Hola {{ $json.name }}",
+    nextText: "Hola {{ $json.name }}, usa el formato {{clave}}",
   });
-  assert.deepEqual(w, ["new_braces_evaluated"]);
+  assert.deepEqual(w, []);
 });
 
 test("computePushWarnings is silent for a plain prompt", () => {
   const w = computePushWarnings({
     currentRaw: "Hola",
     nextText: "Hola de nuevo",
-    expressionPrefix: false,
   });
   assert.deepEqual(w, []);
 });

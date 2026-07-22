@@ -262,9 +262,10 @@ aplicadas por conexión):
 - **Expresiones.** Un string que empieza con `=` es expresión y los
   `{{ ... }}` se interpolan en runtime. Se preserva el prefijo original
   (`expression_prefix`); si el texto actual del nodo trae `{{ }}` y el
-  prompt nuevo no, se bloquea con advertencia (romperías la inyección de
-  datos del lead); si el prompt nuevo trae `{{ }}` literales y el campo
-  lleva `=`, también se advierte. Tests unitarios propios.
+  prompt nuevo no, se advierte (romperías la inyección de datos del lead).
+  Que el prompt nuevo traiga `{{ }}` en un campo expresión es el caso
+  normal (todos los prompts usan interpolación), así que no se advierte.
+  Tests unitarios propios.
 - **Localización del nodo.** `listAgentNodes(workflow)` alimenta el
   picker; `findBoundNode(workflow, binding)` busca por `node_id`, cae a
   `node_name` (flujo reconstruido) pidiendo re-confirmación, y aborta con

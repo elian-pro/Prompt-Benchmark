@@ -57,10 +57,7 @@ export type SystemMessage = {
 export type PushWarning =
   /** Current node interpolates data ({{ }}) but the new prompt does not:
    *  pushing would drop the interpolation. */
-  | "drops_interpolation"
-  /** The new prompt carries literal {{ }} and the field is an expression,
-   *  so n8n would try to evaluate them. */
-  | "new_braces_evaluated";
+  "drops_interpolation";
 
 const PREVIEW_MAX = 120;
 
@@ -189,15 +186,16 @@ export function locateBoundAgent(
 export function computePushWarnings(input: {
   currentRaw: string | undefined;
   nextText: string;
-  expressionPrefix: boolean;
 }): PushWarning[] {
-  const { currentRaw, nextText, expressionPrefix } = input;
+  const { currentRaw, nextText } = input;
   const warnings: PushWarning[] = [];
 
   const currentHasTokens = typeof currentRaw === "string" && hasExpressionTokens(currentRaw);
   const nextHasTokens = hasExpressionTokens(nextText);
 
+  // A prompt legitimately carrying {{ }} in an expression field is the normal
+  // case here (every client prompt uses interpolation), so it is not flagged;
+  // only LOSING interpolation the node already relies on is worth a warning.
   if (currentHasTokens && !nextHasTokens) warnings.push("drops_interpolation");
-  if (expressionPrefix && nextHasTokens) warnings.push("new_braces_evaluated");
   return warnings;
 }
