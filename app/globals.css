@@ -3659,8 +3659,11 @@ body[data-theme="light"] .dot-grid::after {
 .chat-turn.turn-lead .chat-msg:last-of-type {
   border-bottom-right-radius: 14px;
 }
-/* Selection + flash ring the whole turn (all its bubbles). */
-.playground-chat .chat-turn.is-selected {
+/* Selection rings each bubble on its own, not one box around the whole turn:
+   a big container ring left gaps around narrower bubbles and wrapped the role
+   label. The label stays unhighlighted; the estado lives inside its bubble so
+   it rings with it. */
+.playground-chat .chat-turn.is-selected .chat-msg {
   box-shadow: 0 0 0 1.5px var(--accent);
 }
 .playground-chat .chat-turn.is-flashed .chat-msg {
