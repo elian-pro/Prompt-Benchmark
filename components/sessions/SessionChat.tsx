@@ -417,6 +417,10 @@ export function SessionChat({
           setAttachments(sent);
         }
         reportError("Enviar mensaje", e, "Error al enviar el mensaje.");
+        // A dropped stream still persists the partial reply server-side (the
+        // route salvages it before erroring), so re-sync to surface it instead
+        // of leaving the turn looking lost until a manual reload.
+        await load({ silent: true });
       } finally {
         setSending(false);
         setPendingUser(null);

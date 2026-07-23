@@ -153,6 +153,39 @@ export async function POST(req: NextRequest, { params }: Params) {
       { role: "user", content: input.content, attachments: modelAttachments },
     ];
 
+    // Persists the assistant turn and, when the reply carried a closed fenced
+    // prompt block, updates the working draft. Shared by the normal completion
+    // path and the mid-stream-failure salvage below, so a dropped connection
+    // stores exactly what a clean finish would have. Returns whether a block
+    // was opened but left unclosed (draftBroken).
+    const persistTurn = async (
+      text: string,
+      tokensIn: number,
+      tokensOut: number,
+    ): Promise<{ draftBroken: boolean }> => {
+      const draftBroken = hasUnclosedPromptBlock(text);
+      let newDraft = draftBroken ? null : extractPromptFromReply(text);
+      let contentToStore = text;
+      // Editor: stamp the draft (and the stored message, so the chat card
+      // matches) with the version it WILL become on finalize (the next minor
+      // bump), so the user sees v1.8 while editing instead of the base v1.7.
+      // This does not change the DB's latest version, so finalize still
+      // computes the same number: no double bump.
+      if (newDraft && !isCreator && session.client_id) {
+        const latest = await getLatestVersionNumber(session.client_id);
+        newDraft = syncVersionMarkers(newDraft, computeNextNumber(latest, "minor"));
+        contentToStore = replacePromptBlock(text, newDraft);
+      }
+      await appendMessage(id, {
+        role: "assistant",
+        content: contentToStore,
+        tokensIn,
+        tokensOut,
+      });
+      if (newDraft) await updateDraft(id, newDraft);
+      return { draftBroken };
+    };
+
     const encoder = new TextEncoder();
     const stream = new ReadableStream<Uint8Array>({
       async start(controller) {
@@ -185,6 +218,10 @@ export async function POST(req: NextRequest, { params }: Params) {
         let tokensIn = 0;
         let tokensOut = 0;
         let truncated = false;
+        // Guards the salvage path from re-persisting: if the client drops right
+        // after a clean persist but before close, the throw lands in catch with
+        // fullText still set, and without this we would store the turn twice.
+        let persisted = false;
         try {
           for await (const chunk of streamChat({
             providerId: role.provider_id,
@@ -205,28 +242,9 @@ export async function POST(req: NextRequest, { params }: Params) {
             }
           }
 
-          const draftBroken = hasUnclosedPromptBlock(fullText);
-          let newDraft = draftBroken ? null : extractPromptFromReply(fullText);
-          let contentToStore = fullText;
-          // Editor: stamp the draft (and the stored message, so the chat card
-          // matches) with the version it WILL become on finalize (the next
-          // minor bump), so the user sees v1.8 while editing instead of the
-          // base v1.7. This does not change the DB's latest version, so
-          // finalize still computes the same number: no double bump.
-          if (newDraft && !isCreator && session.client_id) {
-            const latest = await getLatestVersionNumber(session.client_id);
-            newDraft = syncVersionMarkers(newDraft, computeNextNumber(latest, "minor"));
-            contentToStore = replacePromptBlock(fullText, newDraft);
-          }
-
           // Persist the assistant turn (version-stamped) and update the draft.
-          await appendMessage(id, {
-            role: "assistant",
-            content: contentToStore,
-            tokensIn,
-            tokensOut,
-          });
-          if (newDraft) await updateDraft(id, newDraft);
+          const { draftBroken } = await persistTurn(fullText, tokensIn, tokensOut);
+          persisted = true;
 
           send({ type: "done", truncated, draftBroken });
           stopHeartbeat();
@@ -234,6 +252,34 @@ export async function POST(req: NextRequest, { params }: Params) {
           controller.close();
         } catch (err) {
           stopHeartbeat();
+          // The stream broke mid-flight: an upstream provider error, or the
+          // client connection dropped (a transient network blip on a long
+          // turn). This route used to swallow the error, which is exactly why
+          // the failure window was empty in the server logs. Log it so a
+          // recurrence leaves a trace.
+          console.error(
+            `[chat-sessions] stream failed (session ${id}, type ${session.type}): ${
+              err instanceof Error ? (err.stack ?? err.message) : String(err)
+            }`,
+          );
+          // Salvage whatever was generated so a dropped connection doesn't
+          // discard the turn: the user finds the partial reply (and its draft,
+          // if a full block already arrived) on the next re-sync instead of an
+          // empty chat. Token counts are best-effort: tokensOut only arrives
+          // on the provider's final event, so a mid-stream drop leaves it 0.
+          if (fullText && !persisted) {
+            try {
+              await persistTurn(fullText, tokensIn, tokensOut);
+            } catch (persistErr) {
+              console.error(
+                `[chat-sessions] failed to persist partial reply (session ${id}): ${
+                  persistErr instanceof Error
+                    ? (persistErr.stack ?? persistErr.message)
+                    : String(persistErr)
+                }`,
+              );
+            }
+          }
           closed = true;
           controller.error(err);
         }
