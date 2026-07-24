@@ -11,6 +11,7 @@
 import { getSupabase } from "../supabase";
 import { syncVersionMarkers } from "../version-utils";
 import { listVersions } from "./versions";
+import { suggestChatsTable } from "./chats-history";
 import type { VersionListItem, Version, VersionSource } from "./versions";
 
 export type ClientFilter = "all" | "production" | "editing" | "legacy" | "archived";
@@ -30,6 +31,10 @@ export type Client = {
    *  has been set up yet. Always set (mandatory at creation, defaults to
    *  'zebra' for pre-existing rows). Drives the Library's yellow host tag. */
   n8n_host: N8nHost;
+  /** Conversation-history table for this client in the "chats" DB
+   *  (chats_<Cliente>), or null when no history is connected yet. Set by
+   *  auto-match on creation or by hand in the Library. See lib/db/chats-history. */
+  chats_table: string | null;
   created_at: string;
   updated_at: string;
 };
@@ -208,6 +213,11 @@ export async function createClient(input: {
   n8nHost?: N8nHost;
 }): Promise<{ client: Client; version: Version | null }> {
   const sb = getSupabase();
+  // Best-effort: auto-connect the client's conversation-history table when its
+  // name matches one in the "chats" DB. Never blocks creation (returns null if
+  // the chats DB is unconfigured/unreachable); existing clients with a
+  // different table name are connected by hand in the Library.
+  const chatsTable = await suggestChatsTable(input.name);
   const { data: client, error } = await sb
     .from("clients")
     .insert({
@@ -215,6 +225,7 @@ export async function createClient(input: {
       segment: input.segment ?? null,
       notes: input.notes ?? null,
       ...(input.n8nHost ? { n8n_host: input.n8nHost } : {}),
+      ...(chatsTable ? { chats_table: chatsTable } : {}),
     })
     .select("*")
     .single();
@@ -257,6 +268,7 @@ export async function updateClient(
     notes?: string | null;
     draft_content?: string | null;
     n8n_host?: N8nHost;
+    chats_table?: string | null;
   },
 ): Promise<Client> {
   const sb = getSupabase();
@@ -266,6 +278,7 @@ export async function updateClient(
   if (input.notes !== undefined) patch.notes = input.notes;
   if (input.draft_content !== undefined) patch.draft_content = input.draft_content;
   if (input.n8n_host !== undefined) patch.n8n_host = input.n8n_host;
+  if (input.chats_table !== undefined) patch.chats_table = input.chats_table;
 
   const { data, error } = await sb
     .from("clients")

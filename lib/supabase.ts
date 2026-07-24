@@ -33,3 +33,41 @@ export function getSupabase(): SupabaseClient {
 
   return client;
 }
+
+/**
+ * Server-side client for the SECOND Supabase project ("chats"), where the
+ * agents store their real client/lead conversation history (one table per
+ * client, chats_<Cliente>). Same service_role rules as getSupabase: never
+ * import from a client component; read-only usage lives in lib/db/chats-history.
+ *
+ * Separate singleton bound to its own project via CHATS_SUPABASE_URL /
+ * CHATS_SUPABASE_SERVICE_ROLE_KEY.
+ */
+let chatsClient: SupabaseClient | null = null;
+
+export function getChatsSupabase(): SupabaseClient {
+  if (chatsClient) return chatsClient;
+
+  const url = process.env.CHATS_SUPABASE_URL;
+  const serviceRoleKey = process.env.CHATS_SUPABASE_SERVICE_ROLE_KEY;
+
+  if (!url || !serviceRoleKey) {
+    throw new Error(
+      "Faltan variables de entorno: CHATS_SUPABASE_URL y CHATS_SUPABASE_SERVICE_ROLE_KEY son obligatorias para el historial de conversaciones.",
+    );
+  }
+
+  chatsClient = createClient(url, serviceRoleKey, {
+    auth: {
+      persistSession: false,
+      autoRefreshToken: false,
+    },
+  });
+
+  return chatsClient;
+}
+
+/** Whether the "chats" DB connection is configured (both env vars present). */
+export function isChatsConfigured(): boolean {
+  return Boolean(process.env.CHATS_SUPABASE_URL && process.env.CHATS_SUPABASE_SERVICE_ROLE_KEY);
+}
