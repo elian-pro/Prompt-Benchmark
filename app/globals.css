@@ -1778,6 +1778,19 @@ a.lab-card:hover {
   outline: 2px solid var(--accent);
   outline-offset: 1px;
 }
+/* Collapsed (non-production, not selected): show only the number pill, so the
+   version list stays short and the panels below it are easy to reach. Clicking
+   selects the version, which expands it. */
+.version-item.is-collapsed {
+  padding: 7px 13px;
+}
+.version-item.is-collapsed .vfoot,
+.version-item.is-collapsed .version-changes-view,
+.version-item.is-collapsed .version-changes-edit,
+.version-item.is-collapsed .version-changes-link,
+.version-item.is-collapsed .vnum-edit-btn {
+  display: none;
+}
 
 /* Read-only version viewer (detail page right panel). */
 .version-view-head {

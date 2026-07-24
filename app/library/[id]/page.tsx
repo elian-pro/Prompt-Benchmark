@@ -570,12 +570,16 @@ export default function ClientDetailPage() {
             {detail.versions.map((v, i) => {
               // Versions are newest-first, so the last entry is the original.
               const isFirstVersion = i === detail.versions.length - 1;
+              // Non-production versions collapse to just their number pill so the
+              // list stays short; production and the one being viewed stay open.
+              // Clicking a collapsed version selects it, which expands it.
+              const expanded = v.is_production || selectedVersionId === v.id;
               return (
                 <div
                   key={v.id}
                   role="button"
                   tabIndex={0}
-                  className={`version-item version-item-btn${v.is_production ? " is-prod" : ""}${selectedVersionId === v.id ? " is-active" : ""}`}
+                  className={`version-item version-item-btn${v.is_production ? " is-prod" : ""}${selectedVersionId === v.id ? " is-active" : ""}${expanded ? "" : " is-collapsed"}`}
                   onClick={() => setSelectedVersionId(v.id)}
                   onKeyDown={(e) => {
                     if (e.key === "Enter" || e.key === " ") {
