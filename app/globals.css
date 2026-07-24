@@ -3636,6 +3636,23 @@ body[data-theme="light"] .dot-grid::after {
   border-top: 0.5px solid var(--border);
 }
 
+/* Conversation-history rows (client detail sidebar): a full-width clickable
+   list item that opens the full conversation in a modal. */
+.conversation-item {
+  display: block;
+  width: 100%;
+  text-align: left;
+  background: none;
+  border: none;
+  border-top: 0.5px solid var(--border);
+  padding: 8px 2px;
+  cursor: pointer;
+  border-radius: 4px;
+}
+.conversation-item:hover {
+  background: var(--surface-2, rgba(127, 127, 127, 0.08));
+}
+
 /* n8n binding modal: destination-type chips + node id line */
 .chip-row {
   display: flex;

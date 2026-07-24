@@ -30,6 +30,13 @@ export const updateClientSchema = z
     notes: z.string().nullable(),
     draft_content: z.string().nullable(),
     n8n_host: z.enum(["zebra", "own"]),
+    // Conversation-history table in the "chats" DB, or null to disconnect.
+    // Must be a chats_<...> name (validated again server-side before querying).
+    chats_table: z
+      .string()
+      .trim()
+      .regex(/^chats_[A-Za-z0-9_]+$/, "Nombre de tabla de historial no válido.")
+      .nullable(),
   })
   .partial()
   .refine((v) => Object.keys(v).length > 0, {
