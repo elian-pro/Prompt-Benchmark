@@ -15,6 +15,10 @@ export type MaskedConnection = {
   name: string;
   base_url: string;
   api_key_masked: string;
+  // Base workflow duplicated for a new client (Sprint 16). Null when this
+  // connection has no template configured.
+  template_workflow_id: string | null;
+  template_workflow_name: string | null;
   created_at: string;
   updated_at: string;
 };
@@ -46,6 +50,8 @@ function toMasked(row: any): MaskedConnection {
     name: row.name,
     base_url: row.base_url,
     api_key_masked: maskFromEncrypted(row.api_key_encrypted),
+    template_workflow_id: row.template_workflow_id ?? null,
+    template_workflow_name: row.template_workflow_name ?? null,
     created_at: row.created_at,
     updated_at: row.updated_at,
   };
@@ -93,7 +99,13 @@ export async function createConnection(input: {
 
 export async function updateConnection(
   id: string,
-  input: { name?: string; base_url?: string; api_key?: string },
+  input: {
+    name?: string;
+    base_url?: string;
+    api_key?: string;
+    template_workflow_id?: string | null;
+    template_workflow_name?: string | null;
+  },
 ): Promise<MaskedConnection> {
   const sb = getSupabase();
   const patch: Record<string, unknown> = {};
@@ -101,6 +113,12 @@ export async function updateConnection(
   if (input.base_url !== undefined) patch.base_url = input.base_url;
   // Re-encrypt only when a new key is provided; blank leaves the existing one.
   if (input.api_key) patch.api_key_encrypted = encrypt(input.api_key);
+  if (input.template_workflow_id !== undefined) {
+    patch.template_workflow_id = input.template_workflow_id;
+  }
+  if (input.template_workflow_name !== undefined) {
+    patch.template_workflow_name = input.template_workflow_name;
+  }
 
   const { data, error } = await sb
     .from("n8n_connections")

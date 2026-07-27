@@ -16,6 +16,11 @@ export function N8nConnectionRow({ connection, onEdit, onDelete }: Props) {
         <div>
           <div className="provider-name">{connection.name}</div>
           <div className="adapter-label">{connection.base_url}</div>
+          <div className="adapter-label">
+            {connection.template_workflow_name
+              ? `Plantilla: ${connection.template_workflow_name}`
+              : "Sin flujo plantilla"}
+          </div>
         </div>
         <div className="provider-actions">
           <span className="masked-key">{connection.api_key_masked}</span>
