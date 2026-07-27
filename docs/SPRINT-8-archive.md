@@ -1,9 +1,12 @@
-# Plan: Sprint 8, rediseño de Playground
+# Sprint 8, rediseño de Playground (archivo)
 
-> Estado: PROPUESTA. Nada implementado. Este documento se pule antes de
-> escribir código. Cinco cambios pedidos por el equipo, entregados por
-> tickets (no todo de una). Cuando se apruebe, se ejecuta ticket por ticket
-> y al final se archiva como `docs/SPRINT-8-archive.md`.
+> Estado: COMPLETADO. Los 7 tickets se implementaron tal como se planearon
+> aquí: migración `012_playground_rounds.sql` (rondas), `parseTurnBubbles()`
+> con sus tests en `lib/adversarial-message.ts`, `POST
+> /api/demo-sessions/[id]/reset`, y el rediseño de notas y globos en
+> `app/lab/playground/[id]/page.tsx`. El comportamiento final vive en
+> `docs/SPEC.md` y `docs/ARCHITECTURE.md`; este documento se conserva solo
+> como registro de las decisiones.
 
 ## 1. Contexto actual (verificado en el código)
 

@@ -11,7 +11,7 @@
 -- view shows only the current round, and old messages stay in the table so a
 -- note's referenced-message preview keeps working. Notes remain session-scoped
 -- (not round-scoped), so they persist across resets. See
--- docs/SPRINT-8-playground-plan.md section 3.
+-- docs/SPRINT-8-archive.md section 3.
 
 -- The session's active round. Reset and version-switch both bump this.
 alter table demo_sessions

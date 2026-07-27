@@ -1,7 +1,12 @@
-# Plan: Sprint 9, arreglo y rediseño del Editor
+# Sprint 9, arreglo y rediseño del Editor (archivo)
 
-> Estado: PROPUESTA. Nada implementado. Se pule antes de codear. Al aprobar,
-> se ejecuta por tickets y se archiva como `docs/SPRINT-9-archive.md`.
+> Estado: COMPLETADO. Los 8 tickets se implementaron: contrato centinela
+> `===PROMPT ACTUALIZADO===` en `lib/prompts/editor-persona.ts`, extracción
+> robusta con fallback greedy, `syncVersionMarkers` al guardar el draft
+> (`app/api/chat-sessions/[id]/messages/route.ts`), y promover a producción
+> con sync n8n desde `components/sessions/SessionChat.tsx`. El
+> comportamiento final vive en `docs/SPEC.md` y `docs/ARCHITECTURE.md`; este
+> documento se conserva solo como registro de las decisiones.
 
 ## 1. Lo que se pide (7 problemas reportados)
 
