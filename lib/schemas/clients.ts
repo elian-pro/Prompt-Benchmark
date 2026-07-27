@@ -23,6 +23,19 @@ export const createClientSchema = z.object({
   }),
 });
 
+/**
+ * Provisioning a client (Sprint 16): duplicate its n8n flow, create its chats
+ * table, or both. Sent right after creation and again by the retry buttons in
+ * the client detail page, so both flags default to false.
+ */
+export const provisionClientSchema = z.object({
+  duplicateWorkflow: z.boolean().default(false),
+  // Per-creation override of the connection's default template. Both or neither.
+  templateConnectionId: z.string().uuid("connection_id debe ser un UUID válido.").optional(),
+  templateWorkflowId: z.string().trim().min(1).optional(),
+  createChatsTable: z.boolean().default(false),
+});
+
 export const updateClientSchema = z
   .object({
     name: z.string().trim().min(1, "El nombre es obligatorio."),
@@ -44,4 +57,5 @@ export const updateClientSchema = z
   });
 
 export type CreateClientInput = z.infer<typeof createClientSchema>;
+export type ProvisionClientInput = z.infer<typeof provisionClientSchema>;
 export type UpdateClientInput = z.infer<typeof updateClientSchema>;
