@@ -9,18 +9,11 @@
  * as clients.chats_table (see migration 018). This module never writes.
  */
 import { getChatsSupabase, isChatsConfigured } from "../supabase";
+// The validator lives in the pure chats-table-name module so the same rule
+// guards the PostgREST path here and the CREATE TABLE that provisioning sends.
+import { isValidChatsTable } from "../chats-table-name";
 
-/**
- * A chats_* table name is interpolated into the PostgREST path (it can't be a
- * bound parameter), so it must be validated before use. Restricting to the
- * chats_ prefix + word chars makes injection impossible and scopes access to
- * conversation tables only.
- */
-const CHATS_TABLE_RE = /^chats_[A-Za-z0-9_]+$/;
-
-export function isValidChatsTable(name: string): boolean {
-  return CHATS_TABLE_RE.test(name);
-}
+export { isValidChatsTable };
 
 export type ChatsTable = { table: string; rows: number };
 
