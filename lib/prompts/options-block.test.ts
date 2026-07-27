@@ -163,10 +163,14 @@ test("splitOptionsBlock leaves no raw markers or JSON in the prose", () => {
     assert.ok(!prose.includes(OPTIONS_END), `stray end marker in: ${prose}`);
     assert.ok(!prose.includes('"questions"'), `stray JSON payload in: ${prose}`);
   }
-  // The prose between and after the blocks survives, stitched together.
+  // Every intro line reads above the single card (which sits where the last
+  // block was), and only the closing prose stays below it.
   assert.match(before, /Elige el enfoque/);
-  assert.match(after, /Y una duda más sobre promociones/);
+  assert.match(before, /Y una duda más sobre promociones/);
   assert.match(after, /¿Te parece\?/);
+  assert.ok(!after.includes("Y una duda"), "intro prose must not fall below the card");
+  // Cutting the blocks out must not leave a stack of blank lines behind.
+  assert.ok(!/\n{3,}/.test(before), `collapsed blank lines expected in: ${JSON.stringify(before)}`);
 });
 
 test("merging drops duplicate question ids and clamps to 3 questions", () => {

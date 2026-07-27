@@ -141,8 +141,9 @@ function mergeQuestions(found: BlockLocation[]): OptionsBlock {
  * other block in that turn. The model still occasionally emits two (one per
  * question) instead of one block with two questions. Rather than render the
  * first and dump the second as raw JSON in the chat, all blocks collapse into a
- * single card and their markers are stripped from the surrounding prose, which
- * is preserved and stitched together.
+ * single card anchored where the LAST one was: every question's introductory
+ * line reads above the card that answers it, instead of a card appearing before
+ * the prose that introduces half of it.
  */
 export function splitOptionsBlock(reply: string): {
   before: string;
@@ -151,16 +152,22 @@ export function splitOptionsBlock(reply: string): {
 } {
   const found = locateOptionsBlocks(reply);
   if (found.length === 0) return { before: reply, block: null, after: "" };
-  const [first, ...rest] = found;
-  // Everything past the first block, minus the extra blocks' own text.
-  let after = "";
-  let cursor = first.end;
-  for (const extra of rest) {
-    after += reply.slice(cursor, extra.start);
-    cursor = extra.end;
+  const last = found[found.length - 1];
+  // Prose up to the last block, with the earlier blocks' own text cut out and
+  // the surrounding paragraphs stitched together.
+  let before = "";
+  let cursor = 0;
+  for (const b of found) {
+    before += reply.slice(cursor, b.start);
+    cursor = b.end;
   }
-  after += reply.slice(cursor);
-  return { before: reply.slice(0, first.start), block: mergeQuestions(found), after };
+  return {
+    // The cuts leave the trailing blank line of one paragraph next to the
+    // leading blank line of the next, which pre-wrap would render as a gap.
+    before: before.replace(/\n{3,}/g, "\n\n"),
+    block: mergeQuestions(found),
+    after: reply.slice(last.end),
+  };
 }
 
 function countOccurrences(haystack: string, needle: string): number {
