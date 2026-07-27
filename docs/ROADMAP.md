@@ -72,11 +72,86 @@ run, and a new Playground where the user converses with a client's prompt
 themselves, tags messages, writes feedback notes, and sends them straight
 into an Editor session. Plan and tickets in `docs/SPRINT-6-archive.md`.
 
+## Sprint 7: n8n prompt sync ✅
+
+Clients can be bound to their n8n AI Agent node, by API connection or
+manually. Promoting a version pushes the prompt into the node after a diff
+confirmation, with drift badges, sync history and revert. Migration
+`011_n8n_sync.sql`. Plan in `docs/N8N-SYNC-PLAN.md`, behavior documented in
+`docs/SPEC.md` and `docs/ARCHITECTURE.md`.
+
+## Sprint 8: Playground redesign ✅
+
+Rounds model (`012_playground_rounds.sql`) so a conversation can be reset
+without losing notes, version switching inside a session, live note card
+with the referenced bubbles, notes in their own section, and WhatsApp style
+bubble splitting. Archived in `docs/SPRINT-8-archive.md`.
+
+## Sprint 9: Editor fixes ✅
+
+Root cause fix for the truncated prompt: sentinel delimiters
+(`===PROMPT ACTUALIZADO===`) replace the fenced block, so client prompts
+containing their own fences survive extraction. Plus target version number
+visible in the draft, bounded change summary, "NEW" badge on Ver borrador,
+promote to production from the Editor, and scroll to bottom button.
+Archived in `docs/SPRINT-9-archive.md`.
+
+## Sprint 10: in-app Google login ✅
+
+"Entrar con Google" owned by the app, restricted to
+`@zebradigital.marketing` accounts and enforced server side in
+`middleware.ts`. Replaces the EasyPanel HTTP Basic Auth perimeter.
+
+## Sprint 11: judge context and lead brief ✅
+
+A run can carry an optional lead brief so the simulated lead stays coherent,
+and the judge receives the bot's prompt as labeled context.
+`013_add_lead_brief_to_runs.sql`.
+
+## Sprint 13: n8n host tag ✅
+
+Clients record where their agent's n8n lives (`014_add_n8n_host_to_clients.sql`)
+and Library cards show it as a yellow "n8n Zebra" / "n8n propio" tag.
+
+## Sprint 14: Playground opening message ✅
+
+An optional opening bot message per Playground session, replayed at the
+start of every round and editable after the chat has started.
+`015_add_opening_message_to_demo_sessions.sql`.
+
+## Sprint 15: Smart Paste ✅
+
+Pasting a long block of text into the Editor or Creator composer turns it
+into an attachment instead of flooding the input. Threshold configurable in
+Settings (`016_composer_settings.sql`).
+
+## Sprint 16: client provisioning ✅
+
+Creating a client can now duplicate the n8n template flow as
+`IA Mensajes <Cliente>` (created disabled, its AI Agent node auto-bound) and
+create the `chats_<Cliente>` history table in the chats project. Both are
+checkboxes in the modal, both are idempotent, and both can be retried from the
+client detail page when they fail. Template picked per n8n connection
+(`019_n8n_template_workflow.sql`); the table DDL goes through the Supabase
+Management API from `lib/chats-admin.ts`. Plan in
+`docs/SPRINT-16-provisioning-plan.md`.
+
+## Post Sprint 15 (unnumbered work) ✅
+
+Shipped without a sprint plan of its own, documented in `docs/SPEC.md`:
+selectable options blocks in Editor/Creator chat
+(`017_add_answer_to_chat_messages.sql`), conversation history viewer per
+client (`018_add_chats_table_to_clients.sql`), Playground conversation
+delete, consultable error log, and turns that keep running after the client
+leaves. Stream resilience hotfix in
+`docs/HOTFIX-creator-editor-stream-timeout.md`.
+
+> There is no Sprint 12. The numbering skips it.
+
 ---
 
 ## Future (not in current scope)
 
-- Direct API integration with n8n (auto-publish to nodes).
 - Batch adversarial runs (multiple personas in parallel).
 - Cross-client analytics (which failure modes are most common across
   clients).

@@ -195,6 +195,37 @@ Click a card → client detail with version list, manual textarea editor,
 "Finalizar edición" button, "Promover a producción" button, copy-to-
 clipboard button.
 
+#### Creating a client: provisioning (Sprint 16)
+
+"+ Nuevo cliente" offers two checkboxes, both checked by default:
+
+- **Duplicar el flujo de n8n**, which copies the template workflow and names
+  the copy `IA Mensajes <Cliente>`. The copy is created disabled, and its AI
+  Agent node is bound automatically so promoting a version pushes the prompt
+  with no extra setup. The template is configured once per n8n connection in
+  Settings, and can be overridden for a single creation.
+- **Crear la tabla de historial**, which creates `chats_<Cliente>` in the
+  chats project and connects it to the history panel. The name drops accents,
+  spaces and punctuation and keeps capitalization: "Bad Boys Toys" becomes
+  `chats_BadBoysToys`, shown in the modal as the user types.
+
+Each option hides itself when it is not configured (no template, or no access
+token for the chats project), so the modal never offers something that can
+only fail.
+
+**The client is always created.** If a step fails, the modal says so per step
+and the user continues to the client's page, where the failed step can be
+retried: "Duplicar plantilla" in the n8n deploy card, "Crear tabla chats_X"
+in the history panel. Retrying is safe, an existing flow or table is adopted
+instead of duplicated.
+
+Both entry points that create a client without these checkboxes ("Importar
+existente" and the Creator's "Finalizar") land on the same retry buttons.
+That is deliberate: an imported or Creator-built client usually already has
+its flow in n8n.
+
+Renaming a client later does not rename its workflow or its table.
+
 #### n8n sync (Sprint 7)
 
 A client detail can be bound to one or more n8n deploy targets, chosen

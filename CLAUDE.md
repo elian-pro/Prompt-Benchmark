@@ -28,7 +28,7 @@ and pastes into the corresponding n8n node.
 | Tech stack, file structure, provider architecture, security model | `docs/ARCHITECTURE.md` |
 | Colors, typography, component patterns | `docs/DESIGN-SYSTEM.md` |
 | All sprints overview | `docs/ROADMAP.md` |
-| Sprint plans (all complete, archived) | `docs/SPRINT-1-archive.md` … `docs/SPRINT-6-archive.md` |
+| Sprint plans (all complete, archived) | `docs/SPRINT-1-archive.md` … `docs/SPRINT-9-archive.md` (no Sprint 7 file, see `docs/N8N-SYNC-PLAN.md`) |
 | Database schema source of truth | `supabase/migrations/` |
 
 ## Rules of engagement
@@ -71,5 +71,14 @@ and pastes into the corresponding n8n node.
 
 ## Active sprint
 
-None. Sprints 1–6 are complete and archived at `docs/SPRINT-1-archive.md`
-through `docs/SPRINT-6-archive.md`.
+Sprint 16, client provisioning: plan and ticket status in
+`docs/SPRINT-16-provisioning-plan.md`. All eight tickets are implemented;
+what remains is manual verification (run `019_n8n_template_workflow.sql`, set
+`SUPABASE_ACCESS_TOKEN` / `CHATS_SUPABASE_PROJECT_REF`, pick the template in
+Settings, then the end-to-end run described in the plan).
+
+Sprints 1 through 15 are complete (there is no Sprint 12). Sprints 1 to 6, 8
+and 9 have archived plans in `docs/SPRINT-*-archive.md`; Sprint 7 is
+`docs/N8N-SYNC-PLAN.md`; sprints 10 to 15 shipped without a plan file and are
+only documented in `docs/ROADMAP.md`, `docs/SPEC.md` and
+`docs/ARCHITECTURE.md`.

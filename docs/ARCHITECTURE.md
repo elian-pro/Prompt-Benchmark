@@ -449,6 +449,78 @@ list connections, list a connection's workflows, list a workflow's AI
 Agent nodes (with a prompt preview, since a workflow can have more than
 one).
 
+## Client provisioning
+
+Sprint 16. Creating a client used to be followed by two manual chores:
+duplicating the n8n workflow and renaming the copy `IA Mensajes <Cliente>`,
+and creating the `chats_<Cliente>` table in the chats project. Both are now
+checkboxes in the Nuevo cliente modal, and buttons on the client detail page
+when they need retrying.
+
+**Two requests, not one.** `POST /api/clients` creates the client, and a
+separate `POST /api/clients/[id]/provision` runs the steps. The rule "the
+client is always created" is then structural rather than a try/catch
+discipline: nothing the provisioning does can undo a client that already
+exists. The same endpoint serves the modal and the retry buttons, so there is
+one implementation, in `lib/provisioning.ts`. It returns
+`{ workflow, chats }`, each a `StepResult` (`{ok:true, detail}` or
+`{ok:false, error}`), and answers 200 even when a step failed, because a
+failed step is a normal outcome here, not a broken request.
+
+**No provisioning state is stored.** Both steps are idempotent, keyed on the
+name they would create, so the real world is the state:
+
+- n8n: if a workflow named `IA Mensajes <Cliente>` already exists on the
+  connection, it is adopted instead of duplicated. A retry after a failure
+  that happened *after* the copy therefore cannot leave two copies behind.
+- chats: the DDL is `create table if not exists`, and an existing table is
+  adopted and linked.
+
+The client detail derives what to offer: no api binding means "Duplicar
+plantilla", a null `chats_table` means "Crear tabla chats_X".
+
+**Template**: `n8n_connections.template_workflow_id` /
+`template_workflow_name` (`019_n8n_template_workflow.sql`), picked in
+Settings. Per connection rather than in a global settings row because a
+workflow id only means something inside its own n8n instance. The Nuevo
+cliente modal can override it per creation.
+
+**Binding**: after duplicating, the copy is read back and its AI Agent nodes
+listed. Exactly one means an api binding is created automatically, so
+promoting a version pushes the prompt with no manual setup. Zero or several
+means the step reports how many it found and the user binds by hand, the same
+refuse-to-guess rule as `matchChatsTable` and `locateBoundAgent`. The copy is
+always created inactive: n8n's POST cannot set `active`, which is what we
+want, since a duplicate inherits the template's credentials and `webhookId`
+and needs a human look before it answers real leads.
+
+**DDL and the access token.** `lib/chats-admin.ts` is the only module in the
+app that writes to the chats project and the only one that runs DDL anywhere.
+PostgREST cannot run DDL and the chats project has no RPC for it, so it goes
+through the Supabase Management API with `SUPABASE_ACCESS_TOKEN`. That token
+is account-wide, so the module is deliberately narrow: the project ref comes
+from `CHATS_SUPABASE_PROJECT_REF`, never from a request; the SQL is built by
+`buildCreateChatsTableSql` from a fixed template; and the table name is
+validated against `CHATS_TABLE_RE` before interpolation. Nothing
+user-authored reaches the endpoint. If that scope is ever judged too broad,
+the drop-in replacement is a `security definer` function in the chats project
+(like `supabase/chats/001_list_chat_tables.sql`) and only this file changes.
+
+The table shape is fixed and matches what the agents already write to:
+`id bigint identity primary key`, `created_at timestamptz not null default
+now()`, `numero_de_mensajes numeric`, `id_de_kommo text`, `historial text`,
+RLS enabled with no policies (service_role bypasses it). The statement ends
+with `notify pgrst, 'reload schema'` so the history panel sees the new table
+immediately instead of 404-ing until PostgREST refreshes its cache.
+
+The naming rule lives in `lib/chats-table-name.ts`, a pure module (no
+Supabase imports) so the modal can preview the name in the browser: strip
+accents, drop everything that is not alphanumeric, keep capitalization,
+prefix `chats_`. "Bad Boys Toys" becomes `chats_BadBoysToys`.
+
+Not covered: renaming a client leaves both the workflow and the table under
+the old name, and archiving a client deletes neither.
+
 ## Uploads TTL
 
 - Editor / Creator file attachments go to Supabase Storage bucket
@@ -520,7 +592,14 @@ See `.env.example`. Required at runtime:
 | `SUPABASE_URL` | Supabase project URL |
 | `SUPABASE_SERVICE_ROLE_KEY` | Server-side full-access key |
 | `KEY_ENCRYPTION_SECRET` | 32+ byte secret for AES-256-GCM |
+| `CHATS_SUPABASE_URL` | Chats project, read-only history panel |
+| `CHATS_SUPABASE_SERVICE_ROLE_KEY` | Same, server-side only |
+| `SUPABASE_ACCESS_TOKEN` | Optional; Management API token used only to create a client's `chats_*` table |
+| `CHATS_SUPABASE_PROJECT_REF` | Optional; the project that token may touch |
 | `NEXT_PUBLIC_BUILD_TAG` | Optional; shown in footer |
+
+Leaving the last two blank disables the "Crear tabla de chats" option
+everywhere; nothing else degrades.
 
 No env var was added for n8n sync: connection URLs and API keys are saved
 through the Settings UI into `n8n_connections`, encrypted with the same
@@ -541,3 +620,5 @@ already work.
 | Push a prompt to n8n | `/api/clients/[id]/n8n-sync` → `lib/n8n/sync.ts` |
 | Read/write an AI Agent's prompt | `lib/n8n/agent-node.ts` |
 | Encrypt an n8n connection key | `/app/api/integrations/n8n` → `lib/db/n8n-connections.ts` |
+| Duplicate a flow / create a chats table for a client | `/api/clients/[id]/provision` → `lib/provisioning.ts` |
+| Run DDL in the chats project | `lib/chats-admin.ts` (the only place) |
