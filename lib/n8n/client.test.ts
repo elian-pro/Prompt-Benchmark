@@ -5,8 +5,31 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 
-import { sanitizeForUpdate, sanitizeSettings } from "./client.ts";
+import { createWorkflow, sanitizeForUpdate, sanitizeSettings } from "./client.ts";
 import type { N8nWorkflow } from "./agent-node.ts";
+
+/** Runs `fn` with fetch stubbed, returning the single captured request. */
+async function captureRequest(
+  responseBody: unknown,
+  fn: () => Promise<unknown>,
+): Promise<{ url: string; init: RequestInit }> {
+  const original = globalThis.fetch;
+  let captured: { url: string; init: RequestInit } | null = null;
+  globalThis.fetch = (async (url: string, init: RequestInit) => {
+    captured = { url: String(url), init };
+    return new Response(JSON.stringify(responseBody), {
+      status: 200,
+      headers: { "content-type": "application/json" },
+    });
+  }) as unknown as typeof fetch;
+  try {
+    await fn();
+  } finally {
+    globalThis.fetch = original;
+  }
+  assert.ok(captured, "fetch was never called");
+  return captured!;
+}
 
 test("sanitizeForUpdate keeps only writable fields", () => {
   const wf = {
@@ -58,4 +81,38 @@ test("sanitizeSettings drops UI/enterprise-only keys the PUT rejects", () => {
 test("sanitizeSettings tolerates null/undefined", () => {
   assert.deepEqual(sanitizeSettings(null), {});
   assert.deepEqual(sanitizeSettings(undefined), {});
+});
+
+test("createWorkflow posts a sanitized copy to /workflows", async () => {
+  // A template exactly as GET returns it: read-only fields and UI-only
+  // settings keys included, which is what duplication has to strip.
+  const template = {
+    id: "tpl1",
+    name: "IA Mensajes PLANTILLA",
+    active: true,
+    createdAt: "2026-01-01",
+    tags: [{ id: "t1" }],
+    versionId: "abc",
+    pinData: { A: [] },
+    nodes: [{ id: "a", name: "AI Agent", type: "@n8n/n8n-nodes-langchain.agent" }],
+    connections: { "AI Agent": {} },
+    settings: { executionOrder: "v1", callerPolicy: "workflowsFromSameOwner" },
+  } as unknown as N8nWorkflow;
+
+  const { url, init } = await captureRequest({ id: "new1" }, () =>
+    createWorkflow(
+      { baseUrl: "https://n8n.test/", apiKey: "k" },
+      { ...template, name: "IA Mensajes Acalai" },
+    ),
+  );
+
+  assert.equal(url, "https://n8n.test/api/v1/workflows");
+  assert.equal(init.method, "POST");
+  assert.equal((init.headers as Record<string, string>)["X-N8N-API-KEY"], "k");
+
+  const body = JSON.parse(init.body as string);
+  assert.deepEqual(Object.keys(body).sort(), ["connections", "name", "nodes", "settings"]);
+  assert.equal(body.name, "IA Mensajes Acalai");
+  assert.deepEqual(body.settings, { executionOrder: "v1" });
+  assert.equal(body.nodes.length, 1);
 });

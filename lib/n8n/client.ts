@@ -6,8 +6,10 @@
  * error messages are in Spanish because they surface directly in the UI.
  *
  * We only ever read and write whole workflows: n8n has no partial update, so
- * `updateWorkflow` sends the full object back. `sanitizeForUpdate` strips the
- * read-only fields the API rejects (id, active, timestamps, tags, ...).
+ * `updateWorkflow` sends the full object back, and `createWorkflow` posts one
+ * read from elsewhere (that is how a client's flow is duplicated from a
+ * template). `sanitizeForUpdate` strips the read-only fields the API rejects
+ * (id, active, timestamps, tags, ...) and both writers share it.
  */
 import type { N8nWorkflow } from "./agent-node";
 
@@ -161,6 +163,28 @@ export function sanitizeForUpdate(workflow: N8nWorkflow): Record<string, unknown
     connections: workflow.connections,
     settings: sanitizeSettings(workflow.settings),
   };
+}
+
+/**
+ * Creates a workflow from a whole object, used to duplicate a template for a
+ * new client. The POST schema is the same allow-list as the PUT (name, nodes,
+ * connections, settings) with `additionalProperties: false`, so a body read
+ * straight from GET must go through the same sanitizer: sending `id`, `active`,
+ * `tags` or the UI-only `settings` keys is a 400. `active` being unwritable is
+ * what we want, the copy is born disabled and is reviewed before turning it on.
+ */
+export async function createWorkflow(
+  creds: N8nConnectionCreds,
+  workflow: N8nWorkflow,
+): Promise<N8nWorkflow> {
+  const res = await ensureOk(
+    await request(creds, "/workflows", {
+      method: "POST",
+      body: JSON.stringify(sanitizeForUpdate(workflow)),
+    }),
+    "Crear el flujo",
+  );
+  return (await res.json()) as N8nWorkflow;
 }
 
 /** Writes a whole workflow back. Caller must send a freshly-read object. */
