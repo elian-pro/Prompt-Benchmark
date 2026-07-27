@@ -5,6 +5,7 @@ import { UnsupportedFileError, AttachmentUnavailableError } from "./db/uploads";
 import { RoleNotConfiguredError } from "./db/runs";
 import { ConnectionInUseError } from "./db/n8n-connections";
 import { N8nApiError } from "./n8n/client";
+import { ChatsAdminError } from "./chats-admin";
 import { VersionSwitchBlockedError } from "./db/demo-sessions";
 
 /** JSON error envelope. Messages are in Spanish (user-facing). */
@@ -46,6 +47,10 @@ export function handleError(err: unknown) {
   }
   if (err instanceof N8nApiError) {
     // 502: the failure is upstream in n8n, not in our request handling.
+    return jsonError(err.message, 502);
+  }
+  if (err instanceof ChatsAdminError) {
+    // 502 for the same reason: upstream is the Supabase Management API.
     return jsonError(err.message, 502);
   }
   if (err instanceof SyntaxError) {
