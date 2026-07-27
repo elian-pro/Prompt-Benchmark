@@ -2,6 +2,7 @@ import { NextRequest } from "next/server";
 import {
   getSession,
   appendMessage,
+  deleteMessage,
   updateDraft,
 } from "@/lib/db/chat-sessions";
 import { getRoleDefault } from "@/lib/db/role-defaults";
@@ -91,6 +92,13 @@ async function loadAttachmentsForModel(
  * never true for legitimate no-draft replies (e.g. a clarifying question),
  * only for the actually-cut-off case. The client surfaces both distinctly.
  *
+ * Cancellation: the composer's stop button aborts the client fetch, which
+ * fires `req.signal`. The stream loop breaks, which returns the provider
+ * generator and aborts the upstream request so the rest of the reply is never
+ * generated. The whole turn is then discarded, including the user message
+ * stored on the way in: a cancelled turn is deliberately NOT salvaged the way
+ * a dropped connection is, because the operator stopped it on purpose.
+ *
  * Editor and Creator share this endpoint, branching on `session.type`: the
  * Editor edits the seeded draft (role `editor`); the Creator builds a new
  * prompt from the architectural reference at `base_version_id` (role
@@ -124,7 +132,7 @@ export async function POST(req: NextRequest, { params }: Params) {
       role: m.role,
       content: m.content,
     }));
-    await appendMessage(id, {
+    const userMessage = await appendMessage(id, {
       role: "user",
       content: input.content,
       attachments: input.attachments ?? null,
@@ -186,6 +194,21 @@ export async function POST(req: NextRequest, { params }: Params) {
       return { draftBroken };
     };
 
+    // The operator pressed "detener": undo the user turn stored above so the
+    // cancelled exchange leaves no trace, and skip the partial-reply salvage.
+    // Best-effort, a failed delete must not mask the cancellation itself.
+    const discardTurn = async () => {
+      try {
+        await deleteMessage(userMessage.id);
+      } catch (delErr) {
+        console.error(
+          `[chat-sessions] failed to delete cancelled user message (session ${id}): ${
+            delErr instanceof Error ? (delErr.stack ?? delErr.message) : String(delErr)
+          }`,
+        );
+      }
+    };
+
     const encoder = new TextEncoder();
     const stream = new ReadableStream<Uint8Array>({
       async start(controller) {
@@ -232,6 +255,11 @@ export async function POST(req: NextRequest, { params }: Params) {
             topP: role.top_p ?? undefined,
             maxTokens: role.max_tokens ?? EDITOR_CREATOR_MAX_TOKENS,
           })) {
+            // Cancelled from the client's stop button. Breaking here returns
+            // the provider generator, which aborts the upstream request, so
+            // the rest of the reply is never generated (and never billed).
+            // The already-consumed input tokens are spent either way.
+            if (req.signal.aborted) break;
             if (chunk.type === "text") {
               fullText += chunk.text;
               send({ type: "text", text: chunk.text });
@@ -240,6 +268,14 @@ export async function POST(req: NextRequest, { params }: Params) {
               tokensOut = chunk.tokensOut;
               truncated = chunk.truncated;
             }
+          }
+
+          if (req.signal.aborted) {
+            await discardTurn();
+            stopHeartbeat();
+            closed = true;
+            controller.close();
+            return;
           }
 
           // Persist the assistant turn (version-stamped) and update the draft.
@@ -252,6 +288,16 @@ export async function POST(req: NextRequest, { params }: Params) {
           controller.close();
         } catch (err) {
           stopHeartbeat();
+          // Same cancellation, but the abort surfaced as a throw (enqueue into
+          // a dropped stream) before the loop could check the signal. Discard,
+          // don't log, and above all don't salvage: the user is stopping this
+          // turn precisely because they don't want it.
+          if (req.signal.aborted) {
+            await discardTurn();
+            closed = true;
+            controller.error(err);
+            return;
+          }
           // The stream broke mid-flight: an upstream provider error, or the
           // client connection dropped (a transient network blip on a long
           // turn). This route used to swallow the error, which is exactly why

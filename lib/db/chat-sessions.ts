@@ -216,6 +216,14 @@ export async function appendMessage(
   return data as unknown as ChatMessageRow;
 }
 
+/** Removes a single message. Used to undo the user turn when the operator
+ *  stops a streaming reply, so a cancelled turn leaves nothing behind. */
+export async function deleteMessage(messageId: string): Promise<void> {
+  const sb = getSupabase();
+  const { error } = await sb.from("chat_messages").delete().eq("id", messageId);
+  if (error) throw new Error(`No se pudo borrar el mensaje: ${error.message}`);
+}
+
 export async function updateDraft(
   sessionId: string,
   content: string,

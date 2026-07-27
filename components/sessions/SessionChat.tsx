@@ -10,6 +10,7 @@ import {
   IconFileText,
   IconPaperclip,
   IconPencil,
+  IconPlayerStopFilled,
   IconReplace,
   IconRocket,
   IconSend,
@@ -130,6 +131,11 @@ export function SessionChat({
   // sent). Attachments from already-sent messages never appear here.
   const [composerSettings, setComposerSettings] = useState<ComposerSettings | null>(null);
   const [smartPasteText, setSmartPasteText] = useState<Record<string, string>>({});
+  // Structured options selection waiting in the composer: confirming a block
+  // writes its summary into `input` instead of sending, so this rides along
+  // until the user actually hits send. It survives free-text edits on purpose,
+  // it records which options were tapped even if the wording changed.
+  const [pendingAnswer, setPendingAnswer] = useState<MessageAnswer | null>(null);
   const [pendingUser, setPendingUser] = useState<string | null>(null);
   const [pendingAttachments, setPendingAttachments] = useState<Attachment[]>([]);
   const [streamingText, setStreamingText] = useState<string | null>(null);
@@ -150,6 +156,12 @@ export function SessionChat({
   const [dragging, setDragging] = useState(false);
   // Whether the chat is scrolled near the bottom (hides the jump button).
   const [atBottom, setAtBottom] = useState(true);
+  // Live turn's abort handle: the stop button cancels the fetch, which drops
+  // the connection the route is streaming into. The route watches its own
+  // request signal, stops pulling from the provider (so the rest of the reply
+  // is never generated or billed) and deletes the user message it had already
+  // stored, so the turn leaves no trace. See the route's abort docstring.
+  const abortRef = useRef<AbortController | null>(null);
 
   // Manual draft editing (Editor only): edit the working draft by hand, no
   // AI turn. draftInput holds the in-progress text; findOpen toggles the
@@ -345,21 +357,25 @@ export function SessionChat({
       const content = (explicit?.content ?? input).trim();
       if (!content || sending || attachmentsBusy) return;
       const sent = explicit?.attachments ?? attachments;
-      const answer = explicit?.answer;
+      const answer = explicit?.answer ?? pendingAnswer ?? undefined;
       setSending(true);
       setError(null);
       if (!explicit) {
         setInput("");
         setAttachments([]);
+        setPendingAnswer(null);
         if (textareaRef.current) textareaRef.current.style.height = "auto";
       }
       setPendingUser(content);
       setPendingAttachments(sent);
       setStreamingText("");
+      const controller = new AbortController();
+      abortRef.current = controller;
       try {
         const res = await fetch(`/api/chat-sessions/${sessionId}/messages`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
+          signal: controller.signal,
           body: JSON.stringify({
             content,
             attachments: sent.length > 0 ? sent : undefined,
@@ -412,9 +428,21 @@ export function SessionChat({
           );
         }
       } catch (e) {
+        // The user pressed stop: put the message back in the composer to fix
+        // and resend, and skip the error log (nothing failed, they cancelled).
+        // No re-sync either: the aborted turn was never in `session.messages`,
+        // so the chat already reads clean while the route deletes its row.
+        if (e instanceof DOMException && e.name === "AbortError") {
+          setInput(content);
+          setAttachments(sent);
+          setPendingAnswer(answer ?? null);
+          showToast("Turno detenido. Tu mensaje volvió al cuadro de texto.", 4000);
+          return;
+        }
         if (!explicit) {
           setInput(content);
           setAttachments(sent);
+          setPendingAnswer(answer ?? null);
         }
         reportError("Enviar mensaje", e, "Error al enviar el mensaje.");
         // A dropped stream still persists the partial reply server-side (the
@@ -422,23 +450,24 @@ export function SessionChat({
         // of leaving the turn looking lost until a manual reload.
         await load({ silent: true });
       } finally {
+        abortRef.current = null;
         setSending(false);
         setPendingUser(null);
         setPendingAttachments([]);
         setStreamingText(null);
       }
     },
-    [sessionId, input, attachments, sending, attachmentsBusy, load],
+    [sessionId, input, attachments, sending, attachmentsBusy, pendingAnswer, load],
   );
 
-  // Confirming an options block sends its human-readable summary as a normal
-  // user message plus the structured selection for persistence.
-  const onSubmitOptions = useCallback(
-    (answerText: string, answer: MessageAnswer) => {
-      void send({ content: answerText, attachments: [], answer });
-    },
-    [send],
-  );
+  // Confirming an options block writes its human-readable summary into the
+  // composer and parks the structured selection, WITHOUT sending: the user
+  // gets to clarify (or fix a wrong tap) before the model burns any tokens.
+  const onSubmitOptions = useCallback((answerText: string, answer: MessageAnswer) => {
+    setInput(answerText);
+    setPendingAnswer(answer);
+    textareaRef.current?.focus();
+  }, []);
 
   // Fire the message the user already typed on the idle composer, the instant
   // this brand-new (zero-message) session is ready — so it reads as the
@@ -847,20 +876,32 @@ export function SessionChat({
           <div className="idle-composer-footrow">
             <span className="idle-composer-hint">
               {sending
-                ? "Enviando…"
+                ? "Enviando… (puedes detener el turno)"
                 : attachmentsBusy
                   ? "Subiendo archivo…"
                   : "⌘/Ctrl + Enter para enviar"}
             </span>
-            <button
-              type="button"
-              className="idle-send-btn"
-              onClick={() => send()}
-              disabled={sending || isAbandoned || attachmentsBusy || !input.trim()}
-              aria-label="Enviar"
-            >
-              <IconSend size={14} />
-            </button>
+            {sending ? (
+              <button
+                type="button"
+                className="idle-send-btn is-stop"
+                onClick={() => abortRef.current?.abort()}
+                aria-label="Detener"
+                title="Detener el turno y recuperar el mensaje"
+              >
+                <IconPlayerStopFilled size={14} />
+              </button>
+            ) : (
+              <button
+                type="button"
+                className="idle-send-btn"
+                onClick={() => send()}
+                disabled={isAbandoned || attachmentsBusy || !input.trim()}
+                aria-label="Enviar"
+              >
+                <IconSend size={14} />
+              </button>
+            )}
           </div>
 
           {dragging && (
