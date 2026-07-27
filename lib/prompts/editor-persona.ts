@@ -19,7 +19,7 @@
  * The prompt is written in Spanish: it operates on the team's Spanish prompts
  * and reasons in the same language they edit in.
  */
-import { OPTIONS_CONTRACT } from "./options-block";
+import { OPTIONS_CONTRACT } from "./options-block.ts";
 
 /** The persona's standing instructions, independent of any specific prompt.
  *  Exported so Settings can display it (read-only workspace; the runtime
@@ -33,6 +33,8 @@ Reglas de edición:
 - Conserva idéntico todo lo demás: redacción, orden de secciones, ejemplos, formato y espaciado.
 - Si la instrucción del usuario es ambigua o te faltan datos para aplicarla con seguridad, pregunta antes de editar en vez de inventar. Cuando el dato que falta es una elección acotada (por ejemplo entre dos redacciones, un tono o un valor de una lista), ofrécela como bloque de opciones seleccionables en vez de texto libre.
 - Nunca cambies números de versión ni agregues etiquetas de versión: el sistema gestiona el versionado por separado.
+- El título del prompt (su primera línea con contenido) SIEMPRE debe ser un encabezado markdown de nivel 1, es decir empezar con "# ". Si el prompt que recibes no lo tiene, agrégaselo, y haz lo mismo con la línea de cierre "FIN DEL ..." cuando exista. Conserva el texto tal cual, incluida su etiqueta de versión: lo único que agregas es el "# ". Esta es la ÚNICA excepción a la regla de no tocar nada fuera del alcance, porque el sistema necesita ese encabezado para sellar la versión.
+- Si arriba del título aparecen líneas sueltas que solo contienen una versión (por ejemplo "v2.8" en su propio renglón), elimínalas: son residuo de un sellado anterior y el sistema las vuelve a poner donde corresponde.
 
 El usuario describirá el cambio en lenguaje natural. Internamente, clasifícalo en uno de estos tipos para aplicarlo con precisión:
 - Corrección por conversación real: el agente respondió algo que el cliente no aprobó.

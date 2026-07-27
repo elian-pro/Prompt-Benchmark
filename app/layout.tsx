@@ -9,6 +9,7 @@ import {
   IconLogout,
 } from "@tabler/icons-react";
 import { ThemeToggle } from "@/components/ui/ThemeToggle";
+import { GenerationWatcher } from "@/components/sessions/GenerationWatcher";
 import "./globals.css";
 
 // Runs synchronously before paint to apply the persisted theme, avoiding a
@@ -58,6 +59,7 @@ export default function RootLayout({
                   </a>
                 ))}
               </nav>
+              <GenerationWatcher />
               <ThemeToggle />
               <form action="/api/auth/logout" method="post" className="logout-form">
                 <button

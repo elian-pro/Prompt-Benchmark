@@ -140,6 +140,10 @@ export function SessionChat({
   const [pendingAttachments, setPendingAttachments] = useState<Attachment[]>([]);
   const [streamingText, setStreamingText] = useState<string | null>(null);
   const [sending, setSending] = useState(false);
+  // Whether the "is a turn still generating?" check on mount has answered.
+  // Until it has, a conversation ending in a user message is ambiguous, so the
+  // interrupted-turn hint below has to hold its tongue.
+  const [inFlightChecked, setInFlightChecked] = useState(false);
   // True while any attachment (attach button, drag-drop, or Smart Paste) is
   // still uploading, so `send` can refuse to fire until it lands in
   // `attachments`. Otherwise a fast send races the upload and the message
@@ -156,12 +160,11 @@ export function SessionChat({
   const [dragging, setDragging] = useState(false);
   // Whether the chat is scrolled near the bottom (hides the jump button).
   const [atBottom, setAtBottom] = useState(true);
-  // Live turn's abort handle: the stop button cancels the fetch, which drops
-  // the connection the route is streaming into. The route watches its own
-  // request signal, stops pulling from the provider (so the rest of the reply
-  // is never generated or billed) and deletes the user message it had already
-  // stored, so the turn leaves no trace. See the route's abort docstring.
-  const abortRef = useRef<AbortController | null>(null);
+  // True while this component is reading a turn's stream, whether it started
+  // that turn or reattached to one already running. A ref, not state: it guards
+  // against a second reader attaching, and React 18 StrictMode runs the mount
+  // effect twice in dev, which would otherwise render the reply twice.
+  const streamingRef = useRef(false);
 
   // Manual draft editing (Editor only): edit the working draft by hand, no
   // AI turn. draftInput holds the in-progress text; findOpen toggles the
@@ -301,6 +304,18 @@ export function SessionChat({
   // The last message in the list: only its (unanswered) options block is live.
   const lastMessageId = session?.messages.at(-1)?.id ?? null;
 
+  // A turn whose reply never arrived: the conversation ends on a user message,
+  // nothing is generating, and the server has confirmed it has no job for this
+  // session. In practice that means the process restarted mid-turn (the
+  // in-flight registry lives in memory), so no reply is coming and the chat
+  // would otherwise just sit there looking stuck.
+  const interrupted =
+    inFlightChecked &&
+    !sending &&
+    streamingText === null &&
+    !pendingUser &&
+    session?.messages.at(-1)?.role === "user";
+
   function showToast(message: string, durationMs = 2500) {
     setToast(message);
     window.setTimeout(() => setToast(null), durationMs);
@@ -352,10 +367,72 @@ export function SessionChat({
     el.style.height = Math.min(el.scrollHeight, 200) + "px";
   }, [input]);
 
+  // Reads a turn's NDJSON stream to the end, driving the live text and the
+  // end-of-turn toasts, then re-syncs from the server. Shared by a fresh send
+  // and by reattaching to a turn that was already running when this component
+  // mounted, which is why it takes a Response rather than starting one.
+  // See the route's docstring for the event shapes.
+  const consume = useCallback(
+    async (res: Response): Promise<{ cancelled: boolean; failure: string | null }> => {
+      const reader = res.body!.getReader();
+      const decoder = new TextDecoder();
+      let acc = "";
+      let buffer = "";
+      let truncated = false;
+      let draftBroken = false;
+      let cancelled = false;
+      let failure: string | null = null;
+      for (;;) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split("\n");
+        buffer = lines.pop() ?? "";
+        for (const line of lines) {
+          if (!line.trim()) continue;
+          const evt = JSON.parse(line);
+          if (evt.type === "text") {
+            acc += evt.text;
+            setStreamingText(acc);
+          } else if (evt.type === "done") {
+            truncated = evt.truncated;
+            draftBroken = evt.draftBroken;
+          } else if (evt.type === "cancelled") {
+            cancelled = true;
+          } else if (evt.type === "error") {
+            failure = evt.message;
+          }
+        }
+      }
+      // A cancelled turn leaves no trace server-side (the route deletes the
+      // user message too), so there is nothing to re-sync: the chat already
+      // reads clean. Every other ending needs the canonical messages, token
+      // usage and updated draft. Silent so the chat doesn't flash to loading.
+      if (!cancelled) await load({ silent: true });
+
+      if (draftBroken) {
+        showToast(
+          "La respuesta se cortó antes de terminar el prompt: el borrador NO se actualizó. Sube «Máx tokens» en Configuración → Asignación de roles y vuelve a intentarlo.",
+          7000,
+        );
+      } else if (truncated) {
+        showToast(
+          "La respuesta se cortó por el límite de tokens. Si falta contenido, sube «Máx tokens» en Configuración.",
+          6000,
+        );
+      }
+      return { cancelled, failure };
+    },
+    // showToast is a plain function declaration, stable enough for this and
+    // deliberately omitted the same way `send` omits it below.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [load],
+  );
+
   const send = useCallback(
     async (explicit?: { content: string; attachments: Attachment[]; answer?: MessageAnswer }) => {
       const content = (explicit?.content ?? input).trim();
-      if (!content || sending || attachmentsBusy) return;
+      if (!content || sending || attachmentsBusy || streamingRef.current) return;
       const sent = explicit?.attachments ?? attachments;
       const answer = explicit?.answer ?? pendingAnswer ?? undefined;
       setSending(true);
@@ -369,13 +446,17 @@ export function SessionChat({
       setPendingUser(content);
       setPendingAttachments(sent);
       setStreamingText("");
-      const controller = new AbortController();
-      abortRef.current = controller;
+      streamingRef.current = true;
+      // Asked at the one moment it makes sense: the user just started a turn
+      // that can run for minutes, so a "we'll tell you when it's done" prompt
+      // has an obvious reason to appear. Never on page load.
+      if (typeof Notification !== "undefined" && Notification.permission === "default") {
+        void Notification.requestPermission();
+      }
       try {
         const res = await fetch(`/api/chat-sessions/${sessionId}/messages`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          signal: controller.signal,
           body: JSON.stringify({
             content,
             attachments: sent.length > 0 ? sent : undefined,
@@ -386,79 +467,83 @@ export function SessionChat({
           const data = await res.json().catch(() => ({}));
           throw new Error(data.error ?? "No se pudo enviar el mensaje.");
         }
-        // NDJSON stream: {type:"text", text} deltas, then one final
-        // {type:"done", truncated, draftBroken} — see the route's docstring.
-        const reader = res.body.getReader();
-        const decoder = new TextDecoder();
-        let acc = "";
-        let buffer = "";
-        let truncated = false;
-        let draftBroken = false;
-        for (;;) {
-          const { done, value } = await reader.read();
-          if (done) break;
-          buffer += decoder.decode(value, { stream: true });
-          const lines = buffer.split("\n");
-          buffer = lines.pop() ?? "";
-          for (const line of lines) {
-            if (!line.trim()) continue;
-            const evt = JSON.parse(line);
-            if (evt.type === "text") {
-              acc += evt.text;
-              setStreamingText(acc);
-            } else if (evt.type === "done") {
-              truncated = evt.truncated;
-              draftBroken = evt.draftBroken;
-            }
-          }
-        }
-        // Re-sync from the server: canonical messages, token usage, updated
-        // draft. Silent so the chat doesn't flash to the loading state.
-        await load({ silent: true });
-
-        if (draftBroken) {
-          showToast(
-            "La respuesta se cortó antes de terminar el prompt: el borrador NO se actualizó. Sube «Máx tokens» en Configuración → Asignación de roles y vuelve a intentarlo.",
-            7000,
-          );
-        } else if (truncated) {
-          showToast(
-            "La respuesta se cortó por el límite de tokens. Si falta contenido, sube «Máx tokens» en Configuración.",
-            6000,
-          );
-        }
-      } catch (e) {
+        const { cancelled, failure } = await consume(res);
         // The user pressed stop: put the message back in the composer to fix
         // and resend, and skip the error log (nothing failed, they cancelled).
-        // No re-sync either: the aborted turn was never in `session.messages`,
-        // so the chat already reads clean while the route deletes its row.
-        if (e instanceof DOMException && e.name === "AbortError") {
+        if (cancelled) {
           setInput(content);
           setAttachments(sent);
           setPendingAnswer(answer ?? null);
           showToast("Turno detenido. Tu mensaje volvió al cuadro de texto.", 4000);
-          return;
+        } else if (failure) {
+          // The turn broke mid-flight. `consume` already re-synced, so whatever
+          // was generated is on screen: don't restore the message to the
+          // composer, that would duplicate the user turn the route kept.
+          reportError("Enviar mensaje", new Error(failure), "La respuesta se interrumpió.");
         }
+      } catch (e) {
         if (!explicit) {
           setInput(content);
           setAttachments(sent);
           setPendingAnswer(answer ?? null);
         }
         reportError("Enviar mensaje", e, "Error al enviar el mensaje.");
-        // A dropped stream still persists the partial reply server-side (the
-        // route salvages it before erroring), so re-sync to surface it instead
-        // of leaving the turn looking lost until a manual reload.
+        // A turn that broke mid-flight still persists whatever it generated
+        // (the route salvages it), so re-sync to surface the partial reply
+        // instead of leaving the turn looking lost until a manual reload.
         await load({ silent: true });
       } finally {
-        abortRef.current = null;
+        streamingRef.current = false;
         setSending(false);
         setPendingUser(null);
         setPendingAttachments([]);
         setStreamingText(null);
       }
     },
-    [sessionId, input, attachments, sending, attachmentsBusy, pendingAnswer, load],
+    [sessionId, input, attachments, sending, attachmentsBusy, pendingAnswer, load, consume],
   );
+
+  // Reattach to a turn that is still generating on the server, so leaving the
+  // page and coming back picks the reply up mid-flight instead of showing a
+  // dead-looking chat. 204 means nothing is in flight, and the plain `load`
+  // above already holds the finished conversation. No `pendingUser` is needed:
+  // the user message was persisted before generation started, so it arrives as
+  // a real message and the streaming text renders under it.
+  useEffect(() => {
+    let alive = true;
+    (async () => {
+      try {
+        const res = await fetch(`/api/chat-sessions/${sessionId}/messages`);
+        if (!alive) return;
+        setInFlightChecked(true);
+        if (res.status === 204 || !res.ok || !res.body) return;
+        if (streamingRef.current) return;
+        streamingRef.current = true;
+        setSending(true);
+        setStreamingText("");
+        try {
+          const { cancelled, failure } = await consume(res);
+          if (cancelled) {
+            showToast("El turno se detuvo.", 4000);
+          } else if (failure) {
+            reportError("Respuesta en curso", new Error(failure), "La respuesta se interrumpió.");
+          }
+        } finally {
+          streamingRef.current = false;
+          setSending(false);
+          setStreamingText(null);
+        }
+      } catch {
+        // Nothing to reattach to, or the connection dropped on the way. The
+        // turn keeps running server-side either way.
+        if (alive) setInFlightChecked(true);
+      }
+    })();
+    return () => {
+      alive = false;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sessionId, consume]);
 
   // Confirming an options block writes its human-readable summary into the
   // composer and parks the structured selection, WITHOUT sending: the user
@@ -496,12 +581,28 @@ export function SessionChat({
     requestAnimationFrame(() => textareaRef.current?.focus());
   }, [initialDraft, session]);
 
+  // Tells the server to stop generating. Closing the connection no longer
+  // cancels anything (that is what lets a turn survive leaving the page), so
+  // stopping has to be an explicit request. The route broadcasts a `cancelled`
+  // event, which `consume` picks up and turns into the message-restored toast,
+  // whether this client started the turn or reattached to it.
+  function stopTurn() {
+    fetch(`/api/chat-sessions/${sessionId}/messages`, { method: "DELETE" }).catch(() => {
+      // The turn ends on its own if this never lands; nothing to undo here.
+    });
+  }
+
   // Leaving a session that never actually changed the prompt shouldn't clutter
   // the history: ask the server to drop it (it decides via isSessionUnchanged;
   // this is best-effort and silently ignored on failure) before navigating back.
   async function handleBack() {
     try {
-      await fetch(`/api/chat-sessions/${sessionId}?onlyIfUnchanged=true`, { method: "DELETE" });
+      // Never while a turn is in flight: the session is about to grow an
+      // assistant message, and deleting it out from under a running job would
+      // strand the generation writing into a session that no longer exists.
+      if (!sending) {
+        await fetch(`/api/chat-sessions/${sessionId}?onlyIfUnchanged=true`, { method: "DELETE" });
+      }
     } catch {
       // Best-effort cleanup — the session just stays in history if this fails.
     }
@@ -812,6 +913,11 @@ export function SessionChat({
           {streamingText !== null && (
             <ChatMessage role="assistant" content={streamingText} streaming mode={mode} />
           )}
+          {interrupted && (
+            <p className="empty-hint">
+              El turno anterior se interrumpió y no llegó respuesta. Vuelve a enviar tu mensaje.
+            </p>
+          )}
         </div>
       </div>
 
@@ -885,7 +991,7 @@ export function SessionChat({
               <button
                 type="button"
                 className="idle-send-btn is-stop"
-                onClick={() => abortRef.current?.abort()}
+                onClick={stopTurn}
                 aria-label="Detener"
                 title="Detener el turno y recuperar el mensaje"
               >
