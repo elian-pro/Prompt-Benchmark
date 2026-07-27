@@ -86,3 +86,24 @@ test("syncVersionMarkers leaves inner subheadings alone, only the first heading 
 test("syncVersionMarkers falls back to a bare token when there is no heading", () => {
   assert.equal(syncVersionMarkers("Objetivo principal...", "v1.0"), "v1.0\n\nObjetivo principal...");
 });
+
+test("syncVersionMarkers does not stack bare tokens on a prompt with no heading", () => {
+  // Regression: every Editor turn re-syncs the draft, and this branch used to
+  // prepend a version line without removing the previous one, so a plain-text
+  // prompt grew "v2.8 / v2.8 / v2.7 / <título>" at the top.
+  let content = "PROMPT ASISTENTE v2.7\n\nObjetivo principal...";
+  for (const v of ["v2.7", "v2.8", "v2.8", "v2.9"]) {
+    content = syncVersionMarkers(content, v);
+  }
+  assert.equal(content, "v2.9\n\nPROMPT ASISTENTE v2.7\n\nObjetivo principal...");
+});
+
+test("syncVersionMarkers clears stacked bare tokens once a title is markdown", () => {
+  // What the Editor produces after being told to emit an H1 title: the stray
+  // lines a previous sync left behind are swept and the real title takes over.
+  const damaged = "v2.8\n\nv2.8\n\nv2.7\n\n# PROMPT ASISTENTE v2.7\n\nObjetivo principal...";
+  assert.equal(
+    syncVersionMarkers(damaged, "v2.9"),
+    "# PROMPT ASISTENTE v2.9\n\nObjetivo principal...\n\n# FIN DEL PROMPT ASISTENTE v2.9",
+  );
+});

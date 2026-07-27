@@ -35,6 +35,13 @@ export function computeNextNumber(
 // such line is stripped on sync.
 const VERSION_DECL_LINE = /^[ \t]*Versi[oó]n[ \t]*:?[ \t]*v?\d+\.\d+[ \t]*$/i;
 
+// A line that is nothing but a version token, e.g. "v2.8" on its own. The
+// no-title fallback below prepends one of these, and used to do it without
+// removing the one it left last time, so a prompt with no markdown title grew a
+// new line on every single sync. Stripping them here makes that fallback
+// idempotent and heals the prompts that already stacked them.
+const BARE_VERSION_LINE = /^[ \t]*v\d+\.\d+[ \t]*$/i;
+
 // A closing footer heading, e.g. "# FIN DEL PROMPT ... v1.4". Matched so it can
 // be regenerated in sync with the version rather than left to drift.
 const FOOTER_LINE = /^[ \t]*#+[ \t]+FIN DEL\b/i;
@@ -67,17 +74,23 @@ function withVersionToken(line: string, ver: string): string {
  * former "Versión: 1.4" line. Idempotent: re-running yields the same text.
  *
  * Fallback: a prompt with no heading at all gets a bare "vX.Y" line at the top
- * and no footer (nothing to derive one from). This is a corner case; real
- * prompts always open with a `# ` title.
+ * and no footer (nothing to derive one from), and its own title is left alone
+ * because there is no way to tell which line that is. Both personas require a
+ * `# ` title precisely so this branch is never reached; it exists only so an
+ * imported prompt that lacks one degrades harmlessly instead of corrupting.
  */
 export function syncVersionMarkers(content: string, versionNumber: string): string {
   const { major, minor } = parseVersion(versionNumber);
   const ver = `v${major}.${minor}`;
 
-  // Drop old declaration lines and any existing footer (regenerated below).
+  // Drop old declaration lines, stray bare version lines, and any existing
+  // footer (regenerated below).
   let lines = content
     .split("\n")
-    .filter((l) => !VERSION_DECL_LINE.test(l) && !FOOTER_LINE.test(l));
+    .filter(
+      (l) =>
+        !VERSION_DECL_LINE.test(l) && !BARE_VERSION_LINE.test(l) && !FOOTER_LINE.test(l),
+    );
 
   // Tidy the edges the removals may have left behind, without touching
   // intentional spacing between inner blocks.
