@@ -44,10 +44,13 @@ function isQuestionAnswered(type: string, value: string | string[]): boolean {
 
 /**
  * Renders a selectable-options block as tappable buttons. The block definition
- * lives in the assistant message; when the user confirms, `onSubmit` sends the
- * human-readable summary as a normal user message plus the structured selection
- * for persistence. An already-answered or non-interactive block renders
- * read-only and starts collapsed to its one-line summary (reopenable).
+ * lives in the assistant message; confirming hands `onSubmit` the
+ * human-readable summary plus the structured selection, which the chat drops
+ * into the composer WITHOUT sending, so the user can add a clarification
+ * before the model starts working. Confirming again overwrites the composer
+ * text: the block stays live until the message is actually sent and the server
+ * echoes back an `answered` selection. An already-answered or non-interactive
+ * block renders read-only and starts collapsed to its summary (reopenable).
  */
 export function OptionsBlock({
   block,
@@ -66,11 +69,10 @@ export function OptionsBlock({
   const [selections, setSelections] = useState<Selections>(() =>
     initialSelections(block, answered),
   );
-  const [submitted, setSubmitted] = useState(false);
-  // Locked = read-only: already answered, just submitted, or a stale block that
+  // Locked = read-only: already answered on the server, or a stale block that
   // isn't the live turn. Only a live, unanswered block accepts input.
-  const locked = answered !== null || submitted || !interactive;
-  const isAnswered = answered !== null || submitted;
+  const locked = answered !== null || !interactive;
+  const isAnswered = answered !== null;
   const [open, setOpen] = useState(!isAnswered);
 
   const toSelectionList = (sel: Selections): QuestionSelection[] =>
@@ -83,24 +85,19 @@ export function OptionsBlock({
   }, [isAnswered, selections, block]);
 
   const allAnswered = block.questions.every((q) => isQuestionAnswered(q.type, selections[q.id]));
-  // A single single_select question submits on tap; anything else confirms.
-  const autoSubmit =
-    block.questions.length === 1 && block.questions[0].type === "single_select";
 
   function submit(next: Selections) {
     if (locked) return;
     const list = toSelectionList(next);
-    const answerText = buildAnswerSummary(block, list);
-    setSubmitted(true);
-    setOpen(false);
-    onSubmit(answerText, { sourceMessageId: messageId, selections: list });
+    onSubmit(buildAnswerSummary(block, list), {
+      sourceMessageId: messageId,
+      selections: list,
+    });
   }
 
   function pickSingle(qId: string, option: string) {
     if (locked) return;
-    const next = { ...selections, [qId]: option };
-    setSelections(next);
-    if (autoSubmit) submit(next);
+    setSelections({ ...selections, [qId]: option });
   }
 
   function toggleMulti(qId: string, option: string) {
@@ -205,7 +202,7 @@ export function OptionsBlock({
               );
             })}
 
-            {!locked && !autoSubmit && (
+            {!locked && (
               <div className="options-actions">
                 <button
                   type="button"
@@ -214,7 +211,7 @@ export function OptionsBlock({
                   onClick={() => submit(selections)}
                 >
                   <IconListNumbers size={14} />
-                  Confirmar
+                  Escribir respuesta
                 </button>
               </div>
             )}

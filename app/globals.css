@@ -3219,6 +3219,11 @@ body[data-theme="light"] .dot-grid::after {
   color: var(--faint);
   cursor: not-allowed;
 }
+/* Stop button: same slot as send while a turn is streaming. */
+.idle-send-btn.is-stop {
+  background: var(--danger);
+  color: #fff;
+}
 
 /* Client/reference chip + its dropdown (inside the composer's top row). */
 .chip-select {

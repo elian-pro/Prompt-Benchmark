@@ -45,6 +45,7 @@ Reglas del bloque:
 - Antes del bloque, escribe siempre una línea conversacional breve que lo introduzca. Nunca muestres el bloque en silencio.
 - Úsalo SOLO para elicitar preferencias, restricciones o contexto. No lo uses para preguntas de análisis u opinión, ni cuando el usuario ya dio la información o la puedes inferir con seguridad.
 - Si la duda es abierta y no se presta a opciones, pregunta en texto normal como siempre.
+- UN SOLO bloque por respuesta. Si tienes dos o tres cosas que preguntar, van como varias preguntas DENTRO del mismo bloque, nunca como bloques separados.
 - No mezcles el bloque de opciones con la entrega de un prompt en la misma respuesta.`;
 
 /** A single tolerant question. Counts are clamped rather than hard-rejected so a
@@ -89,48 +90,99 @@ export function parseOptionsJson(raw: string): unknown {
 }
 
 // Content between the two markers. Non-greedy is safe because OPTIONS_END never
-// appears inside a real JSON payload.
-const OPTIONS_RE = new RegExp(`${OPTIONS_START}[ \\t]*\\n([\\s\\S]*?)\\n?${OPTIONS_END}`);
+// appears inside a real JSON payload. Global: a drifting reply can emit more
+// than one block (see mergeQuestions).
+const OPTIONS_RE = new RegExp(`${OPTIONS_START}[ \\t]*\\n([\\s\\S]*?)\\n?${OPTIONS_END}`, "g");
 
 type BlockLocation = { block: OptionsBlock; start: number; end: number };
 
 /**
- * Locates and validates the options block in an assistant reply. Returns null
- * when there is no complete, valid block yet (still streaming, cut off, or the
- * JSON failed to parse/validate) so the caller falls back to plain text.
+ * Locates and validates every complete options block in an assistant reply, in
+ * order. Blocks whose JSON fails to parse or validate are skipped (the caller
+ * falls back to plain text for them), so a half-streamed or malformed emission
+ * never breaks the chat.
  */
-function locateOptionsBlock(reply: string): BlockLocation | null {
-  const match = reply.match(OPTIONS_RE);
-  if (!match || match.index === undefined) return null;
-  const parsed = parseOptionsJson(match[1]);
-  if (parsed === null) return null;
-  const result = optionsBlockSchema.safeParse(parsed);
-  if (!result.success) return null;
-  return { block: result.data, start: match.index, end: match.index + match[0].length };
+function locateOptionsBlocks(reply: string): BlockLocation[] {
+  const found: BlockLocation[] = [];
+  for (const match of reply.matchAll(OPTIONS_RE)) {
+    if (match.index === undefined) continue;
+    const parsed = parseOptionsJson(match[1]);
+    if (parsed === null) continue;
+    const result = optionsBlockSchema.safeParse(parsed);
+    if (!result.success) continue;
+    found.push({ block: result.data, start: match.index, end: match.index + match[0].length });
+  }
+  return found;
+}
+
+/**
+ * Folds several blocks into one, dropping repeated question ids (they key the
+ * rendered list and the persisted selection, so a duplicate would collide) and
+ * clamping to the schema's 3-question ceiling.
+ */
+function mergeQuestions(found: BlockLocation[]): OptionsBlock {
+  const seen = new Set<string>();
+  const questions: OptionsQuestion[] = [];
+  for (const q of found.flatMap((f) => f.block.questions)) {
+    if (seen.has(q.id)) continue;
+    seen.add(q.id);
+    questions.push(q);
+  }
+  return { questions: questions.slice(0, 3) };
 }
 
 /**
  * Splits a reply around its options block into the prose before it, the parsed
  * block (null when there is no complete valid block), and the prose after it.
  * Shared by the server and the chat renderer so both agree on the boundaries.
+ *
+ * The contract asks for ONE block per reply, because a turn carries exactly one
+ * answer: the user replies to a block by sending a message, which retires every
+ * other block in that turn. The model still occasionally emits two (one per
+ * question) instead of one block with two questions. Rather than render the
+ * first and dump the second as raw JSON in the chat, all blocks collapse into a
+ * single card anchored where the LAST one was: every question's introductory
+ * line reads above the card that answers it, instead of a card appearing before
+ * the prose that introduces half of it.
  */
 export function splitOptionsBlock(reply: string): {
   before: string;
   block: OptionsBlock | null;
   after: string;
 } {
-  const loc = locateOptionsBlock(reply);
-  if (!loc) return { before: reply, block: null, after: "" };
-  return { before: reply.slice(0, loc.start), block: loc.block, after: reply.slice(loc.end) };
+  const found = locateOptionsBlocks(reply);
+  if (found.length === 0) return { before: reply, block: null, after: "" };
+  const last = found[found.length - 1];
+  // Prose up to the last block, with the earlier blocks' own text cut out and
+  // the surrounding paragraphs stitched together.
+  let before = "";
+  let cursor = 0;
+  for (const b of found) {
+    before += reply.slice(cursor, b.start);
+    cursor = b.end;
+  }
+  return {
+    // The cuts leave the trailing blank line of one paragraph next to the
+    // leading blank line of the next, which pre-wrap would render as a gap.
+    before: before.replace(/\n{3,}/g, "\n\n"),
+    block: mergeQuestions(found),
+    after: reply.slice(last.end),
+  };
+}
+
+function countOccurrences(haystack: string, needle: string): number {
+  return haystack.split(needle).length - 1;
 }
 
 /**
  * Whether the reply opened an options block that never closed: while it streams,
- * the START marker is present but END has not arrived. Used to show a
- * "preparando opciones…" placeholder instead of the half-written JSON.
+ * a START marker is present with no END yet. Used to show a "preparando
+ * opciones…" placeholder instead of the half-written JSON. Counts rather than
+ * tests presence, so a second block still streaming behind a finished first one
+ * is caught too.
  */
 export function hasUnclosedOptionsBlock(reply: string): boolean {
-  return reply.includes(OPTIONS_START) && !reply.includes(OPTIONS_END);
+  return countOccurrences(reply, OPTIONS_START) > countOccurrences(reply, OPTIONS_END);
 }
 
 /**

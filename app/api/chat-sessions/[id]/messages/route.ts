@@ -2,6 +2,7 @@ import { NextRequest } from "next/server";
 import {
   getSession,
   appendMessage,
+  deleteMessage,
   updateDraft,
 } from "@/lib/db/chat-sessions";
 import { getRoleDefault } from "@/lib/db/role-defaults";
@@ -19,6 +20,15 @@ import {
 } from "@/lib/prompts/editor-persona";
 import { buildCreatorSystemPrompt } from "@/lib/prompts/creator-persona";
 import { streamChat, type ChatMessage, type MessageAttachment } from "@/lib/providers";
+import {
+  startTurn,
+  stopTurn,
+  getTurn,
+  subscribeTurn,
+  TurnInFlightError,
+  type TurnEvent,
+  type TurnJob,
+} from "@/lib/jobs/chat-turn";
 import { handleError, jsonError } from "@/lib/http";
 
 export const dynamic = "force-dynamic";
@@ -75,6 +85,81 @@ async function loadAttachmentsForModel(
 }
 
 /**
+ * Attaches an HTTP response to a running turn: replays whatever the job has
+ * already generated, then tails it live, as NDJSON. Shared by POST (which has
+ * nothing to replay yet, so the replay is a no-op) and GET (which reattaches a
+ * client that navigated away and came back).
+ *
+ * Losing this connection does NOT cancel anything. It only unsubscribes, which
+ * is the entire point: the job outlives the request that started it.
+ */
+function turnStream(job: TurnJob): Response {
+  const encoder = new TextEncoder();
+  let teardown = () => {};
+
+  const stream = new ReadableStream<Uint8Array>({
+    // Synchronous on purpose: no await between reading the job's buffered text
+    // and subscribing, so no delta can slip through the gap.
+    start(controller) {
+      let closed = false;
+      let detach = () => {};
+      let heartbeat: ReturnType<typeof setInterval> | undefined;
+
+      const close = () => {
+        if (closed) return;
+        closed = true;
+        detach();
+        if (heartbeat) clearInterval(heartbeat);
+        try {
+          controller.close();
+        } catch {
+          // Already torn down by the client going away.
+        }
+      };
+      teardown = close;
+      const send = (evt: Record<string, unknown>) => {
+        if (closed) return;
+        try {
+          controller.enqueue(encoder.encode(JSON.stringify(evt) + "\n"));
+        } catch {
+          close();
+        }
+      };
+
+      // Flush a byte immediately, and keep flushing every 15s, so a reverse
+      // proxy in front of the app doesn't 502 the connection while Opus is
+      // still producing its first token (time-to-first-token can be several
+      // seconds on a large prompt). The client ignores unknown event types, so
+      // pings are harmless.
+      send({ type: "ping" });
+      heartbeat = setInterval(() => send({ type: "ping" }), 15000);
+
+      detach = subscribeTurn(job, (evt: TurnEvent) => {
+        send(evt);
+        if (evt.type !== "text") close();
+      });
+      // subscribeTurn replays synchronously, so an already-finished job has
+      // closed us by now and the heartbeat above is already cleared.
+    },
+    cancel() {
+      // The client left. Unsubscribe and stop the heartbeat, but let the turn
+      // itself keep running.
+      teardown();
+    },
+  });
+
+  return new Response(stream, {
+    headers: {
+      "Content-Type": "application/x-ndjson; charset=utf-8",
+      "Cache-Control": "no-store",
+      // Disable proxy buffering (nginx and friends) so bytes stream through
+      // immediately instead of being held back until the response ends.
+      "X-Accel-Buffering": "no",
+    },
+  });
+}
+
+/**
  * Sends a user message and streams Opus's reply as NDJSON events:
  *   {type:"text", text} — incremental content, same as the raw reply text.
  *   {type:"done", truncated, draftBroken} — sent once at the end.
@@ -91,6 +176,19 @@ async function loadAttachmentsForModel(
  * never true for legitimate no-draft replies (e.g. a clarifying question),
  * only for the actually-cut-off case. The client surfaces both distinctly.
  *
+ * Backgrounding: generation does NOT live in this request. POST registers a job
+ * (see lib/jobs/chat-turn.ts) and then subscribes to it, so a client that
+ * navigates away only unsubscribes while the turn runs to completion and
+ * persists itself. GET reattaches to a turn already in flight, replaying what
+ * it has produced so far. Closing the connection means "I left", never "cancel".
+ *
+ * Cancellation is therefore explicit: DELETE aborts the job's own signal. The
+ * loop breaks, which returns the provider generator and aborts the upstream
+ * request so the rest of the reply is never generated. The whole turn is then
+ * discarded, including the user message stored on the way in: a cancelled turn
+ * is deliberately NOT salvaged the way a provider failure is, because the
+ * operator stopped it on purpose.
+ *
  * Editor and Creator share this endpoint, branching on `session.type`: the
  * Editor edits the seeded draft (role `editor`); the Creator builds a new
  * prompt from the architectural reference at `base_version_id` (role
@@ -104,6 +202,14 @@ export async function POST(req: NextRequest, { params }: Params) {
     if (!session) return jsonError("Sesión no encontrada.", 404);
     if (session.status === "abandoned") {
       return jsonError("La sesión fue descartada y no admite más mensajes.", 409);
+    }
+    // Checked before the user message is stored, so a second tab (or a double
+    // submit) can't strand an extra user row with no reply behind it.
+    if (getTurn(id)) {
+      return jsonError(
+        "Ya hay una respuesta en curso en esta sesión. Espera a que termine.",
+        409,
+      );
     }
 
     const input = appendMessageSchema.parse(await req.json());
@@ -124,7 +230,7 @@ export async function POST(req: NextRequest, { params }: Params) {
       role: m.role,
       content: m.content,
     }));
-    await appendMessage(id, {
+    const userMessage = await appendMessage(id, {
       role: "user",
       content: input.content,
       attachments: input.attachments ?? null,
@@ -186,115 +292,157 @@ export async function POST(req: NextRequest, { params }: Params) {
       return { draftBroken };
     };
 
-    const encoder = new TextEncoder();
-    const stream = new ReadableStream<Uint8Array>({
-      async start(controller) {
-        let closed = false;
-        const send = (evt: Record<string, unknown>) => {
-          if (closed) return;
-          controller.enqueue(encoder.encode(JSON.stringify(evt) + "\n"));
-        };
+    // The operator pressed "detener": undo the user turn stored above so the
+    // cancelled exchange leaves no trace, and skip the partial-reply salvage.
+    // Best-effort, a failed delete must not mask the cancellation itself.
+    const discardTurn = async () => {
+      try {
+        await deleteMessage(userMessage.id);
+      } catch (delErr) {
+        console.error(
+          `[chat-sessions] failed to delete cancelled user message (session ${id}): ${
+            delErr instanceof Error ? (delErr.stack ?? delErr.message) : String(delErr)
+          }`,
+        );
+      }
+    };
 
-        // Flush a byte immediately, and keep flushing every 15s, so a reverse
-        // proxy in front of the app doesn't 502 the connection while Opus is
-        // still producing its first token (time-to-first-token can be several
-        // seconds on a large prompt, and this route otherwise sends nothing
-        // until then). The client ignores unknown event types, so pings are
-        // harmless. Same resilience the adversarial run route gets for free
-        // from its immediate turn_start.
-        send({ type: "ping" });
-        const heartbeat = setInterval(() => {
-          try {
-            send({ type: "ping" });
-          } catch {
-            // Stream already gone — nothing to keep alive.
+    // The turn itself, handed to the registry and run detached from this
+    // request. Everything domain-specific stays here (draft extraction,
+    // version stamping, token accounting, the partial-reply salvage); the
+    // registry only buffers text and fans it out to whoever is attached.
+    const run = async (
+      signal: AbortSignal,
+      emit: (text: string) => void,
+    ): Promise<TurnEvent> => {
+      let fullText = "";
+      let tokensIn = 0;
+      let tokensOut = 0;
+      let truncated = false;
+      // Guards the salvage path from re-persisting: a provider error landing
+      // right after a clean persist would otherwise store the turn twice.
+      let persisted = false;
+      try {
+        for await (const chunk of streamChat({
+          providerId: role.provider_id,
+          modelName: role.model_name,
+          systemPrompt,
+          messages,
+          temperature: role.temperature ?? undefined,
+          topP: role.top_p ?? undefined,
+          maxTokens: role.max_tokens ?? EDITOR_CREATOR_MAX_TOKENS,
+        })) {
+          // Cancelled from the stop button, which now goes through DELETE.
+          // Breaking here returns the provider generator, which aborts the
+          // upstream request, so the rest of the reply is never generated (and
+          // never billed). The already-consumed input tokens are spent either
+          // way.
+          if (signal.aborted) break;
+          if (chunk.type === "text") {
+            fullText += chunk.text;
+            emit(chunk.text);
+          } else {
+            tokensIn = chunk.tokensIn;
+            tokensOut = chunk.tokensOut;
+            truncated = chunk.truncated;
           }
-        }, 15000);
-        const stopHeartbeat = () => {
-          clearInterval(heartbeat);
-        };
-
-        let fullText = "";
-        let tokensIn = 0;
-        let tokensOut = 0;
-        let truncated = false;
-        // Guards the salvage path from re-persisting: if the client drops right
-        // after a clean persist but before close, the throw lands in catch with
-        // fullText still set, and without this we would store the turn twice.
-        let persisted = false;
-        try {
-          for await (const chunk of streamChat({
-            providerId: role.provider_id,
-            modelName: role.model_name,
-            systemPrompt,
-            messages,
-            temperature: role.temperature ?? undefined,
-            topP: role.top_p ?? undefined,
-            maxTokens: role.max_tokens ?? EDITOR_CREATOR_MAX_TOKENS,
-          })) {
-            if (chunk.type === "text") {
-              fullText += chunk.text;
-              send({ type: "text", text: chunk.text });
-            } else {
-              tokensIn = chunk.tokensIn;
-              tokensOut = chunk.tokensOut;
-              truncated = chunk.truncated;
-            }
-          }
-
-          // Persist the assistant turn (version-stamped) and update the draft.
-          const { draftBroken } = await persistTurn(fullText, tokensIn, tokensOut);
-          persisted = true;
-
-          send({ type: "done", truncated, draftBroken });
-          stopHeartbeat();
-          closed = true;
-          controller.close();
-        } catch (err) {
-          stopHeartbeat();
-          // The stream broke mid-flight: an upstream provider error, or the
-          // client connection dropped (a transient network blip on a long
-          // turn). This route used to swallow the error, which is exactly why
-          // the failure window was empty in the server logs. Log it so a
-          // recurrence leaves a trace.
-          console.error(
-            `[chat-sessions] stream failed (session ${id}, type ${session.type}): ${
-              err instanceof Error ? (err.stack ?? err.message) : String(err)
-            }`,
-          );
-          // Salvage whatever was generated so a dropped connection doesn't
-          // discard the turn: the user finds the partial reply (and its draft,
-          // if a full block already arrived) on the next re-sync instead of an
-          // empty chat. Token counts are best-effort: tokensOut only arrives
-          // on the provider's final event, so a mid-stream drop leaves it 0.
-          if (fullText && !persisted) {
-            try {
-              await persistTurn(fullText, tokensIn, tokensOut);
-            } catch (persistErr) {
-              console.error(
-                `[chat-sessions] failed to persist partial reply (session ${id}): ${
-                  persistErr instanceof Error
-                    ? (persistErr.stack ?? persistErr.message)
-                    : String(persistErr)
-                }`,
-              );
-            }
-          }
-          closed = true;
-          controller.error(err);
         }
-      },
-    });
 
-    return new Response(stream, {
-      headers: {
-        "Content-Type": "application/x-ndjson; charset=utf-8",
-        "Cache-Control": "no-store",
-        // Disable proxy buffering (nginx and friends) so bytes stream through
-        // immediately instead of being held back until the response ends.
-        "X-Accel-Buffering": "no",
-      },
+        if (signal.aborted) {
+          await discardTurn();
+          return { type: "cancelled" };
+        }
+
+        // Persist the assistant turn (version-stamped) and update the draft.
+        const { draftBroken } = await persistTurn(fullText, tokensIn, tokensOut);
+        persisted = true;
+        return { type: "done", truncated, draftBroken };
+      } catch (err) {
+        // Same cancellation, but it surfaced as a throw before the loop could
+        // check the signal. Discard, don't log, and above all don't salvage:
+        // the user stopped this turn precisely because they don't want it.
+        if (signal.aborted) {
+          await discardTurn();
+          return { type: "cancelled" };
+        }
+        // The provider stream broke mid-flight. A client walking away is no
+        // longer one of the possible causes, so this is always a real upstream
+        // failure and always worth a log line.
+        console.error(
+          `[chat-sessions] stream failed (session ${id}, type ${session.type}): ${
+            err instanceof Error ? (err.stack ?? err.message) : String(err)
+          }`,
+        );
+        // Salvage whatever was generated so a mid-flight failure doesn't
+        // discard the turn: the user finds the partial reply (and its draft, if
+        // a full block already arrived) on the next re-sync instead of an empty
+        // chat. Token counts are best-effort: tokensOut only arrives on the
+        // provider's final event, so a mid-stream break leaves it 0.
+        if (fullText && !persisted) {
+          try {
+            await persistTurn(fullText, tokensIn, tokensOut);
+          } catch (persistErr) {
+            console.error(
+              `[chat-sessions] failed to persist partial reply (session ${id}): ${
+                persistErr instanceof Error
+                  ? (persistErr.stack ?? persistErr.message)
+                  : String(persistErr)
+              }`,
+            );
+          }
+        }
+        return {
+          type: "error",
+          message: err instanceof Error ? err.message : "La generación falló.",
+        };
+      }
+    };
+
+    const job = startTurn({
+      sessionId: id,
+      mode: session.type,
+      title: session.client_name ?? session.title ?? "Sesión",
+      run,
     });
+    return turnStream(job);
+  } catch (err) {
+    // Two POSTs that both cleared the getTurn guard above and then raced
+    // through the awaits between it and startTurn. The loser reports the same
+    // conflict the guard would have.
+    if (err instanceof TurnInFlightError) return jsonError(err.message, 409);
+    return handleError(err);
+  }
+}
+
+/**
+ * Reattaches to a turn already generating for this session, replaying what it
+ * has produced so far and then tailing it live. 204 when nothing is in flight,
+ * which is the client's cue to just read the finished conversation from the
+ * database: the assistant message is always persisted before a job leaves the
+ * registry, so there is no window where a reply is both missing and unreadable.
+ */
+export async function GET(_req: NextRequest, { params }: Params) {
+  try {
+    const { id } = await params;
+    const job = getTurn(id);
+    if (!job) return new Response(null, { status: 204 });
+    return turnStream(job);
+  } catch (err) {
+    return handleError(err);
+  }
+}
+
+/**
+ * The composer's stop button. Closing the stream no longer cancels anything, so
+ * stopping has to be said out loud. Idempotent: a stop that lands after the
+ * last token is a no-op, not an error, because the button always races the end
+ * of the turn.
+ */
+export async function DELETE(_req: NextRequest, { params }: Params) {
+  try {
+    const { id } = await params;
+    stopTurn(id);
+    return new Response(null, { status: 204 });
   } catch (err) {
     return handleError(err);
   }

@@ -60,7 +60,7 @@ No preguntes lo que puedas inferir con seguridad del brief. Agrupa las preguntas
 PASO 2 — DESPUÉS DE LAS RESPUESTAS DEL USUARIO: construye el prompt completo del nuevo cliente.
 
 FORMATO DE ENTREGA DEL PASO 2 (obligatorio):
-1. Entrega el prompt COMPLETO del nuevo cliente dentro de un único bloque de código markdown (delimitado por triple backtick). El bloque debe contener exclusivamente el prompt, listo para copiar y pegar. No incluyas números ni etiquetas de versión: el sistema gestiona el versionado por separado.
+1. Entrega el prompt COMPLETO del nuevo cliente dentro de un único bloque de código markdown (delimitado por triple backtick). El bloque debe contener exclusivamente el prompt, listo para copiar y pegar. No incluyas números ni etiquetas de versión: el sistema gestiona el versionado por separado. La primera línea del prompt debe ser su título como encabezado markdown de nivel 1, es decir empezando con "# ": el sistema lo necesita para sellar la versión ahí y en la línea de cierre.
 2. Fuera del bloque de código, al final, incluye este reporte:
 
 **ARQUITECTURA TRASLADADA DEL BASE:**
