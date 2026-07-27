@@ -769,7 +769,7 @@ export default function ClientDetailPage() {
             }}
           />
           <N8nSyncHistory clientId={id} />
-          <ConversationHistory clientId={id} />
+          <ConversationHistory clientId={id} clientName={detail.name} />
         </aside>
 
         {viewingVersion ? (

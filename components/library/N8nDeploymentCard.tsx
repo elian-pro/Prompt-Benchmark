@@ -49,6 +49,8 @@ export function N8nDeploymentCard({ clientId, productionVersion, onRequestSync }
   const [confirmingId, setConfirmingId] = useState<string | null>(null);
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [driftById, setDriftById] = useState<Record<string, DriftResult>>({});
+  const [hasTemplate, setHasTemplate] = useState(false);
+  const [duplicating, setDuplicating] = useState(false);
 
   // Opened straight from creation/import with ?bind=1: auto-open the picker
   // once, then strip the param so a refresh doesn't reopen it. Reading
@@ -93,6 +95,47 @@ export function N8nDeploymentCard({ clientId, productionVersion, onRequestSync }
   useEffect(() => {
     load();
   }, [load]);
+
+  // Offer "duplicar plantilla" only when a template is configured, so the
+  // button never appears just to fail. Same rule as the Nuevo cliente modal.
+  useEffect(() => {
+    let alive = true;
+    fetch("/api/provisioning-options")
+      .then((r) => (r.ok ? r.json() : { templates: [] }))
+      .then((data: { templates: unknown[] }) => {
+        if (alive) setHasTemplate((data.templates ?? []).length > 0);
+      })
+      .catch(() => {});
+    return () => {
+      alive = false;
+    };
+  }, []);
+
+  /**
+   * Provisioning retry: duplicates the template as "IA Mensajes <Cliente>" and
+   * binds its AI Agent node. Idempotent server-side, so pressing it twice
+   * adopts the existing flow instead of making a second copy.
+   */
+  async function duplicateFromTemplate() {
+    setDuplicating(true);
+    setError(null);
+    try {
+      const res = await fetch(`/api/clients/${clientId}/provision`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ duplicateWorkflow: true }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error ?? "No se pudo duplicar el flujo.");
+      const step = data.provisioning?.workflow;
+      if (step && !step.ok) throw new Error(step.error);
+      await load();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Error inesperado.");
+    } finally {
+      setDuplicating(false);
+    }
+  }
 
   async function createBinding(selection: BindingSelection) {
     const res = await fetch(`/api/clients/${clientId}/n8n-bindings`, {
@@ -192,6 +235,16 @@ export function N8nDeploymentCard({ clientId, productionVersion, onRequestSync }
           <span className="muted" style={{ fontSize: 13 }}>
             Sin vínculos. Al promover, este cliente no actualiza ningún nodo.
           </span>
+          {hasTemplate && (
+            <Button
+              size="sm"
+              variant="secondary"
+              onClick={duplicateFromTemplate}
+              disabled={duplicating}
+            >
+              {duplicating ? "Duplicando…" : "Duplicar plantilla"}
+            </Button>
+          )}
         </div>
       )}
 

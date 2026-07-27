@@ -10,9 +10,12 @@ import type { ConversationRow } from "@/lib/db/chats-history";
 import { Button } from "@/components/ui/Button";
 import { Modal } from "@/components/ui/Modal";
 import { EmptyState } from "@/components/ui/EmptyState";
+import { chatsTableName } from "@/lib/chats-table-name";
 
 type Props = {
   clientId: string;
+  /** Used to name the table the "Crear tabla" shortcut would create. */
+  clientName: string;
 };
 
 type Page = {
@@ -44,8 +47,10 @@ function formatDate(iso: string): string {
  * connected yet, shows a picker to connect one (persisted as clients.chats_table).
  * Lazy-loads on first open, like N8nSyncHistory.
  */
-export function ConversationHistory({ clientId }: Props) {
+export function ConversationHistory({ clientId, clientName }: Props) {
   const [open, setOpen] = useState(false);
+  const [creating, setCreating] = useState(false);
+  const suggestedTable = chatsTableName(clientName);
 
   const [page, setPage] = useState<Page | null>(null);
   const [rows, setRows] = useState<ConversationRow[]>([]);
@@ -108,6 +113,34 @@ export function ConversationHistory({ clientId }: Props) {
       setError(e instanceof Error ? e.message : "Error inesperado.");
     } finally {
       setLoadingMore(false);
+    }
+  }
+
+  /**
+   * Provisioning retry: creates chats_<Cliente> and connects it. Idempotent
+   * server-side (create if not exists, adopt when the table already exists).
+   */
+  async function createTable() {
+    setCreating(true);
+    setError(null);
+    try {
+      const res = await fetch(`/api/clients/${clientId}/provision`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ createChatsTable: true }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error ?? "No se pudo crear la tabla.");
+      const step = data.provisioning?.chats;
+      if (step && !step.ok) throw new Error(step.error);
+      setPage(null);
+      setRows([]);
+      setOffset(0);
+      await loadFirstPage();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Error inesperado.");
+    } finally {
+      setCreating(false);
     }
   }
 
@@ -188,9 +221,21 @@ export function ConversationHistory({ clientId }: Props) {
               title="Sin historial conectado"
               description="Este cliente aún no tiene una tabla de conversaciones asociada."
               action={
-                <Button size="sm" variant="primary" onClick={openPicker}>
-                  Conectar historial
-                </Button>
+                <div style={{ display: "flex", gap: 8, flexWrap: "wrap", justifyContent: "center" }}>
+                  <Button size="sm" variant="primary" onClick={openPicker} disabled={creating}>
+                    Conectar historial
+                  </Button>
+                  {suggestedTable && (
+                    <Button
+                      size="sm"
+                      variant="secondary"
+                      onClick={createTable}
+                      disabled={creating}
+                    >
+                      {creating ? "Creando…" : `Crear tabla ${suggestedTable}`}
+                    </Button>
+                  )}
+                </div>
               }
             />
           )}
