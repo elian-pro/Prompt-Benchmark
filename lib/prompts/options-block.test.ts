@@ -137,3 +137,50 @@ test("moveRankItem swaps immutably and respects boundaries", () => {
   // Original is not mutated.
   assert.deepEqual(order, ["A", "B", "C"]);
 });
+
+// Two blocks in one reply (observed drift: the model emits one block per
+// question instead of one block with two questions). Both must render.
+const PROMOS_JSON = JSON.stringify({
+  questions: [
+    { id: "promos", prompt: "¿Qué hace el asesor?", type: "single_select", options: ["Remitir", "Call center"] },
+  ],
+});
+
+const TWO_BLOCK_REPLY =
+  wrap(SINGLE_JSON, "Elige el enfoque:\n\n", "\n\nY una duda más sobre promociones:\n\n") +
+  wrap(PROMOS_JSON, "", "\n\n¿Te parece?");
+
+test("splitOptionsBlock folds several blocks into one card", () => {
+  const { block } = splitOptionsBlock(TWO_BLOCK_REPLY);
+  assert.ok(block);
+  assert.deepEqual(block.questions.map((q) => q.id), ["budget", "promos"]);
+});
+
+test("splitOptionsBlock leaves no raw markers or JSON in the prose", () => {
+  const { before, after } = splitOptionsBlock(TWO_BLOCK_REPLY);
+  for (const prose of [before, after]) {
+    assert.ok(!prose.includes(OPTIONS_START), `stray start marker in: ${prose}`);
+    assert.ok(!prose.includes(OPTIONS_END), `stray end marker in: ${prose}`);
+    assert.ok(!prose.includes('"questions"'), `stray JSON payload in: ${prose}`);
+  }
+  // The prose between and after the blocks survives, stitched together.
+  assert.match(before, /Elige el enfoque/);
+  assert.match(after, /Y una duda más sobre promociones/);
+  assert.match(after, /¿Te parece\?/);
+});
+
+test("merging drops duplicate question ids and clamps to 3 questions", () => {
+  const dup = (id: string) =>
+    wrap(JSON.stringify({
+      questions: [{ id, prompt: `p-${id}`, type: "single_select", options: ["A", "B"] }],
+    }));
+  const { block } = splitOptionsBlock([dup("a"), dup("a"), dup("b"), dup("c"), dup("d")].join("\n"));
+  assert.ok(block);
+  assert.deepEqual(block.questions.map((q) => q.id), ["a", "b", "c"]);
+});
+
+test("hasUnclosedOptionsBlock catches a second block still streaming", () => {
+  const closed = wrap(SINGLE_JSON, "Elige:\n\n");
+  assert.equal(hasUnclosedOptionsBlock(closed), false);
+  assert.equal(hasUnclosedOptionsBlock(`${closed}\n\nY otra:\n\n${OPTIONS_START}\n{ "questi`), true);
+});
