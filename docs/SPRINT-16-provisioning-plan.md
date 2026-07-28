@@ -310,4 +310,12 @@ Dos cambios, ya en `main` vía `sprint-16/node-pick-and-version-sync`:
   "Sincronizar con n8n" en la vista de cualquier versión, y el link de la
   tarjeta visible siempre que haya versión de producción.
 
+- **Nada de esto aplica al n8n del cliente.** Con "n8n propio del cliente" en
+  `N8nHostPicker`, ni el flujo ni la tabla ni el vínculo existen en nuestra
+  infraestructura, así que Nuevo cliente oculta los dos checkboxes y el toggle
+  de vincular (Importar oculta el suyo) y el submit los ignora aunque quedaran
+  marcados. El estado no se resetea, así que volver a "n8n de Zebra" recupera
+  los defaults. Su destino se registra después desde la ficha, como vínculo
+  manual.
+
 Queda pendiente el resto de la verificación end to end (puntos 4 a 7).
