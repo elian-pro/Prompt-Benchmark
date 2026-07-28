@@ -18,13 +18,19 @@ function client(ctx: AdapterContext): Anthropic {
  * is a plain string; otherwise it becomes a content-block array: the text,
  * then native image/document blocks, with text files folded inline.
  */
-function toMessageParam(m: ChatMessage): Anthropic.MessageParam {
-  if (!m.attachments || m.attachments.length === 0) {
+function toMessageParam(m: ChatMessage, cache = false): Anthropic.MessageParam {
+  if ((!m.attachments || m.attachments.length === 0) && !cache) {
     return { role: m.role, content: m.content };
   }
-  const blocks: Anthropic.ContentBlockParam[] = [];
+  // Narrower than ContentBlockParam: every block we build accepts
+  // cache_control, which the full union (ThinkingBlockParam) does not.
+  const blocks: (
+    | Anthropic.TextBlockParam
+    | Anthropic.ImageBlockParam
+    | Anthropic.DocumentBlockParam
+  )[] = [];
   let text = m.content;
-  for (const a of m.attachments) {
+  for (const a of m.attachments ?? []) {
     if (a.kind === "image") {
       blocks.push({
         type: "image",
@@ -39,15 +45,33 @@ function toMessageParam(m: ChatMessage): Anthropic.MessageParam {
       text += `\n\n--- Archivo adjunto: ${a.filename} ---\n${a.data}`;
     }
   }
-  return { role: m.role, content: [{ type: "text", text }, ...blocks] };
+  const content: typeof blocks = [{ type: "text", text }, ...blocks];
+  if (cache) {
+    // Breakpoint on the last block of the newest turn: this request writes it,
+    // the next one finds it inside its own prefix and reads it back.
+    content[content.length - 1].cache_control = { type: "ephemeral" };
+  }
+  return { role: m.role, content };
 }
 
 function baseParams(req: ChatRequest) {
+  const lastIndex = req.messages.length - 1;
   return {
     model: req.modelName,
     max_tokens: req.maxTokens ?? DEFAULT_MAX_TOKENS,
-    system: req.systemPrompt,
-    messages: req.messages.map(toMessageParam),
+    // Rendering order is system then messages, so the system breakpoint covers
+    // the whole stable prefix and the message one extends it turn by turn.
+    system:
+      req.cache && req.systemPrompt
+        ? [
+            {
+              type: "text" as const,
+              text: req.systemPrompt,
+              cache_control: { type: "ephemeral" as const },
+            },
+          ]
+        : req.systemPrompt,
+    messages: req.messages.map((m, i) => toMessageParam(m, req.cache === true && i === lastIndex)),
     temperature: req.temperature,
     top_p: req.topP,
   };

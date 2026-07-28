@@ -62,6 +62,9 @@ export async function POST(req: NextRequest, { params }: Params) {
       temperature: role.temperature ?? undefined,
       topP: role.top_p ?? undefined,
       maxTokens: role.max_tokens ?? undefined,
+      // prompt_snapshot is frozen for the session, so the whole prefix is
+      // stable and every turn after the first reads the history from cache.
+      cache: true,
     });
 
     const botMessage = await appendMessage(id, {

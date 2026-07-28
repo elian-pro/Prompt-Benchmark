@@ -27,6 +27,17 @@ export type ChatRequest = {
   temperature?: number;
   topP?: number;
   maxTokens?: number;
+  /**
+   * Marks the system prompt and the conversation so far as cacheable, so a
+   * long history (and any attached documents in it) bills at ~10% on later
+   * turns instead of full price.
+   *
+   * Only set this when the system prompt is STABLE across the session's turns.
+   * Caching is a prefix match: a system prompt that changes every turn
+   * invalidates the whole prefix, and the cache writes become pure overhead
+   * (~1.25x) that is never read back. Ignored by adapters other than Anthropic.
+   */
+  cache?: boolean;
 };
 
 export type ChatResponse = {

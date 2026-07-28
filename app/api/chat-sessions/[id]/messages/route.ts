@@ -375,6 +375,12 @@ export async function POST(req: NextRequest, { params }: Params) {
           temperature: role.temperature ?? undefined,
           topP: role.top_p ?? undefined,
           maxTokens: role.max_tokens ?? EDITOR_CREATOR_MAX_TOKENS,
+          // Creator's system prompt holds the base version, fixed for the whole
+          // session, so the prefix is stable and worth caching. Editor's holds
+          // the working draft, which the model rewrites on every turn: caching
+          // there would pay the write premium on a prefix nothing ever reads.
+          // ponytail: move the draft out of the system prompt to cache Editor too.
+          cache: isCreator,
         })) {
           // Cancelled from the stop button, which now goes through DELETE.
           // Breaking here returns the provider generator, which aborts the
