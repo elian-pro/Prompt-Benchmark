@@ -306,14 +306,11 @@ export function N8nDeploymentCard({ clientId, productionVersion, onRequestSync }
                   {driftById[b.id]?.status === "synced" && <IconCheck size={12} />}
                   {DRIFT_LABEL[driftById[b.id]?.status ?? "no_baseline"]}
                 </span>
-                {(driftById[b.id]?.status === "drifted" ||
-                  driftById[b.id]?.status === "not_found" ||
-                  driftById[b.id]?.status === "not_agent") &&
-                  productionVersion && (
-                    <button className="n8n-sync-link" onClick={onRequestSync}>
-                      Ver diff / sincronizar
-                    </button>
-                  )}
+                {productionVersion && (
+                  <button className="n8n-sync-link" onClick={onRequestSync}>
+                    Ver diff / sincronizar
+                  </button>
+                )}
               </div>
             )}
 
