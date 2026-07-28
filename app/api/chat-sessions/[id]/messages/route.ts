@@ -67,21 +67,54 @@ async function loadAttachmentsForModel(
         `No se pudo cargar el archivo adjunto "${a.filename}". Puede haber expirado o haber sido eliminado; vuelve a adjuntarlo e intenta de nuevo.`,
       );
     }
-    const mediaType = dl.upload.mime_type ?? a.mimeType ?? "";
-    if (mediaType.startsWith("image/")) {
-      out.push({ filename: dl.upload.filename, mediaType, kind: "image", data: dl.bytes.toString("base64") });
-    } else if (mediaType === "application/pdf") {
-      out.push({ filename: dl.upload.filename, mediaType, kind: "document", data: dl.bytes.toString("base64") });
-    } else {
-      out.push({
-        filename: dl.upload.filename,
-        mediaType: mediaType || "text/plain",
-        kind: "text",
-        data: dl.bytes.toString("utf-8"),
-      });
-    }
+    out.push(toModelAttachment(dl, a));
   }
   return out;
+}
+
+/** Shapes one downloaded upload for the model. */
+function toModelAttachment(
+  dl: NonNullable<Awaited<ReturnType<typeof downloadUploadBytes>>>,
+  a: Attachment,
+): MessageAttachment {
+  const mediaType = dl.upload.mime_type ?? a.mimeType ?? "";
+  if (mediaType.startsWith("image/")) {
+    return { filename: dl.upload.filename, mediaType, kind: "image", data: dl.bytes.toString("base64") };
+  }
+  if (mediaType === "application/pdf") {
+    return { filename: dl.upload.filename, mediaType, kind: "document", data: dl.bytes.toString("base64") };
+  }
+  return {
+    filename: dl.upload.filename,
+    mediaType: mediaType || "text/plain",
+    kind: "text",
+    data: dl.bytes.toString("utf-8"),
+  };
+}
+
+/**
+ * Re-loads the files of an OLDER turn so a document stays visible for the rest
+ * of the conversation instead of only the turn it arrived in.
+ *
+ * Best-effort on purpose: uploads expire after 7 days, and a file that is gone
+ * must not make every later turn fail. What is missing is named in the text so
+ * the model says "ya no tengo ese archivo" instead of inventing its contents.
+ *
+ * ponytail: re-downloads every historical file from Storage on every turn.
+ * Fine for the handful of files a prompt session carries; add an in-request
+ * memo or a bytes cache if a long session with many attachments feels slow.
+ */
+async function loadHistoricalAttachments(
+  attachments: Attachment[],
+): Promise<{ loaded: MessageAttachment[]; missing: string[] }> {
+  const loaded: MessageAttachment[] = [];
+  const missing: string[] = [];
+  for (const a of attachments) {
+    const dl = await downloadUploadBytes(a.uploadId).catch(() => null);
+    if (dl) loaded.push(toModelAttachment(dl, a));
+    else missing.push(a.filename);
+  }
+  return { loaded, missing };
 }
 
 /**
@@ -225,11 +258,22 @@ export async function POST(req: NextRequest, { params }: Params) {
       );
     }
 
-    // History before this turn, plus the new user message.
-    const history: ChatMessage[] = session.messages.map((m) => ({
-      role: m.role,
-      content: m.content,
-    }));
+    // History before this turn, plus the new user message. Past attachments are
+    // re-sent, so a document the user shared on turn 2 is still readable on
+    // turn 20 rather than surviving only as whatever the model said about it.
+    const history: ChatMessage[] = await Promise.all(
+      session.messages.map(async (m): Promise<ChatMessage> => {
+        if (!m.attachments?.length) return { role: m.role, content: m.content };
+        const { loaded, missing } = await loadHistoricalAttachments(m.attachments);
+        return {
+          role: m.role,
+          content: missing.length
+            ? `${m.content}\n\n[Archivos de este mensaje que ya no están disponibles: ${missing.join(", ")}]`
+            : m.content,
+          attachments: loaded.length ? loaded : undefined,
+        };
+      }),
+    );
     const userMessage = await appendMessage(id, {
       role: "user",
       content: input.content,
