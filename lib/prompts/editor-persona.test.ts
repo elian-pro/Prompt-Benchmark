@@ -6,6 +6,8 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 
 import {
+  buildEditorSystemPrompt,
+  buildEditorDraftMessage,
   extractPromptFromReply,
   splitPromptBlock,
   replacePromptBlock,
@@ -135,4 +137,28 @@ test("unclosedBlockPreamble falls back to the legacy fence marker when no sentin
 test("unclosedBlockPreamble returns the whole reply when no block has started yet", () => {
   const reply = "Antes de editar, ¿me confirmas el alcance?";
   assert.equal(unclosedBlockPreamble(reply), reply);
+});
+
+// The draft must stay OUT of the system prompt: it is rewritten every turn,
+// and the system prompt is the front of the cache prefix, so putting it back
+// there silently un-caches every conversation.
+test("system prompt carries the persona but never the draft", () => {
+  const draft = "# PROMPT DE PRUEBA v9.9";
+  const system = buildEditorSystemPrompt();
+  assert.ok(system.includes("ingeniero de prompts"));
+  assert.ok(!system.includes(draft));
+  assert.ok(!system.includes("PROMPT EN PRODUCCI"));
+});
+
+test("draft message carries the draft, and says so when it is empty", () => {
+  const draft = "# PROMPT DE PRUEBA v9.9";
+  assert.ok(buildEditorDraftMessage(draft).includes(draft));
+  assert.ok(buildEditorDraftMessage("   ").includes("El prompt está vacío"));
+});
+
+test("a persona override replaces the persona, keeping the options contract", () => {
+  const system = buildEditorSystemPrompt("Eres otra persona.");
+  assert.ok(system.includes("Eres otra persona."));
+  assert.ok(!system.includes("ingeniero de prompts"));
+  assert.ok(system.includes("OPCIONES"));
 });
