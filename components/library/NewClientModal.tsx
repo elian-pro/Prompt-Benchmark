@@ -10,7 +10,9 @@ import { N8nHostPicker } from "@/components/library/N8nHostPicker";
 import { ProvisionFields, type ProvisionChoice } from "@/components/library/ProvisionFields";
 import type { N8nHost } from "@/lib/db/clients";
 
-type StepResult = { ok: true; detail: string } | { ok: false; error: string };
+type StepResult =
+  | { ok: true; detail: string }
+  | { ok: false; error: string; pick?: { connectionId: string; workflowId: string } };
 type Provisioning = { workflow: StepResult | null; chats: StepResult | null };
 
 export function NewClientModal({ open, onClose }: { open: boolean; onClose: () => void }) {
@@ -35,6 +37,13 @@ export function NewClientModal({ open, onClose }: { open: boolean; onClose: () =
 
   function goToClient(clientId: string, bind: boolean) {
     router.push(`/library/${clientId}${bind ? "?bind=1" : ""}`);
+  }
+
+  /** Opens the client's binding picker already on the duplicated workflow. */
+  function goPickNode(clientId: string, pick: { connectionId: string; workflowId: string }) {
+    router.push(
+      `/library/${clientId}?bind=1&conn=${encodeURIComponent(pick.connectionId)}&wf=${encodeURIComponent(pick.workflowId)}`,
+    );
   }
 
   async function submit() {
@@ -116,6 +125,10 @@ export function NewClientModal({ open, onClose }: { open: boolean; onClose: () =
     }
   }
 
+  // Only the workflow step can leave a "choose the node" pending action.
+  const workflowStep = report?.provisioning.workflow;
+  const pendingPick = workflowStep && !workflowStep.ok ? workflowStep.pick : undefined;
+
   return (
     <Modal
       open={open}
@@ -123,9 +136,15 @@ export function NewClientModal({ open, onClose }: { open: boolean; onClose: () =
       title="Nuevo cliente"
       footer={
         report ? (
-          <Button variant="primary" onClick={() => goToClient(report.clientId, false)}>
-            Continuar
-          </Button>
+          pendingPick ? (
+            <Button variant="primary" onClick={() => goPickNode(report.clientId, pendingPick)}>
+              Elegir nodo
+            </Button>
+          ) : (
+            <Button variant="primary" onClick={() => goToClient(report.clientId, false)}>
+              Continuar
+            </Button>
+          )
         ) : (
           <>
             <Button variant="ghost" onClick={onClose} disabled={saving}>
@@ -143,7 +162,11 @@ export function NewClientModal({ open, onClose }: { open: boolean; onClose: () =
           <p className="form-ok">El cliente se creó.</p>
           <StepLine label="Flujo de n8n" result={report.provisioning.workflow} />
           <StepLine label="Tabla de historial" result={report.provisioning.chats} />
-          <p className="field-hint">Puedes reintentar lo que falló desde la ficha del cliente.</p>
+          <p className="field-hint">
+            {pendingPick
+              ? "Continúa para elegir el nodo del flujo que ya se creó."
+              : "Puedes reintentar lo que falló desde la ficha del cliente."}
+          </p>
         </>
       ) : (
         <>

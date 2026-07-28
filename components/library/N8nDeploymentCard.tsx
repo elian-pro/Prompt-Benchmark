@@ -51,16 +51,28 @@ export function N8nDeploymentCard({ clientId, productionVersion, onRequestSync }
   const [driftById, setDriftById] = useState<Record<string, DriftResult>>({});
   const [hasTemplate, setHasTemplate] = useState(false);
   const [duplicating, setDuplicating] = useState(false);
+  // Set when the picker should open on a known workflow (provisioning made the
+  // copy but could not decide which of its AI Agent nodes to bind).
+  const [preselect, setPreselect] = useState<{
+    connectionId: string;
+    workflowId: string;
+  } | null>(null);
 
   // Opened straight from creation/import with ?bind=1: auto-open the picker
   // once, then strip the param so a refresh doesn't reopen it. Reading
   // window.location avoids the Suspense boundary useSearchParams would require.
+  // ?conn= and ?wf= carry the duplicated flow, so the picker opens on it.
   useEffect(() => {
     if (typeof window === "undefined") return;
     const url = new URL(window.location.href);
     if (url.searchParams.get("bind") === "1") {
+      const conn = url.searchParams.get("conn");
+      const wf = url.searchParams.get("wf");
+      if (conn && wf) setPreselect({ connectionId: conn, workflowId: wf });
       setModalOpen(true);
       url.searchParams.delete("bind");
+      url.searchParams.delete("conn");
+      url.searchParams.delete("wf");
       window.history.replaceState(null, "", url.pathname + url.search);
     }
   }, []);
@@ -128,7 +140,16 @@ export function N8nDeploymentCard({ clientId, productionVersion, onRequestSync }
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data.error ?? "No se pudo duplicar el flujo.");
       const step = data.provisioning?.workflow;
-      if (step && !step.ok) throw new Error(step.error);
+      if (step && !step.ok) {
+        // The copy exists, only its node is undecided: finish in the picker
+        // instead of leaving the user with an error and no next step.
+        if (step.pick) {
+          setPreselect(step.pick);
+          setModalOpen(true);
+          return;
+        }
+        throw new Error(step.error);
+      }
       await load();
     } catch (e) {
       setError(e instanceof Error ? e.message : "Error inesperado.");
@@ -341,9 +362,13 @@ export function N8nDeploymentCard({ clientId, productionVersion, onRequestSync }
       {modalOpen && (
         <N8nBindingModal
           open={modalOpen}
-          onClose={() => setModalOpen(false)}
+          onClose={() => {
+            setModalOpen(false);
+            setPreselect(null);
+          }}
           onConfirm={createBinding}
           onConfirmManual={createManualBinding}
+          preselect={preselect}
         />
       )}
     </div>
