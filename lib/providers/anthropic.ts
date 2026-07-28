@@ -55,7 +55,12 @@ function toMessageParam(m: ChatMessage, cache = false): Anthropic.MessageParam {
 }
 
 function baseParams(req: ChatRequest) {
-  const lastIndex = req.messages.length - 1;
+  // The breakpoint goes on the last message that will still look byte-identical
+  // next turn. Volatile ones (a redrafted prompt) trail after it, so rewriting
+  // them costs their own tokens instead of the whole conversation's.
+  const cacheIndex = req.cache
+    ? req.messages.reduce((last, m, i) => (m.volatile ? last : i), -1)
+    : -1;
   return {
     model: req.modelName,
     max_tokens: req.maxTokens ?? DEFAULT_MAX_TOKENS,
@@ -71,7 +76,7 @@ function baseParams(req: ChatRequest) {
             },
           ]
         : req.systemPrompt,
-    messages: req.messages.map((m, i) => toMessageParam(m, req.cache === true && i === lastIndex)),
+    messages: req.messages.map((m, i) => toMessageParam(m, i === cacheIndex)),
     temperature: req.temperature,
     top_p: req.topP,
   };

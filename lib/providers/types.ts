@@ -17,6 +17,13 @@ export type ChatMessage = {
   role: "user" | "assistant";
   content: string;
   attachments?: MessageAttachment[];
+  /**
+   * This message is rebuilt on every turn (the Editor's working draft), so it
+   * must stay OUTSIDE the cached prefix. Adapters put the cache breakpoint on
+   * the last non-volatile message; volatile ones trail after it. Requires the
+   * caller to keep them last, and to not persist them as history.
+   */
+  volatile?: boolean;
 };
 
 export type ChatRequest = {

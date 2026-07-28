@@ -14,6 +14,7 @@ import { appendMessageSchema } from "@/lib/schemas/chat-sessions";
 import type { Attachment } from "@/lib/db/chat-sessions";
 import {
   buildEditorSystemPrompt,
+  buildEditorDraftMessage,
   extractPromptFromReply,
   hasUnclosedPromptBlock,
   replacePromptBlock,
@@ -293,7 +294,7 @@ export async function POST(req: NextRequest, { params }: Params) {
         : null;
       systemPrompt = buildCreatorSystemPrompt(reference?.content ?? "", personaOverride);
     } else {
-      systemPrompt = buildEditorSystemPrompt(session.current_draft_content ?? "", personaOverride);
+      systemPrompt = buildEditorSystemPrompt(personaOverride);
     }
     const modelAttachments = input.attachments?.length
       ? await loadAttachmentsForModel(input.attachments)
@@ -301,6 +302,18 @@ export async function POST(req: NextRequest, { params }: Params) {
     const messages: ChatMessage[] = [
       ...history,
       { role: "user", content: input.content, attachments: modelAttachments },
+      // Editor only: the draft closes the conversation instead of opening the
+      // system prompt, so the cached prefix survives the model rewriting it.
+      // Not persisted, so the history rebuilt next turn is unchanged.
+      ...(isCreator
+        ? []
+        : [
+            {
+              role: "user" as const,
+              content: buildEditorDraftMessage(session.current_draft_content ?? ""),
+              volatile: true,
+            },
+          ]),
     ];
 
     // Persists the assistant turn and, when the reply carried a closed fenced
@@ -375,12 +388,9 @@ export async function POST(req: NextRequest, { params }: Params) {
           temperature: role.temperature ?? undefined,
           topP: role.top_p ?? undefined,
           maxTokens: role.max_tokens ?? EDITOR_CREATOR_MAX_TOKENS,
-          // Creator's system prompt holds the base version, fixed for the whole
-          // session, so the prefix is stable and worth caching. Editor's holds
-          // the working draft, which the model rewrites on every turn: caching
-          // there would pay the write premium on a prefix nothing ever reads.
-          // ponytail: move the draft out of the system prompt to cache Editor too.
-          cache: isCreator,
+          // Both system prompts are now fixed for the session (Creator's base
+          // version, Editor's persona), so the prefix is stable and cacheable.
+          cache: true,
         })) {
           // Cancelled from the stop button, which now goes through DELETE.
           // Breaking here returns the provider generator, which aborts the

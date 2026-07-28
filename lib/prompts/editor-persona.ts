@@ -61,30 +61,37 @@ No envuelvas el prompt en un bloque de código markdown (triple backtick). El pr
 Si el usuario solo hace una pregunta o pide una aclaración sin solicitar una edición, responde con texto normal y NO incluyas los delimitadores ni el resumen.`;
 
 /**
- * Builds the full system prompt by appending the prompt currently under edit.
- * `currentDraft` is the session's working draft (seeded from the base version).
- * `personaOverride`, when given, replaces the code persona with the team's
- * saved version from Settings (prompt_overrides); the dynamic draft is still
- * appended here either way.
+ * The system prompt: persona plus standing contracts, and nothing that changes
+ * between turns. `personaOverride`, when given, replaces the code persona with
+ * the team's saved version from Settings (prompt_overrides).
+ *
+ * The prompt under edit deliberately does NOT live here. The persona rewrites
+ * it on every turn, and the system prompt is the very front of the cache
+ * prefix, so a draft embedded here invalidated the whole cached conversation
+ * each time. It travels as the conversation's last message instead: see
+ * buildEditorDraftMessage.
  *
  * OPTIONS_CONTRACT is appended AFTER the persona (default or override) on
  * purpose: if it lived inside EDITOR_PERSONA it would vanish whenever an
  * operator saves a persona override, so appending it separately keeps the
  * selectable-options capability available regardless of the persona in use.
  */
-export function buildEditorSystemPrompt(
-  currentDraft: string,
-  personaOverride?: string | null,
-): string {
-  const draft = currentDraft.trim().length > 0 ? currentDraft : "(El prompt está vacío.)";
+export function buildEditorSystemPrompt(personaOverride?: string | null): string {
   const persona = personaOverride?.trim() ? personaOverride : EDITOR_PERSONA;
   return `${persona}
 
-${OPTIONS_CONTRACT}
+${OPTIONS_CONTRACT}`;
+}
 
----
-
-PROMPT EN PRODUCCIÓN (estado actual sobre el que debes trabajar):
+/**
+ * The prompt under edit, shaped as the conversation's closing message so it is
+ * always the freshest thing the model reads. Sent after the user's turn (and
+ * never persisted), so the history the next turn rebuilds from the database
+ * stays byte-identical and remains cacheable.
+ */
+export function buildEditorDraftMessage(currentDraft: string): string {
+  const draft = currentDraft.trim().length > 0 ? currentDraft : "(El prompt está vacío.)";
+  return `PROMPT EN PRODUCCIÓN (estado actual sobre el que debes trabajar):
 
 ${draft}`;
 }
