@@ -46,6 +46,12 @@ export function NewClientModal({ open, onClose }: { open: boolean; onClose: () =
     );
   }
 
+  // Provisioning duplicates a flow in OUR n8n and creates the history table
+  // OUR agents read: none of it exists for a client running its own n8n, so
+  // the options are hidden and ignored. Its binding is added later from the
+  // client's page, as a manual target.
+  const onZebra = n8nHost === "zebra";
+
   async function submit() {
     setSaving(true);
     setError(null);
@@ -66,9 +72,10 @@ export function NewClientModal({ open, onClose }: { open: boolean; onClose: () =
       }
       const { client } = await res.json();
 
-      const wantsProvisioning = provision.duplicateWorkflow || provision.createChatsTable;
+      const wantsProvisioning =
+        onZebra && (provision.duplicateWorkflow || provision.createChatsTable);
       if (!wantsProvisioning) {
-        goToClient(client.id, bindAfter);
+        goToClient(client.id, onZebra && bindAfter);
         return;
       }
 
@@ -187,14 +194,23 @@ export function NewClientModal({ open, onClose }: { open: boolean; onClose: () =
             />
           </div>
           <N8nHostPicker value={n8nHost} onChange={setN8nHost} />
-          <ProvisionFields
-            clientName={name}
-            value={provision}
-            onChange={setProvision}
-            disabled={saving}
-          />
-          {!provision.duplicateWorkflow && (
-            <BindOnCreateToggle checked={bindAfter} onChange={setBindAfter} />
+          {onZebra ? (
+            <>
+              <ProvisionFields
+                clientName={name}
+                value={provision}
+                onChange={setProvision}
+                disabled={saving}
+              />
+              {!provision.duplicateWorkflow && (
+                <BindOnCreateToggle checked={bindAfter} onChange={setBindAfter} />
+              )}
+            </>
+          ) : (
+            <p className="field-hint">
+              El agente vive fuera de Zebra, así que no hay flujo ni tabla que
+              crear aquí. Desde su ficha puedes registrar el destino de n8n.
+            </p>
           )}
           {error && <p className="form-error">{error}</p>}
         </>
