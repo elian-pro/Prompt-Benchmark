@@ -1,10 +1,8 @@
 "use client";
 
-import { useState, type KeyboardEvent } from "react";
-import { useRouter } from "next/navigation";
+import { useState } from "react";
 import type { ConversationRow } from "@/lib/db/chats-history";
 import { transcriptOf, type ConversationTurn } from "@/lib/conversation-turns";
-import { Button } from "@/components/ui/Button";
 
 const ROLE_LABEL: Record<ConversationTurn["rol"], string> = {
   lead: "Lead",
@@ -13,26 +11,11 @@ const ROLE_LABEL: Record<ConversationTurn["rol"], string> = {
 };
 
 /** Reuses the Playground's chat classes so a real conversation and a simulated
- *  one read the same way, selection included. */
-function Turn({
-  turn,
-  selected,
-  selectable,
-  onSelect,
-}: {
-  turn: ConversationTurn;
-  selected: boolean;
-  /** False in the Library panel, which only shows the conversation. Without
-   *  this the turns would still offer a pointer and a button role for a click
-   *  that does nothing. */
-  selectable: boolean;
-  onSelect: () => void;
-}) {
-  const side = turn.rol === "lead" ? "turn-lead" : "turn-bot";
-
+ *  one read the same way. */
+function Turn({ turn }: { turn: ConversationTurn }) {
   if (turn.rol === "sistema") {
     return (
-      <div className="chat-turn turn-bot">
+      <div className="chat-turn turn-bot is-static">
         <span className="chat-turn-role">{ROLE_LABEL.sistema}</span>
         <div className="chat-msg">
           <div className="chat-content chat-empty">
@@ -43,27 +26,9 @@ function Turn({
     );
   }
 
+  const side = turn.rol === "lead" ? "turn-lead" : "turn-bot";
   return (
-    <div
-      className={`chat-turn ${side}${selected ? " is-selected" : ""}${
-        selectable ? "" : " is-static"
-      }`}
-      {...(selectable
-        ? {
-            onClick: onSelect,
-            role: "button" as const,
-            tabIndex: 0,
-            "aria-pressed": selected,
-            title: "Marcar este mensaje como el punto de falla",
-            onKeyDown: (e: KeyboardEvent) => {
-              if (e.key === "Enter" || e.key === " ") {
-                e.preventDefault();
-                onSelect();
-              }
-            },
-          }
-        : {})}
-    >
+    <div className={`chat-turn ${side} is-static`}>
       <span className="chat-turn-role">{ROLE_LABEL[turn.rol]}</span>
       <div className="chat-msg">
         <div className="chat-content">{turn.texto}</div>
@@ -79,7 +44,9 @@ function Turn({
 }
 
 /**
- * A real conversation rendered as a chat instead of a text blob.
+ * A real conversation, read only. Marking messages and filing a case is
+ * Replay's job (components/replay/ReplayWorkspace.tsx); this is the reference
+ * view that lives in the Library.
  *
  * Rows written before the flows filled `turnos` are reconstructed from the
  * flat `historial`, and say so: that parser is best effort over a format whose
@@ -87,49 +54,9 @@ function Turn({
  * the strangest conversations, which are the ones worth reading. The raw text
  * stays one click away for that reason, always, not only on failure.
  */
-export function ConversationTranscript({
-  row,
-  clientId,
-  /** Filing a case belongs to Replay (Lab). The Library panel is reference
-   *  material only, so it renders the transcript without the compose box. */
-  canFileCase = false,
-}: {
-  row: ConversationRow;
-  clientId: string;
-  canFileCase?: boolean;
-}) {
-  const router = useRouter();
+export function ConversationTranscript({ row }: { row: ConversationRow }) {
   const [showRaw, setShowRaw] = useState(false);
-  const [failedAt, setFailedAt] = useState<number | null>(null);
-  const [nota, setNota] = useState("");
-  const [sending, setSending] = useState(false);
-  const [error, setError] = useState<string | null>(null);
   const { turns, source } = transcriptOf(row);
-
-  /** Files the case and lands in the Editor with the message composed. The
-   *  draft rides through sessionStorage under the key the Editor already
-   *  watches, the same channel the Playground handoff uses. */
-  async function sendToEditor() {
-    setSending(true);
-    setError(null);
-    try {
-      const res = await fetch(`/api/clients/${clientId}/cases`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ rowId: row.id, nota: nota.trim(), turnoIndex: failedAt }),
-      });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(data.error ?? "No se pudo enviar al Editor.");
-      window.sessionStorage.setItem(
-        `playground-handoff:${data.editorSessionId}`,
-        data.draftMessage,
-      );
-      router.push(`/editor/${data.editorSessionId}`);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Error al enviar al Editor.");
-      setSending(false);
-    }
-  }
 
   return (
     <>
@@ -159,50 +86,11 @@ export function ConversationTranscript({
           No se pudo leer ningún mensaje. Revisa el texto crudo.
         </p>
       ) : (
-        <>
-          <div className="chat-messages">
-            {turns.map((turn, i) => (
-              <Turn
-                key={i}
-                turn={turn}
-                selectable={canFileCase && turn.rol !== "sistema"}
-                selected={canFileCase && failedAt === i}
-                onSelect={() => setFailedAt((current) => (current === i ? null : i))}
-              />
-            ))}
-          </div>
-
-          {canFileCase && (
-          <div className="case-compose">
-            <p className="muted" style={{ fontSize: 11 }}>
-              {failedAt === null
-                ? "Haz clic en el mensaje donde el bot falló, para poder correr el replay después."
-                : `Mensaje ${failedAt + 1} marcado como el punto de falla.`}
-            </p>
-            <textarea
-              className="textarea"
-              rows={3}
-              value={nota}
-              onChange={(e) => setNota(e.target.value)}
-              placeholder="¿Qué salió mal? Ej. dio el precio antes de perfilar."
-            />
-            {error && <p className="form-error">{error}</p>}
-            <div className="row-between">
-              <span className="muted" style={{ fontSize: 11 }}>
-                Se guarda como caso de este cliente.
-              </span>
-              <Button
-                size="sm"
-                variant="primary"
-                onClick={sendToEditor}
-                disabled={sending || !nota.trim()}
-              >
-                {sending ? "Enviando…" : "Enviar al Editor"}
-              </Button>
-            </div>
-          </div>
-          )}
-        </>
+        <div className="chat-messages">
+          {turns.map((turn, i) => (
+            <Turn key={i} turn={turn} />
+          ))}
+        </div>
       )}
     </>
   );

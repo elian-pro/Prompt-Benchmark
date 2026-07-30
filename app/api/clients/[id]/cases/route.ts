@@ -2,10 +2,12 @@ import { NextRequest, NextResponse } from "next/server";
 import { getClient } from "@/lib/db/clients";
 import { getConversation } from "@/lib/db/chats-history";
 import { listVersions } from "@/lib/db/versions";
-import { createCase } from "@/lib/db/conversation-cases";
-import { createSession as createChatSession } from "@/lib/db/chat-sessions";
+import {
+  createCase,
+  listCasesForConversation,
+  replayCutFor,
+} from "@/lib/db/conversation-cases";
 import { transcriptOf } from "@/lib/conversation-turns";
-import { buildReplayHandoff } from "@/lib/prompts/replay-handoff";
 import { createCaseSchema } from "@/lib/schemas/cases";
 import { isChatsConfigured } from "@/lib/supabase";
 import { handleError, jsonError } from "@/lib/http";
@@ -14,14 +16,32 @@ export const dynamic = "force-dynamic";
 
 type Params = { params: Promise<{ id: string }> };
 
+/** The saved notes of one conversation, for the notes panel. */
+export async function GET(req: NextRequest, { params }: Params) {
+  try {
+    const { id } = await params;
+    const client = await getClient(id);
+    if (!client) return jsonError("Cliente no encontrado.", 404);
+    if (!client.chats_table) return NextResponse.json({ cases: [] });
+
+    const rowId = Number(req.nextUrl.searchParams.get("rowId"));
+    if (!Number.isFinite(rowId) || rowId <= 0) {
+      return jsonError("Falta la conversación.", 400);
+    }
+    const cases = await listCasesForConversation(id, client.chats_table, rowId);
+    return NextResponse.json({
+      cases: cases.map(({ historial_snapshot, turnos_snapshot, ...rest }) => rest),
+    });
+  } catch (err) {
+    return handleError(err);
+  }
+}
+
 /**
- * Files a real conversation as a case and opens an Editor session on it.
- *
- * The case is stored before the response so the record survives even if the
- * user closes the Editor without sending anything: the point is to accumulate
- * evidence, not only to start a chat. The composed message is returned rather
- * than persisted, same as the Playground handoff, so the user reviews it in
- * the composer before it is sent.
+ * Saves a note on a real conversation. The note is the case: it is stored
+ * right away, with the snapshot and the version frozen, and only gets an
+ * Editor session later when the conversation is handed off. Writing a note and
+ * never sending it still leaves the evidence behind, which is the point.
  */
 export async function POST(req: NextRequest, { params }: Params) {
   try {
@@ -51,18 +71,7 @@ export async function POST(req: NextRequest, { params }: Params) {
     }
 
     const { turns } = transcriptOf(row);
-    // A conversation older than the version it is judged against may have been
-    // produced by a different prompt. Surfaced instead of blocked: it is often
-    // still the right case to work on, but the Editor must not assume.
-    const stale = new Date(row.created_at) < new Date(production.created_at);
-
-    const editorSession = await createChatSession({
-      type: "editor",
-      clientId: id,
-      baseVersionId: production.id,
-    });
-
-    await createCase({
+    const created = await createCase({
       clientId: id,
       chatsTable: client.chats_table,
       rowId: row.id,
@@ -71,23 +80,13 @@ export async function POST(req: NextRequest, { params }: Params) {
       historialSnapshot: row.historial,
       turnosSnapshot: row.turnos ?? null,
       versionId: production.id,
-      turnoIndex: input.turnoIndex ?? null,
+      turnosMarcados: input.turnosMarcados,
+      turnoIndex: replayCutFor(input.turnosMarcados, turns),
       nota: input.nota,
-      editorSessionId: editorSession.id,
     });
 
-    const draftMessage = buildReplayHandoff({
-      clientName: client.name,
-      versionNumber: production.version_number,
-      turns,
-      failedAt: input.turnoIndex ?? null,
-      nota: input.nota,
-      idDeKommo: row.id_de_kommo,
-      conversationAt: row.created_at,
-      stale,
-    });
-
-    return NextResponse.json({ editorSessionId: editorSession.id, draftMessage, stale });
+    const { historial_snapshot, turnos_snapshot, ...rest } = created;
+    return NextResponse.json(rest, { status: 201 });
   } catch (err) {
     return handleError(err);
   }

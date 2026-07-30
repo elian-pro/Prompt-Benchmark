@@ -18,8 +18,13 @@ export type ConversationCase = {
   historial_snapshot: string | null;
   turnos_snapshot: unknown;
   version_id: string | null;
+  /** Where the replay cuts the history: the first bot turn among the marked
+   *  ones. A replay can only answer one turn. */
   turno_index: number | null;
+  /** Every turn the note points at, for the pins in the transcript. */
+  turnos_marcados: number[];
   nota: string;
+  /** Null until the case is handed off: a saved note nobody sent yet. */
   editor_session_id: string | null;
   /** The version that earned the "ya pasa" verdict, and when. Null means the
    *  case is still open: either never replayed, or replayed and still wrong. */
@@ -30,8 +35,8 @@ export type ConversationCase = {
 
 const CASE_COLS =
   "id, client_id, chats_table, row_id, id_de_kommo, conversation_at, " +
-  "historial_snapshot, turnos_snapshot, version_id, turno_index, nota, " +
-  "editor_session_id, resolved_version_id, resolved_at, created_at";
+  "historial_snapshot, turnos_snapshot, version_id, turno_index, turnos_marcados, " +
+  "nota, editor_session_id, resolved_version_id, resolved_at, created_at";
 
 export type NewCase = {
   clientId: string;
@@ -42,10 +47,27 @@ export type NewCase = {
   historialSnapshot?: string | null;
   turnosSnapshot?: unknown;
   versionId?: string | null;
+  turnosMarcados?: number[];
+  /** Derived with replayCutFor, never sent by a client. */
   turnoIndex?: number | null;
   nota: string;
   editorSessionId?: string | null;
 };
+
+/**
+ * The turn a replay cuts at, out of everything the note marked: the first bot
+ * turn among them. A note can point at several messages, but a replay can only
+ * answer one, and the earliest bot turn is where the conversation first went
+ * wrong. Null when the note marks nothing or only lead messages, which leaves
+ * the case unreplayable and says so in the UI.
+ */
+export function replayCutFor(
+  marked: number[],
+  turns: { rol: string }[],
+): number | null {
+  const bots = marked.filter((i) => turns[i]?.rol === "bot").sort((a, b) => a - b);
+  return bots[0] ?? null;
+}
 
 export async function createCase(input: NewCase): Promise<ConversationCase> {
   const sb = getSupabase();
@@ -60,6 +82,7 @@ export async function createCase(input: NewCase): Promise<ConversationCase> {
       historial_snapshot: input.historialSnapshot ?? null,
       turnos_snapshot: input.turnosSnapshot ?? null,
       version_id: input.versionId ?? null,
+      turnos_marcados: input.turnosMarcados ?? [],
       turno_index: input.turnoIndex ?? null,
       nota: input.nota,
       editor_session_id: input.editorSessionId ?? null,
@@ -68,6 +91,65 @@ export async function createCase(input: NewCase): Promise<ConversationCase> {
     .single();
   if (error) throw new Error(`No se pudo guardar el caso: ${error.message}`);
   return data as unknown as ConversationCase;
+}
+
+/** Edits a saved note: its text and the messages it marks. */
+export async function updateCaseNote(
+  id: string,
+  patch: { nota: string; turnosMarcados: number[]; turnoIndex: number | null },
+): Promise<ConversationCase> {
+  const sb = getSupabase();
+  const { data, error } = await sb
+    .from("conversation_cases")
+    .update({
+      nota: patch.nota,
+      turnos_marcados: patch.turnosMarcados,
+      turno_index: patch.turnoIndex,
+    })
+    .eq("id", id)
+    .select(CASE_COLS)
+    .single();
+  if (error) throw new Error(`No se pudo editar la nota: ${error.message}`);
+  return data as unknown as ConversationCase;
+}
+
+export async function deleteCase(id: string): Promise<void> {
+  const sb = getSupabase();
+  const { error } = await sb.from("conversation_cases").delete().eq("id", id);
+  if (error) throw new Error(`No se pudo eliminar el caso: ${error.message}`);
+}
+
+/** The saved notes for one conversation, oldest first so their numbering
+ *  matches the order they were written in. */
+export async function listCasesForConversation(
+  clientId: string,
+  chatsTable: string,
+  rowId: number,
+): Promise<ConversationCase[]> {
+  const sb = getSupabase();
+  const { data, error } = await sb
+    .from("conversation_cases")
+    .select(CASE_COLS)
+    .eq("client_id", clientId)
+    .eq("chats_table", chatsTable)
+    .eq("row_id", rowId)
+    .order("created_at", { ascending: true });
+  if (error) throw new Error(`No se pudieron listar las notas: ${error.message}`);
+  return (data ?? []) as unknown as ConversationCase[];
+}
+
+/** Links every case handed off in one go to the Editor session it produced. */
+export async function attachEditorSession(
+  ids: string[],
+  editorSessionId: string,
+): Promise<void> {
+  if (ids.length === 0) return;
+  const sb = getSupabase();
+  const { error } = await sb
+    .from("conversation_cases")
+    .update({ editor_session_id: editorSessionId })
+    .in("id", ids);
+  if (error) throw new Error(`No se pudo enlazar la sesión: ${error.message}`);
 }
 
 export async function getCase(id: string): Promise<ConversationCase | null> {
@@ -117,8 +199,8 @@ export type CaseListItem = Omit<
  *  read one built at runtime. */
 const LIST_COLS =
   "id, client_id, chats_table, row_id, id_de_kommo, conversation_at, " +
-  "version_id, turno_index, nota, editor_session_id, resolved_version_id, " +
-  "resolved_at, created_at, clients(name)";
+  "version_id, turno_index, turnos_marcados, nota, editor_session_id, " +
+  "resolved_version_id, resolved_at, created_at, clients(name)";
 
 /**
  * Cases newest first, for one client or for all of them. Replay opens on the

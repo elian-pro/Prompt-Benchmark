@@ -3684,8 +3684,8 @@ body[data-theme="light"] .dot-grid::after {
    .chat-messages container (flex column, bounded height) plus the chat-turn /
    chat-msg / chat-state classes. Nothing here to add. */
 
-/* Replay (Lab): conversations on one side, filed cases on the other. Stacked
-   until there is room, since each column holds a full transcript. */
+/* Replay (Lab): the conversation list beside the workspace, until one is open
+   and the list folds away to leave the whole width for transcript + notes. */
 .replay-layout {
   display: grid;
   gap: 24px;
@@ -3693,7 +3693,22 @@ body[data-theme="light"] .dot-grid::after {
 }
 @media (min-width: 1000px) {
   .replay-layout {
-    grid-template-columns: 1fr 1fr;
+    grid-template-columns: minmax(280px, 22rem) 1fr;
+  }
+  .replay-layout.is-collapsed {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* The workspace itself mirrors the Playground: chat, then notes. */
+.replay-workspace {
+  display: grid;
+  gap: 20px;
+  align-items: start;
+}
+@media (min-width: 900px) {
+  .replay-workspace {
+    grid-template-columns: 1fr minmax(260px, 22rem);
   }
 }
 
@@ -3715,15 +3730,6 @@ body[data-theme="light"] .dot-grid::after {
   .replay-compare {
     grid-template-columns: 1fr 1fr;
   }
-}
-
-/* Marking a real conversation as a case, under the transcript. */
-.case-compose {
-  display: grid;
-  gap: 8px;
-  margin-top: 12px;
-  padding-top: 12px;
-  border-top: 0.5px solid var(--border);
 }
 
 /* Conversation history: search box + filter row, in a narrow sidebar card. */

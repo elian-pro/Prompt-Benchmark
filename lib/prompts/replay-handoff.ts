@@ -28,7 +28,14 @@ function formatDate(iso: string): string {
   });
 }
 
-function renderTurn(turn: ConversationTurn, index: number, failedAt: number | null): string {
+/** One saved note: what went wrong, and which turns it points at. */
+export type HandoffNote = { nota: string; marcados: number[] };
+
+function renderTurn(
+  turn: ConversationTurn,
+  index: number,
+  notesByTurn: Map<number, number[]>,
+): string {
   const number = String(index + 1).padStart(2, " ");
   if (turn.rol === "sistema") {
     return `  ${number}. ---- pasa a estado [${turn.estado}]`;
@@ -37,16 +44,18 @@ function renderTurn(turn: ConversationTurn, index: number, failedAt: number | nu
   // por-perfilar", "jumped to humano"), so it travels with the turn.
   const estado = turn.rol === "bot" && turn.estado ? ` [${turn.estado}]` : "";
   const line = `  ${number}. ${ROLE_LABEL[turn.rol]}${estado}: "${turn.texto}"`;
-  return index === failedAt ? `${line}\n      ^^^ AQUÍ ESTÁ EL PROBLEMA` : line;
+  const marks = notesByTurn.get(index);
+  // The mark points at the note by number instead of repeating the text, so a
+  // turn flagged by two notes stays one line.
+  return marks ? `${line}\n      ^^^ ${marks.map((n) => `NOTA ${n}`).join(", ")}` : line;
 }
 
 export type ReplayHandoffInput = {
   clientName: string;
   versionNumber: string;
   turns: ConversationTurn[];
-  /** Index into `turns` of the tagged turn, or null when the note is general. */
-  failedAt: number | null;
-  nota: string;
+  /** Every note written on this conversation, in the order they were saved. */
+  notes: HandoffNote[];
   idDeKommo?: string | null;
   conversationAt?: string | null;
   /** True when the conversation predates the version it is being judged
@@ -55,7 +64,14 @@ export type ReplayHandoffInput = {
 };
 
 export function buildReplayHandoff(input: ReplayHandoffInput): string {
-  const { clientName, versionNumber, turns, failedAt, nota } = input;
+  const { clientName, versionNumber, turns, notes } = input;
+
+  const notesByTurn = new Map<number, number[]>();
+  notes.forEach((note, i) => {
+    for (const turn of note.marcados) {
+      notesByTurn.set(turn, [...(notesByTurn.get(turn) ?? []), i + 1]);
+    }
+  });
 
   const origin = [
     input.idDeKommo ? `lead Kommo ${input.idDeKommo}` : null,
@@ -69,11 +85,11 @@ export function buildReplayHandoff(input: ReplayHandoffInput): string {
     `Prompt en producción al marcarla: ${versionNumber}`,
     "",
     ...(turns.length > 0
-      ? turns.map((t, i) => renderTurn(t, i, failedAt))
+      ? turns.map((t, i) => renderTurn(t, i, notesByTurn))
       : ["  (No se pudo leer ningún mensaje de esta conversación.)"]),
     "",
     "Lo que salió mal:",
-    nota,
+    ...notes.map((n, i) => `${i + 1}. ${n.nota}`),
     "",
   ];
 

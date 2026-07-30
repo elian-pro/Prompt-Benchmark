@@ -1,7 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getCase, setCaseResolution } from "@/lib/db/conversation-cases";
+import {
+  deleteCase,
+  getCase,
+  replayCutFor,
+  setCaseResolution,
+  updateCaseNote,
+} from "@/lib/db/conversation-cases";
 import { getVersion } from "@/lib/db/versions";
-import { resolveCaseSchema } from "@/lib/schemas/cases";
+import { transcriptOf } from "@/lib/conversation-turns";
+import { resolveCaseSchema, updateCaseSchema } from "@/lib/schemas/cases";
 import { handleError, jsonError } from "@/lib/http";
 
 export const dynamic = "force-dynamic";
@@ -34,6 +41,42 @@ export async function PATCH(req: NextRequest, { params }: Params) {
       resolved_version_id: updated.resolved_version_id,
       resolved_at: updated.resolved_at,
     });
+  } catch (err) {
+    return handleError(err);
+  }
+}
+
+/** Edits a saved note: its text and the messages it marks. The replay cut is
+ *  recomputed from the snapshot, never sent by the client. */
+export async function PUT(req: NextRequest, { params }: Params) {
+  try {
+    const { id } = await params;
+    const kase = await getCase(id);
+    if (!kase) return jsonError("Caso no encontrado.", 404);
+
+    const input = updateCaseSchema.parse(await req.json());
+    const { turns } = transcriptOf({
+      turnos: kase.turnos_snapshot,
+      historial: kase.historial_snapshot,
+    });
+
+    const updated = await updateCaseNote(id, {
+      nota: input.nota,
+      turnosMarcados: input.turnosMarcados,
+      turnoIndex: replayCutFor(input.turnosMarcados, turns),
+    });
+    const { historial_snapshot, turnos_snapshot, ...rest } = updated;
+    return NextResponse.json(rest);
+  } catch (err) {
+    return handleError(err);
+  }
+}
+
+export async function DELETE(_req: NextRequest, { params }: Params) {
+  try {
+    const { id } = await params;
+    await deleteCase(id);
+    return NextResponse.json({ ok: true });
   } catch (err) {
     return handleError(err);
   }

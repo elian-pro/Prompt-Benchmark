@@ -1,12 +1,25 @@
 import { z } from "zod";
 
-/** Filing a real conversation as a case, from the history panel. */
+/** Saving a note on a real conversation. The note IS the case: a case with no
+ *  editor session is simply one nobody has handed off yet. */
 export const createCaseSchema = z.object({
   rowId: z.number().int().positive(),
   nota: z.string().trim().min(1, "Escribe qué salió mal.").max(2000),
-  /** Index of the tagged turn. Null when the note is about the conversation as
-   *  a whole; the replay needs one, so the UI nudges toward tagging. */
-  turnoIndex: z.number().int().min(0).nullable().optional(),
+  /** Every turn the note points at. Empty is allowed (a general note), but
+   *  then the case cannot be replayed and the UI says so. */
+  turnosMarcados: z.array(z.number().int().min(0)).default([]),
+});
+
+/** Editing a saved note. */
+export const updateCaseSchema = z.object({
+  nota: z.string().trim().min(1, "Escribe qué salió mal.").max(2000),
+  turnosMarcados: z.array(z.number().int().min(0)).default([]),
+});
+
+/** Handing off every saved note of one conversation in a single Editor
+ *  session, the way the Playground sends its notes. */
+export const handoffSchema = z.object({
+  rowId: z.number().int().positive(),
 });
 
 /** Re-running a case. Omitting the version means "the one in production now",

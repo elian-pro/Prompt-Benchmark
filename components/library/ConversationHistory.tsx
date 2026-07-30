@@ -526,11 +526,7 @@ export function ConversationHistory({
                   ? ` · ${selected.numero_de_mensajes} mensaje(s)`
                   : ""}
               </p>
-              <ConversationTranscript
-                row={selected}
-                clientId={clientId}
-                canFileCase={embedded}
-              />
+              <ConversationTranscript row={selected} />
             </>
           )}
         </Modal>

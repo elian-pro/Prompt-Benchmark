@@ -20,8 +20,7 @@ const BASE = {
   clientName: "Chapur",
   versionNumber: "v1.4",
   turns: TURNS,
-  failedAt: 3,
-  nota: "Dio el precio antes de perfilar.",
+  notes: [{ nota: "Dio el precio antes de perfilar.", marcados: [3] }],
 };
 
 test("sends the whole conversation, not only the tagged turn", () => {
@@ -29,12 +28,25 @@ test("sends the whole conversation, not only the tagged turn", () => {
   for (const turn of TURNS) assert.ok(out.includes(turn.texto), turn.texto);
 });
 
-test("marks the failing turn in place", () => {
+test("marks the flagged turn in place, pointing at the note", () => {
   const out = buildReplayHandoff(BASE);
   const lines = out.split("\n");
-  const marker = lines.findIndex((l) => l.includes("AQUÍ ESTÁ EL PROBLEMA"));
+  const marker = lines.findIndex((l) => l.includes("NOTA 1"));
   assert.ok(marker > 0);
   assert.ok(lines[marker - 1].includes("4.5 MDP"));
+});
+
+test("several notes are numbered, and a turn can carry more than one", () => {
+  const out = buildReplayHandoff({
+    ...BASE,
+    notes: [
+      { nota: "Dio el precio antes de perfilar.", marcados: [3] },
+      { nota: "Y no retomó cuando el lead se enfrió.", marcados: [3, 4] },
+    ],
+  });
+  assert.ok(out.includes("^^^ NOTA 1, NOTA 2"));
+  assert.ok(out.includes("1. Dio el precio antes de perfilar."));
+  assert.ok(out.includes("2. Y no retomó cuando el lead se enfrió."));
 });
 
 test("carries the estado of each bot turn", () => {
@@ -61,22 +73,25 @@ test("warns when the conversation predates the version", () => {
   assert.ok(stale.includes("OJO:"));
 });
 
-test("works with no tagged turn", () => {
-  const out = buildReplayHandoff({ ...BASE, failedAt: null });
-  assert.ok(!out.includes("AQUÍ ESTÁ EL PROBLEMA"));
-  assert.ok(out.includes("Dio el precio antes de perfilar."));
+test("a note that marks nothing still travels, just without a mark", () => {
+  const out = buildReplayHandoff({
+    ...BASE,
+    notes: [{ nota: "En general suena muy comercial.", marcados: [] }],
+  });
+  assert.ok(!out.includes("^^^"));
+  assert.ok(out.includes("1. En general suena muy comercial."));
 });
 
 test("a state transition renders as its own line", () => {
   const out = buildReplayHandoff({
     ...BASE,
     turns: [{ rol: "bot", texto: "Te paso con un asesor." }, { rol: "sistema", texto: "", estado: "humano" }],
-    failedAt: null,
+    notes: [],
   });
   assert.ok(out.includes("pasa a estado [humano]"));
 });
 
 test("an unreadable conversation says so instead of rendering nothing", () => {
-  const out = buildReplayHandoff({ ...BASE, turns: [], failedAt: null });
+  const out = buildReplayHandoff({ ...BASE, turns: [], notes: [] });
   assert.ok(out.includes("No se pudo leer ningún mensaje"));
 });
