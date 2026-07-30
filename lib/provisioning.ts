@@ -26,7 +26,7 @@ import { createApiBinding, listBindings } from "./db/n8n-bindings";
 import { listChatsTables } from "./db/chats-history";
 import { isChatsConfigured } from "./supabase";
 import { createWorkflow, getWorkflow, listWorkflows } from "./n8n/client";
-import { listAgentNodes } from "./n8n/agent-node";
+import { listAgentNodes, pickPromptAgent, PROMPT_AGENT_NAME } from "./n8n/agent-node";
 import { retargetChatsTable } from "./n8n/chats-table";
 import { createChatsTable, isChatsAdminConfigured } from "./chats-admin";
 import { chatsTableName } from "./chats-table-name";
@@ -108,18 +108,18 @@ async function duplicateAndBind(
 
   // The copy is fresh, so read it back rather than trusting the POST echo.
   const agents = listAgentNodes(await getWorkflow(creds, workflowId));
-  if (agents.length !== 1) {
+  const agent = pickPromptAgent(agents);
+  if (!agent) {
     const why =
       agents.length === 0
         ? "no tiene ningún nodo AI Agent"
-        : `tiene ${agents.length} nodos AI Agent`;
+        : `tiene ${agents.length} nodos AI Agent y ninguno se llama «${PROMPT_AGENT_NAME}»`;
     return {
       ok: false,
       error: `El flujo «${wanted}» ${adopted ? "ya existía y " : "se creó, pero "}${why}. Vincúlalo a mano desde la ficha.`,
     };
   }
 
-  const agent = agents[0];
   await createApiBinding(client.id, {
     connection_id: template.connectionId,
     workflow_id: workflowId,

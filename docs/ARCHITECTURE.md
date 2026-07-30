@@ -479,6 +479,15 @@ name they would create, so the real world is the state:
 The client detail derives what to offer: no api binding means "Duplicar
 plantilla", a null `chats_table` means "Crear tabla chats_X".
 
+**Which agent gets bound.** The `IA mensajes <Cliente>` workflows carry three
+agent nodes: a `Router` that dispatches, `dudas/conversacion` that talks to
+the lead, and an `AI Agent` for the calendar. `pickPromptAgent` takes the only
+agent when there is one, else the exact name `dudas/conversacion`
+(`PROMPT_AGENT_NAME`), which is how all six clients on that family are bound.
+Any other shape returns null and the flow is bound by hand from the client
+detail: binding the wrong agent would later push the client's prompt over the
+router's.
+
 **The copy is retargeted before it is created.** The template in n8n is itself
 a copy of a real client's workflow, so its Supabase nodes carry that client's
 `chats_*` table. `lib/n8n/chats-table.ts` rewrites every such node to the new
