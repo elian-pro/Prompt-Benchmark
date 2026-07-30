@@ -30,6 +30,25 @@ type ChatsTable = { table: string; rows: number };
 
 const PAGE_SIZE = 20;
 
+/** The filters as submitted, not as typed: the list only refetches when the
+ *  user applies them. */
+type Filters = { search: string; from: string; to: string; maxMessages: string };
+
+const NO_FILTERS: Filters = { search: "", from: "", to: "", maxMessages: "" };
+
+function hasFilters(f: Filters): boolean {
+  return Boolean(f.search || f.from || f.to || f.maxMessages);
+}
+
+function historyQuery(offset: number, f: Filters): string {
+  const params = new URLSearchParams({ limit: String(PAGE_SIZE), offset: String(offset) });
+  if (f.search) params.set("search", f.search);
+  if (f.from) params.set("from", f.from);
+  if (f.to) params.set("to", f.to);
+  if (f.maxMessages) params.set("maxMessages", f.maxMessages);
+  return params.toString();
+}
+
 function formatDate(iso: string): string {
   return new Date(iso).toLocaleString("es-MX", {
     day: "2-digit",
@@ -64,6 +83,11 @@ export function ConversationHistory({ clientId, clientName }: Props) {
   // Full-conversation modal.
   const [selected, setSelected] = useState<ConversationRow | null>(null);
 
+  // Search and filters: `draft` is what the inputs hold, `applied` is what the
+  // list is showing. Splitting them keeps typing from refetching on every key.
+  const [draft, setDraft] = useState<Filters>(NO_FILTERS);
+  const [applied, setApplied] = useState<Filters>(NO_FILTERS);
+
   // Connect-a-table flow (disconnected clients / "Cambiar tabla").
   const [picking, setPicking] = useState(false);
   const [tables, setTables] = useState<ChatsTable[] | null>(null);
@@ -75,7 +99,9 @@ export function ConversationHistory({ clientId, clientName }: Props) {
     setError(null);
     setUnconfigured(false);
     try {
-      const res = await fetch(`/api/clients/${clientId}/conversations?limit=${PAGE_SIZE}&offset=0`);
+      const res = await fetch(
+        `/api/clients/${clientId}/conversations?${historyQuery(0, applied)}`,
+      );
       if (res.status === 503) {
         setUnconfigured(true);
         setPage(null);
@@ -91,18 +117,29 @@ export function ConversationHistory({ clientId, clientName }: Props) {
     } finally {
       setLoading(false);
     }
-  }, [clientId]);
+  }, [clientId, applied]);
 
   useEffect(() => {
     if (open && page === null && !unconfigured && !loading && !error) loadFirstPage();
   }, [open, page, unconfigured, loading, error, loadFirstPage]);
+
+  /** Re-runs the query from page one. Clearing `page` is what the load effect
+   *  watches, so this is also how the filter form submits. */
+  function reload(next: Filters) {
+    setApplied(next);
+    setDraft(next);
+    setPage(null);
+    setRows([]);
+    setOffset(0);
+    setError(null);
+  }
 
   async function loadMore() {
     setLoadingMore(true);
     setError(null);
     try {
       const res = await fetch(
-        `/api/clients/${clientId}/conversations?limit=${PAGE_SIZE}&offset=${offset}`,
+        `/api/clients/${clientId}/conversations?${historyQuery(offset, applied)}`,
       );
       if (!res.ok) throw new Error((await res.json()).error ?? "No se pudo cargar más.");
       const data: Page = await res.json();
@@ -281,11 +318,77 @@ export function ConversationHistory({ clientId, clientName }: Props) {
             </div>
           )}
 
-          {/* Connected: the conversation list. */}
+          {/* Connected: search, filters, then the conversation list. */}
           {!unconfigured && connected && !picking && (
             <div>
+              <form
+                className="history-filters"
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  reload(draft);
+                }}
+              >
+                <input
+                  className="input"
+                  type="search"
+                  value={draft.search}
+                  onChange={(e) => setDraft((d) => ({ ...d, search: e.target.value }))}
+                  placeholder="Id de Kommo, id de conversación o texto…"
+                  aria-label="Buscar en el historial"
+                />
+                <div className="history-filters-row">
+                  <label className="field-label" htmlFor="hist-from">Desde</label>
+                  <input
+                    id="hist-from"
+                    className="input"
+                    type="date"
+                    value={draft.from}
+                    onChange={(e) => setDraft((d) => ({ ...d, from: e.target.value }))}
+                  />
+                  <label className="field-label" htmlFor="hist-to">Hasta</label>
+                  <input
+                    id="hist-to"
+                    className="input"
+                    type="date"
+                    value={draft.to}
+                    onChange={(e) => setDraft((d) => ({ ...d, to: e.target.value }))}
+                  />
+                  <select
+                    className="select"
+                    value={draft.maxMessages}
+                    onChange={(e) => setDraft((d) => ({ ...d, maxMessages: e.target.value }))}
+                    aria-label="Largo de la conversación"
+                  >
+                    <option value="">Cualquier largo</option>
+                    <option value="2">Hasta 2 mensajes</option>
+                    <option value="5">Hasta 5 mensajes</option>
+                    <option value="10">Hasta 10 mensajes</option>
+                  </select>
+                </div>
+                <div className="row-between">
+                  {hasFilters(applied) ? (
+                    <button
+                      type="button"
+                      className="version-changes-link"
+                      onClick={() => reload(NO_FILTERS)}
+                    >
+                      Limpiar filtros
+                    </button>
+                  ) : (
+                    <span />
+                  )}
+                  <Button size="sm" variant="secondary" type="submit" disabled={loading}>
+                    {loading ? "Buscando…" : "Buscar"}
+                  </Button>
+                </div>
+              </form>
+
               {rows.length === 0 ? (
-                <p className="muted" style={{ fontSize: 13 }}>Sin conversaciones todavía.</p>
+                <p className="muted" style={{ fontSize: 13 }}>
+                  {hasFilters(applied)
+                    ? "Ninguna conversación coincide con esos filtros."
+                    : "Sin conversaciones todavía."}
+                </p>
               ) : (
                 rows.map((r) => (
                   <button

@@ -17,6 +17,7 @@ import { getChatsSupabase, isChatsConfigured } from "../supabase";
 // The validator lives in the pure chats-table-name module so the same rule
 // guards the PostgREST path here and the CREATE TABLE that provisioning sends.
 import { isValidChatsTable } from "../chats-table-name";
+import { isDateOnly, nextDay, searchFilterFor } from "../history-filters";
 
 export { isValidChatsTable };
 
@@ -56,23 +57,59 @@ export async function listChatsTables(): Promise<ChatsTable[]> {
     .filter((t: ChatsTable) => isValidChatsTable(t.table));
 }
 
+export type HistoryFilters = {
+  /** One box, three meanings: a Kommo lead id, our own row id, or free text. */
+  search?: string;
+  /** Date-only (yyyy-mm-dd) or a full timestamp. `to` is inclusive of the day. */
+  from?: string;
+  to?: string;
+  /** Conversations with at most this many messages: the cheapest "the lead
+   *  left early" filter there is. */
+  maxMessages?: number;
+};
+
 /**
  * Reads one page of a client's conversation history, newest first. Validates
  * the table name first (defense against a bad/stale chats_table value).
+ *
+ * There is no filter for the conversation's final estado yet. It is already
+ * reachable through `search` because the flows write the state into
+ * `historial` too ("se mueve a humano"), which is imprecise but works on every
+ * row, old and new. The precise version is `turnos @> [{"estado": X}]`, worth
+ * doing once all client flows write the column (today only three do).
  */
 export async function getClientHistory(
   chatsTable: string,
-  { limit, offset }: { limit: number; offset: number },
+  { limit, offset, ...filters }: { limit: number; offset: number } & HistoryFilters,
 ): Promise<ConversationPage> {
   if (!isValidChatsTable(chatsTable)) {
     throw new Error("Tabla de historial no válida.");
   }
   const sb = getChatsSupabase();
-  const { data, error, count } = await sb
+  let query = sb
     .from(chatsTable)
     .select("id, created_at, numero_de_mensajes, id_de_kommo, historial", {
       count: "exact",
-    })
+    });
+
+  const search = filters.search ? searchFilterFor(filters.search) : null;
+  if (search) {
+    query =
+      search.kind === "or"
+        ? query.or(search.filter)
+        : query.ilike(search.column, search.pattern);
+  }
+  if (filters.from) query = query.gte("created_at", filters.from);
+  if (filters.to) {
+    query = isDateOnly(filters.to)
+      ? query.lt("created_at", nextDay(filters.to))
+      : query.lte("created_at", filters.to);
+  }
+  if (filters.maxMessages != null) {
+    query = query.lte("numero_de_mensajes", filters.maxMessages);
+  }
+
+  const { data, error, count } = await query
     .order("created_at", { ascending: false })
     .range(offset, offset + limit - 1);
   if (error) {

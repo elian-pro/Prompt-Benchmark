@@ -10,6 +10,9 @@ type Params = { params: Promise<{ id: string }> };
 
 const DEFAULT_LIMIT = 20;
 const MAX_LIMIT = 50;
+/** Long enough for a lead's full name, short enough that nobody pastes a
+ *  transcript in and makes the chats DB scan for it. */
+const MAX_SEARCH = 120;
 
 /**
  * One page of a client's real conversation history, read from the "chats" DB.
@@ -41,7 +44,15 @@ export async function GET(req: NextRequest, { params }: Params) {
     );
     const offset = Math.max(Number(searchParams.get("offset")) || 0, 0);
 
-    const page = await getClientHistory(client.chats_table, { limit, offset });
+    const maxMessages = Number(searchParams.get("maxMessages"));
+    const page = await getClientHistory(client.chats_table, {
+      limit,
+      offset,
+      search: searchParams.get("search")?.slice(0, MAX_SEARCH) || undefined,
+      from: searchParams.get("from") || undefined,
+      to: searchParams.get("to") || undefined,
+      maxMessages: Number.isFinite(maxMessages) && maxMessages > 0 ? maxMessages : undefined,
+    });
     return NextResponse.json({ connected: true, table: client.chats_table, ...page });
   } catch (err) {
     return handleError(err);

@@ -3671,6 +3671,31 @@ body[data-theme="light"] .dot-grid::after {
   background: var(--surface-2, rgba(127, 127, 127, 0.08));
 }
 
+/* Conversation history: search box + filter row, in a narrow sidebar card. */
+.history-filters {
+  display: grid;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+.history-filters-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+.history-filters-row .field-label {
+  margin: 0;
+}
+/* The date inputs share a line and shrink together; the length select takes
+   the rest of the row when they wrap. */
+.history-filters-row input[type="date"] {
+  flex: 1 1 8rem;
+  min-width: 0;
+}
+.history-filters-row .select {
+  flex: 1 1 100%;
+}
+
 /* n8n binding modal: destination-type chips + node id line */
 .chip-row {
   display: flex;
