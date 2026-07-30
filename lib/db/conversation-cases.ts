@@ -21,13 +21,17 @@ export type ConversationCase = {
   turno_index: number | null;
   nota: string;
   editor_session_id: string | null;
+  /** The version that earned the "ya pasa" verdict, and when. Null means the
+   *  case is still open: either never replayed, or replayed and still wrong. */
+  resolved_version_id: string | null;
+  resolved_at: string | null;
   created_at: string;
 };
 
 const CASE_COLS =
   "id, client_id, chats_table, row_id, id_de_kommo, conversation_at, " +
   "historial_snapshot, turnos_snapshot, version_id, turno_index, nota, " +
-  "editor_session_id, created_at";
+  "editor_session_id, resolved_version_id, resolved_at, created_at";
 
 export type NewCase = {
   clientId: string;
@@ -75,6 +79,29 @@ export async function getCase(id: string): Promise<ConversationCase | null> {
     .maybeSingle();
   if (error) throw new Error(`No se pudo leer el caso: ${error.message}`);
   return (data as unknown as ConversationCase | null) ?? null;
+}
+
+/**
+ * Records the verdict after a replay. Passing is relative to a version, so the
+ * one that earned it is stored with it; a later version that breaks the case
+ * again clears both by passing null.
+ */
+export async function setCaseResolution(
+  id: string,
+  resolvedVersionId: string | null,
+): Promise<ConversationCase> {
+  const sb = getSupabase();
+  const { data, error } = await sb
+    .from("conversation_cases")
+    .update({
+      resolved_version_id: resolvedVersionId,
+      resolved_at: resolvedVersionId ? new Date().toISOString() : null,
+    })
+    .eq("id", id)
+    .select(CASE_COLS)
+    .single();
+  if (error) throw new Error(`No se pudo guardar el veredicto: ${error.message}`);
+  return data as unknown as ConversationCase;
 }
 
 /** A client's cases, newest first. */

@@ -14,3 +14,9 @@ export const createCaseSchema = z.object({
 export const replayCaseSchema = z.object({
   versionId: z.string().uuid().optional(),
 });
+
+/** The verdict. Null reopens the case: passing belongs to a version, and a
+ *  later one can break it again. */
+export const resolveCaseSchema = z.object({
+  resolvedVersionId: z.string().uuid().nullable(),
+});

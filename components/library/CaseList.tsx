@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { IconChevronDown, IconChevronRight, IconPlayerPlay } from "@tabler/icons-react";
 import { Button } from "@/components/ui/Button";
+import { Badge } from "@/components/ui/Badge";
 import { parseTurnBubbles } from "@/lib/adversarial-message";
 import type { ConversationTurn } from "@/lib/conversation-turns";
 
@@ -13,10 +14,13 @@ type CaseRow = {
   conversation_at: string | null;
   turno_index: number | null;
   nota: string;
+  resolved_version_id: string | null;
+  resolved_at: string | null;
   created_at: string;
 };
 
 type ReplayResult = {
+  versionId: string;
   versionNumber: string;
   isProduction: boolean;
   original: ConversationTurn[];
@@ -61,6 +65,32 @@ function CaseItem({ kase }: { kase: CaseRow }) {
   const [running, setRunning] = useState(false);
   const [result, setResult] = useState<ReplayResult | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [resolved, setResolved] = useState<{ version_id: string | null; at: string | null }>({
+    version_id: kase.resolved_version_id,
+    at: kase.resolved_at,
+  });
+  const [saving, setSaving] = useState(false);
+
+  /** The verdict is a person's call after reading both replies. Passing null
+   *  reopens the case, which is what a later version breaking it looks like. */
+  async function resolve(versionId: string | null) {
+    setSaving(true);
+    setError(null);
+    try {
+      const res = await fetch(`/api/cases/${kase.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ resolvedVersionId: versionId }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error ?? "No se pudo guardar el veredicto.");
+      setResolved({ version_id: data.resolved_version_id, at: data.resolved_at });
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Error al guardar el veredicto.");
+    } finally {
+      setSaving(false);
+    }
+  }
 
   async function runReplay() {
     setRunning(true);
@@ -88,6 +118,7 @@ function CaseItem({ kase }: { kase: CaseRow }) {
       <div className="row-between">
         <span style={{ fontSize: 13 }}>
           {kase.id_de_kommo ? `Lead ${kase.id_de_kommo}` : "Conversación"}
+          {resolved.at && <Badge variant="new">Ya pasa</Badge>}
         </span>
         <span className="muted" style={{ fontSize: 11 }}>
           {formatDate(kase.created_at)}
@@ -136,7 +167,37 @@ function CaseItem({ kase }: { kase: CaseRow }) {
               <Reply bubbles={replayed.messages} estado={replayed.state} />
             )}
           </div>
+
+          <div className="row-between" style={{ gridColumn: "1 / -1" }}>
+            <span className="muted" style={{ fontSize: 11 }}>
+              ¿La nueva respuesta resuelve el problema?
+            </span>
+            <span style={{ display: "flex", gap: 6 }}>
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={() => resolve(null)}
+                disabled={saving}
+              >
+                Sigue fallando
+              </Button>
+              <Button
+                size="sm"
+                variant="primary"
+                onClick={() => resolve(result.versionId)}
+                disabled={saving}
+              >
+                Ya pasa
+              </Button>
+            </span>
+          </div>
         </div>
+      )}
+
+      {resolved.at && (
+        <p className="muted" style={{ fontSize: 11, marginTop: 4 }}>
+          Marcado como resuelto el {formatDate(resolved.at)}.
+        </p>
       )}
     </div>
   );
@@ -192,6 +253,11 @@ export function CaseList({ clientId }: { clientId: string }) {
           {cases?.length === 0 && (
             <p className="muted" style={{ fontSize: 13 }}>
               Todavía no hay casos. Marca una conversación desde el historial.
+            </p>
+          )}
+          {cases && cases.length > 0 && (
+            <p className="muted" style={{ fontSize: 11 }}>
+              {cases.filter((c) => c.resolved_at).length} de {cases.length} resueltos.
             </p>
           )}
           {cases?.map((kase) => <CaseItem key={kase.id} kase={kase} />)}
