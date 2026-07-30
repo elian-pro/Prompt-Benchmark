@@ -4,6 +4,7 @@ import { getRoleDefault } from "@/lib/db/role-defaults";
 import { RoleNotConfiguredError } from "@/lib/db/runs";
 import { appendDemoMessageSchema } from "@/lib/schemas/demo-sessions";
 import { chat, type ChatMessage } from "@/lib/providers";
+import { asEnvelope } from "@/lib/adversarial-message";
 import { handleError, jsonError } from "@/lib/http";
 
 export const dynamic = "force-dynamic";
@@ -38,10 +39,12 @@ export async function POST(req: NextRequest, { params }: Params) {
 
     // The bot's own past turns keep their raw JSON as `assistant` content
     // (it needs to see its own output shape to keep emitting it); only the
-    // display layer reduces it to a readable bubble.
+    // display layer reduces it to a readable bubble. The seeded opening
+    // message is the exception: human-written plain text, wrapped here so it
+    // doesn't teach the bot to answer without the envelope.
     const history: ChatMessage[] = session.messages.map((m) => ({
       role: m.role === "bot" ? "assistant" : "user",
-      content: m.content,
+      content: m.role === "bot" ? asEnvelope(m.content, session.prompt_snapshot) : m.content,
     }));
     const messages: ChatMessage[] = [...history, { role: "user", content: input.content }];
 
