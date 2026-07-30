@@ -460,7 +460,7 @@ export function ConversationHistory({ clientId, clientName }: Props) {
                 ? ` · ${selected.numero_de_mensajes} mensaje(s)`
                 : ""}
             </p>
-            <ConversationTranscript row={selected} />
+            <ConversationTranscript row={selected} clientId={clientId} />
           </>
         )}
       </Modal>

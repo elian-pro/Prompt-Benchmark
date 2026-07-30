@@ -123,6 +123,28 @@ export async function getClientHistory(
   return { rows, total, hasMore: offset + rows.length < total };
 }
 
+/**
+ * One conversation by its row id. Read fresh at the moment a case is filed, so
+ * the snapshot stored with the case is what the agents had actually written by
+ * then, not whatever the list happened to be showing.
+ */
+export async function getConversation(
+  chatsTable: string,
+  rowId: number,
+): Promise<ConversationRow | null> {
+  if (!isValidChatsTable(chatsTable)) {
+    throw new Error("Tabla de historial no válida.");
+  }
+  const sb = getChatsSupabase();
+  const { data, error } = await sb
+    .from(chatsTable)
+    .select("id, created_at, numero_de_mensajes, id_de_kommo, historial, turnos")
+    .eq("id", rowId)
+    .maybeSingle();
+  if (error) throw new Error(`No se pudo leer la conversación: ${error.message}`);
+  return (data as ConversationRow | null) ?? null;
+}
+
 /** Strip accents/spaces/punctuation and lowercase, for name comparison. */
 function normalize(value: string): string {
   return value

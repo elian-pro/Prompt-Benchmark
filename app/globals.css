@@ -3680,6 +3680,15 @@ body[data-theme="light"] .dot-grid::after {
   padding-right: 4px;
 }
 
+/* Marking a real conversation as a case, under the transcript. */
+.case-compose {
+  display: grid;
+  gap: 8px;
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 0.5px solid var(--border);
+}
+
 /* Conversation history: search box + filter row, in a narrow sidebar card. */
 .history-filters {
   display: grid;
