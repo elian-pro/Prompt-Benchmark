@@ -77,11 +77,14 @@ and pastes into the corresponding n8n node.
 
 ## Active sprint
 
-Sprint 16, client provisioning: plan and ticket status in
-`docs/SPRINT-16-provisioning-plan.md`. All eight tickets are implemented;
-what remains is manual verification (run `019_n8n_template_workflow.sql`, set
-`SUPABASE_ACCESS_TOKEN` / `CHATS_SUPABASE_PROJECT_REF`, pick the template in
-Settings, then the end-to-end run described in the plan).
+Sprint 17, searchable history and conversations as cases: plan in
+`docs/SPRINT-17-history-cases-plan.md`. Nothing implemented yet; the data
+groundwork (the `turnos` column, its trigger, the n8n flows that write it) is
+done.
+
+Sprint 16 (client provisioning) is verified end to end: Chapur was provisioned
+from the template, retargeted to `chats_Chapur` and bound to
+`dudas/conversacion`.
 
 Sprints 1 through 15 are complete (there is no Sprint 12). Sprints 1 to 6, 8
 and 9 have archived plans in `docs/SPRINT-*-archive.md`; Sprint 7 is

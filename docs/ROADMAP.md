@@ -148,6 +148,22 @@ leaves. Stream resilience hotfix in
 
 > There is no Sprint 12. The numbering skips it.
 
+## Sprint 17 — Searchable history, real conversations as cases ⏳
+
+Search and filter a client's real lead conversations, read one as a chat
+instead of a text blob, and hand it to the Editor with a note. Every
+conversation marked as bad is stored as a case (snapshot, version it failed
+on, where it failed), which is the eval set the prompt-tuning loop will need
+later. Plan in `docs/SPRINT-17-history-cases-plan.md`.
+
+Groundwork already shipped: the `turnos jsonb` column on the chats tables,
+its normalizing trigger, and the n8n flows that write it.
+
+**Definition of done**: a client reports a bad reply, Carlos finds that
+conversation by its Kommo id, reads it as a chat, tags the offending message,
+writes what went wrong, and lands in the Editor with the context loaded. No
+screenshots.
+
 ---
 
 ## Future (not in current scope)
