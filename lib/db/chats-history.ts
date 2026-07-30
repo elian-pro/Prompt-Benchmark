@@ -3,7 +3,12 @@
  * store real client/lead conversations. One table per client, chats_<Cliente>,
  * each row a conversation blob:
  *   id, created_at, numero_de_mensajes, id_de_kommo (Kommo CRM lead id),
- *   historial (the full conversation as plain text: "User: ...\nIA: ...").
+ *   historial (the full conversation as plain text: "User: ...\nIA: ..."),
+ *   turnos (the same conversation as one object per turn, see
+ *   supabase/chats/002_add_turnos.sql). Only flows duplicated from the updated
+ *   template write turnos, so it is null for every row written before
+ *   2026-07-30 and for every client still on an older flow. Nothing reads it
+ *   yet: this module still selects historial.
  *
  * Client names do not map to table names, so the mapping is stored explicitly
  * as clients.chats_table (see migration 018). This module never writes.
