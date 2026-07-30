@@ -50,3 +50,13 @@ create index if not exists conversation_cases_client_idx
 
 -- The same conversation can be filed more than once (a second problem, or the
 -- same one after an edit), so row_id is deliberately not unique.
+
+-- Same posture as every other table here: RLS on, one policy for authenticated.
+-- The app reaches this through the service_role client, which bypasses RLS;
+-- leaving it off would expose a client's cases to anyone holding the
+-- publishable key.
+alter table conversation_cases enable row level security;
+
+drop policy if exists authenticated_all on conversation_cases;
+create policy authenticated_all on conversation_cases
+  for all to authenticated using (true) with check (true);
