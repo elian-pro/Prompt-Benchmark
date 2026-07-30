@@ -1,7 +1,19 @@
 # Sprint 17: Replay (conversaciones reales como casos)
 
-> Estado: PLANEADO. La plomería de datos ya está hecha (ver "Lo que ya está
-> listo"). Faltan los cinco tickets de este documento.
+> Estado: CÓDIGO COMPLETO, PENDIENTE DE VERIFICACIÓN. Los cinco tickets están
+> implementados y las migraciones 020 y 021 ya corrieron en prompt_studio.
+> Falta desplegar la rama y hacer la prueba end to end con un cliente que
+> escriba `turnos` (Fernando Wagner, Kuyabeh o Chapur): buscar una
+> conversación, marcar el turno, editar, promover, correr el replay.
+>
+> Dos desvíos respecto a este plan, ambos por buenas razones:
+>
+> - T4 tuvo que incluir el panel de casos, porque un endpoint sin punto de
+>   entrada es código muerto. T5 quedó reducido al veredicto.
+> - El filtro de estado final de T1 no se implementó como columna propia: hoy
+>   se alcanza por la búsqueda de texto, porque los flujos escriben el estado
+>   también en `historial`. La versión precisa (`turnos @> [{"estado": X}]`)
+>   espera a que los 16 flujos escriban la columna.
 
 ## Contexto
 
