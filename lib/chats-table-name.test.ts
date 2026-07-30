@@ -32,9 +32,10 @@ test("every suggested name is a valid table name", () => {
   }
 });
 
-test("buildCreateChatsTableSql emits the five columns and RLS", () => {
+test("buildCreateChatsTableSql emits the six columns and RLS", () => {
   const sql = buildCreateChatsTableSql("chats_ZebraQA");
   assert.match(sql, /create table if not exists public\."chats_ZebraQA"/);
+  assert.match(sql, /turnos jsonb/);
   for (const col of ["id", "created_at", "numero_de_mensajes", "id_de_kommo", "historial"]) {
     assert.ok(sql.includes(col), col);
   }

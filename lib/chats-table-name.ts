@@ -54,7 +54,11 @@ export function buildCreateChatsTableSql(tableName: string): string {
   created_at timestamptz not null default now(),
   numero_de_mensajes numeric,
   id_de_kommo text,
-  historial text
+  historial text,
+  -- One object per turn: rol, texto, estado, ts. The historial column keeps
+  -- the flat text the agents have always written; this is the parseable
+  -- version, the only one that survives a message containing User: or IA:.
+  turnos jsonb
 );
 alter table public."${tableName}" enable row level security;
 notify pgrst, 'reload schema';`;
