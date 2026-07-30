@@ -77,7 +77,8 @@ and pastes into the corresponding n8n node.
 
 ## Active sprint
 
-Sprint 17, searchable history and conversations as cases: plan in
+Sprint 17, **Replay**: a third Lab mode where the lead is real and the
+conversation already happened. Plan in
 `docs/SPRINT-17-history-cases-plan.md`. Nothing implemented yet; the data
 groundwork (the `turnos` column, its trigger, the n8n flows that write it) is
 done.
