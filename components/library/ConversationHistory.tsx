@@ -46,6 +46,12 @@ function hasFilters(f: Filters): boolean {
   return Boolean(f.search || f.from || f.to || f.maxMessages);
 }
 
+/** Anything hidden behind "Opciones avanzadas", so the collapsed header can
+ *  say that a filter is active without opening it. */
+function hasAdvanced(f: Filters): boolean {
+  return Boolean(f.from || f.to || f.maxMessages);
+}
+
 function historyQuery(offset: number, f: Filters): string {
   const params = new URLSearchParams({ limit: String(PAGE_SIZE), offset: String(offset) });
   if (f.search) params.set("search", f.search);
@@ -89,10 +95,15 @@ export function ConversationHistory({ clientId, clientName, embedded = false }: 
   // Full-conversation modal.
   const [selected, setSelected] = useState<ConversationRow | null>(null);
 
-  // Search and filters: `draft` is what the inputs hold, `applied` is what the
-  // list is showing. Splitting them keeps typing from refetching on every key.
-  const [draft, setDraft] = useState<Filters>(NO_FILTERS);
+  // `filters` is what the inputs hold and `applied` is what the list is
+  // showing: the gap between them is the debounce, so typing an id narrows the
+  // list on its own instead of waiting for a button.
+  const [filters, setFilters] = useState<Filters>(NO_FILTERS);
   const [applied, setApplied] = useState<Filters>(NO_FILTERS);
+  /** Bumped to re-run the query without changing the filters, after the
+   *  history table is connected or created. */
+  const [refreshKey, setRefreshKey] = useState(0);
+  const [advanced, setAdvanced] = useState(false);
 
   // Connect-a-table flow (disconnected clients / "Cambiar tabla").
   const [picking, setPicking] = useState(false);
@@ -100,45 +111,60 @@ export function ConversationHistory({ clientId, clientName, embedded = false }: 
   const [chosen, setChosen] = useState("");
   const [saving, setSaving] = useState(false);
 
-  const loadFirstPage = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-    setUnconfigured(false);
-    try {
-      const res = await fetch(
-        `/api/clients/${clientId}/conversations?${historyQuery(0, applied)}`,
-      );
-      if (res.status === 503) {
-        setUnconfigured(true);
-        setPage(null);
-        return;
-      }
-      if (!res.ok) throw new Error((await res.json()).error ?? "No se pudo cargar el historial.");
-      const data: Page = await res.json();
-      setPage(data);
-      setRows(data.rows);
-      setOffset(data.rows.length);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Error inesperado.");
-    } finally {
-      setLoading(false);
-    }
-  }, [clientId, applied]);
+  const SEARCH_DEBOUNCE_MS = 300;
 
   useEffect(() => {
-    if (open && page === null && !unconfigured && !loading && !error) loadFirstPage();
-  }, [open, page, unconfigured, loading, error, loadFirstPage]);
+    if (!open) return;
+    const timer = setTimeout(() => setApplied(filters), SEARCH_DEBOUNCE_MS);
+    return () => clearTimeout(timer);
+  }, [filters, open]);
 
-  /** Re-runs the query from page one. Clearing `page` is what the load effect
-   *  watches, so this is also how the filter form submits. */
-  function reload(next: Filters) {
-    setApplied(next);
-    setDraft(next);
-    setPage(null);
-    setRows([]);
-    setOffset(0);
+  /**
+   * Loads page one whenever the applied filters change.
+   *
+   * Two things it deliberately does NOT do: clear `rows` first, so the list
+   * stays readable while the next page is in flight instead of blinking empty
+   * on every keystroke; and trust a response that arrived late. With a search
+   * running per keystroke, a slow early request can resolve after a fast later
+   * one and repaint stale results, so anything but the newest is dropped.
+   */
+  useEffect(() => {
+    if (!open) return;
+    let current = true;
+    setLoading(true);
     setError(null);
-  }
+
+    (async () => {
+      try {
+        const res = await fetch(
+          `/api/clients/${clientId}/conversations?${historyQuery(0, applied)}`,
+        );
+        if (!current) return;
+        if (res.status === 503) {
+          setUnconfigured(true);
+          setPage(null);
+          return;
+        }
+        if (!res.ok) {
+          throw new Error((await res.json()).error ?? "No se pudo cargar el historial.");
+        }
+        const data: Page = await res.json();
+        if (!current) return;
+        setUnconfigured(false);
+        setPage(data);
+        setRows(data.rows);
+        setOffset(data.rows.length);
+      } catch (e) {
+        if (current) setError(e instanceof Error ? e.message : "Error inesperado.");
+      } finally {
+        if (current) setLoading(false);
+      }
+    })();
+
+    return () => {
+      current = false;
+    };
+  }, [open, applied, clientId, refreshKey]);
 
   async function loadMore() {
     setLoadingMore(true);
@@ -176,10 +202,7 @@ export function ConversationHistory({ clientId, clientName, embedded = false }: 
       if (!res.ok) throw new Error(data.error ?? "No se pudo crear la tabla.");
       const step = data.provisioning?.chats;
       if (step && !step.ok) throw new Error(step.error);
-      setPage(null);
-      setRows([]);
-      setOffset(0);
-      await loadFirstPage();
+      setRefreshKey((k) => k + 1);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Error inesperado.");
     } finally {
@@ -213,13 +236,10 @@ export function ConversationHistory({ clientId, clientName, embedded = false }: 
         body: JSON.stringify({ chats_table: chosen }),
       });
       if (!res.ok) throw new Error((await res.json()).error ?? "No se pudo conectar la tabla.");
-      // Reset and reload the history for the newly connected table.
+      // Reload the history for the newly connected table.
       setPicking(false);
       setChosen("");
-      setPage(null);
-      setRows([]);
-      setOffset(0);
-      await loadFirstPage();
+      setRefreshKey((k) => k + 1);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Error inesperado.");
     } finally {
@@ -255,7 +275,10 @@ export function ConversationHistory({ clientId, clientName, embedded = false }: 
             </p>
           )}
 
-          {!unconfigured && loading && (
+          {/* Only the very first load takes over the panel. Later searches
+              keep the list on screen and report themselves in the filter row,
+              so typing does not blank the view on every keystroke. */}
+          {!unconfigured && loading && page === null && (
             <p className="muted" style={{ fontSize: 13 }}>Cargando…</p>
           )}
 
@@ -329,74 +352,85 @@ export function ConversationHistory({ clientId, clientName, embedded = false }: 
           {/* Connected: search, filters, then the conversation list. */}
           {!unconfigured && connected && !picking && (
             <div>
-              <form
-                className="history-filters"
-                onSubmit={(e) => {
-                  e.preventDefault();
-                  reload(draft);
-                }}
-              >
+              <div className="history-filters">
                 <input
                   className="input"
                   type="search"
-                  value={draft.search}
-                  onChange={(e) => setDraft((d) => ({ ...d, search: e.target.value }))}
+                  value={filters.search}
+                  onChange={(e) => setFilters((f) => ({ ...f, search: e.target.value }))}
                   placeholder="Id de Kommo, id de conversación o texto…"
                   aria-label="Buscar en el historial"
                 />
-                <div className="history-filters-row">
-                  <label className="field-label" htmlFor="hist-from">Desde</label>
-                  <input
-                    id="hist-from"
-                    className="input"
-                    type="date"
-                    value={draft.from}
-                    onChange={(e) => setDraft((d) => ({ ...d, from: e.target.value }))}
-                  />
-                  <label className="field-label" htmlFor="hist-to">Hasta</label>
-                  <input
-                    id="hist-to"
-                    className="input"
-                    type="date"
-                    value={draft.to}
-                    onChange={(e) => setDraft((d) => ({ ...d, to: e.target.value }))}
-                  />
-                  <select
-                    className="select"
-                    value={draft.maxMessages}
-                    onChange={(e) => setDraft((d) => ({ ...d, maxMessages: e.target.value }))}
-                    aria-label="Largo de la conversación"
-                  >
-                    <option value="">Cualquier largo</option>
-                    <option value="2">Hasta 2 mensajes</option>
-                    <option value="5">Hasta 5 mensajes</option>
-                    <option value="10">Hasta 10 mensajes</option>
-                  </select>
-                </div>
+
                 <div className="row-between">
-                  {hasFilters(applied) ? (
+                  <button
+                    type="button"
+                    className="version-changes-link"
+                    aria-expanded={advanced}
+                    onClick={() => setAdvanced((v) => !v)}
+                  >
+                    {advanced ? "Ocultar opciones" : "Opciones avanzadas"}
+                    {!advanced && hasAdvanced(filters) ? " ·" : ""}
+                  </button>
+                  {loading ? (
+                    <span className="muted" style={{ fontSize: 11 }}>Buscando…</span>
+                  ) : hasFilters(applied) ? (
                     <button
                       type="button"
                       className="version-changes-link"
-                      onClick={() => reload(NO_FILTERS)}
+                      onClick={() => setFilters(NO_FILTERS)}
                     >
-                      Limpiar filtros
+                      Limpiar
                     </button>
                   ) : (
                     <span />
                   )}
-                  <Button size="sm" variant="secondary" type="submit" disabled={loading}>
-                    {loading ? "Buscando…" : "Buscar"}
-                  </Button>
                 </div>
-              </form>
 
+                {advanced && (
+                  <div className="history-filters-row">
+                    <label className="field-label" htmlFor="hist-from">Desde</label>
+                    <input
+                      id="hist-from"
+                      className="input"
+                      type="date"
+                      value={filters.from}
+                      onChange={(e) => setFilters((f) => ({ ...f, from: e.target.value }))}
+                    />
+                    <label className="field-label" htmlFor="hist-to">Hasta</label>
+                    <input
+                      id="hist-to"
+                      className="input"
+                      type="date"
+                      value={filters.to}
+                      onChange={(e) => setFilters((f) => ({ ...f, to: e.target.value }))}
+                    />
+                    <select
+                      className="select"
+                      value={filters.maxMessages}
+                      onChange={(e) => setFilters((f) => ({ ...f, maxMessages: e.target.value }))}
+                      aria-label="Largo de la conversación"
+                    >
+                      <option value="">Cualquier largo</option>
+                      <option value="2">Hasta 2 mensajes</option>
+                      <option value="5">Hasta 5 mensajes</option>
+                      <option value="10">Hasta 10 mensajes</option>
+                    </select>
+                  </div>
+                )}
+              </div>
+
+              {/* Silent while a search is in flight: saying "no matches" over
+                  a half-typed id is noise, and the previous rows are still on
+                  screen anyway. */}
               {rows.length === 0 ? (
-                <p className="muted" style={{ fontSize: 13 }}>
-                  {hasFilters(applied)
-                    ? "Ninguna conversación coincide con esos filtros."
-                    : "Sin conversaciones todavía."}
-                </p>
+                loading ? null : (
+                  <p className="muted" style={{ fontSize: 13 }}>
+                    {hasFilters(applied)
+                      ? "Ninguna conversación coincide con esos filtros."
+                      : "Sin conversaciones todavía."}
+                  </p>
+                )
               ) : (
                 rows.map((r) => (
                   <button
