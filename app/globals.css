@@ -3675,14 +3675,9 @@ body[data-theme="light"] .dot-grid::after {
   background: var(--surface-2, rgba(127, 127, 127, 0.08));
 }
 
-/* A real conversation rendered inside the history modal. The chat-turn /
-   chat-msg / chat-state classes come from the Playground; this only bounds
-   the height so a long transcript scrolls instead of pushing the modal. */
-.chat-transcript {
-  max-height: 60vh;
-  overflow-y: auto;
-  padding-right: 4px;
-}
+/* A real conversation reuses the Playground's whole chat layout: the
+   .chat-messages container (flex column, bounded height) plus the chat-turn /
+   chat-msg / chat-state classes. Nothing here to add. */
 
 /* Replay (Lab): conversations on one side, filed cases on the other. Stacked
    until there is room, since each column holds a full transcript. */
@@ -3874,11 +3869,20 @@ body[data-theme="dark"] .history-filters input[type="date"]::-webkit-calendar-pi
 /* Selection rings each bubble on its own, not one box around the whole turn:
    a big container ring left gaps around narrower bubbles and wrapped the role
    label. The label stays unhighlighted; the estado lives inside its bubble so
-   it rings with it. */
-.playground-chat .chat-turn.is-selected .chat-msg {
+   it rings with it.
+
+   Not scoped to .playground-chat: Replay marks the turn that failed with the
+   same gesture, and picking a message should look the same wherever a
+   transcript is shown. */
+.chat-turn.is-selected .chat-msg {
   box-shadow: 0 0 0 1.5px var(--accent);
 }
-.playground-chat .chat-turn.is-flashed .chat-msg {
+/* A transcript shown for reading only: no pointer promising a click that does
+   nothing. */
+.chat-turn.is-static {
+  cursor: default;
+}
+.chat-turn.is-flashed .chat-msg {
   animation: noteFlash 1.6s ease;
 }
 

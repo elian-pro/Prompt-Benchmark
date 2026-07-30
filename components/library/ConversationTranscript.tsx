@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, type KeyboardEvent } from "react";
 import { useRouter } from "next/navigation";
 import type { ConversationRow } from "@/lib/db/chats-history";
 import { transcriptOf, type ConversationTurn } from "@/lib/conversation-turns";
@@ -17,10 +17,15 @@ const ROLE_LABEL: Record<ConversationTurn["rol"], string> = {
 function Turn({
   turn,
   selected,
+  selectable,
   onSelect,
 }: {
   turn: ConversationTurn;
   selected: boolean;
+  /** False in the Library panel, which only shows the conversation. Without
+   *  this the turns would still offer a pointer and a button role for a click
+   *  that does nothing. */
+  selectable: boolean;
   onSelect: () => void;
 }) {
   const side = turn.rol === "lead" ? "turn-lead" : "turn-bot";
@@ -40,16 +45,24 @@ function Turn({
 
   return (
     <div
-      className={`chat-turn ${side}${selected ? " is-selected" : ""}`}
-      onClick={onSelect}
-      role="button"
-      tabIndex={0}
-      onKeyDown={(e) => {
-        if (e.key === "Enter" || e.key === " ") {
-          e.preventDefault();
-          onSelect();
-        }
-      }}
+      className={`chat-turn ${side}${selected ? " is-selected" : ""}${
+        selectable ? "" : " is-static"
+      }`}
+      {...(selectable
+        ? {
+            onClick: onSelect,
+            role: "button" as const,
+            tabIndex: 0,
+            "aria-pressed": selected,
+            title: "Marcar este mensaje como el punto de falla",
+            onKeyDown: (e: KeyboardEvent) => {
+              if (e.key === "Enter" || e.key === " ") {
+                e.preventDefault();
+                onSelect();
+              }
+            },
+          }
+        : {})}
     >
       <span className="chat-turn-role">{ROLE_LABEL[turn.rol]}</span>
       <div className="chat-msg">
@@ -147,15 +160,14 @@ export function ConversationTranscript({
         </p>
       ) : (
         <>
-          <div className="chat-transcript">
+          <div className="chat-messages">
             {turns.map((turn, i) => (
               <Turn
                 key={i}
                 turn={turn}
+                selectable={canFileCase && turn.rol !== "sistema"}
                 selected={canFileCase && failedAt === i}
-                onSelect={() =>
-                  canFileCase && setFailedAt((current) => (current === i ? null : i))
-                }
+                onSelect={() => setFailedAt((current) => (current === i ? null : i))}
               />
             ))}
           </div>
