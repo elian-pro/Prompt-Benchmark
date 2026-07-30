@@ -66,6 +66,17 @@ export async function createCase(input: NewCase): Promise<ConversationCase> {
   return data as unknown as ConversationCase;
 }
 
+export async function getCase(id: string): Promise<ConversationCase | null> {
+  const sb = getSupabase();
+  const { data, error } = await sb
+    .from("conversation_cases")
+    .select(CASE_COLS)
+    .eq("id", id)
+    .maybeSingle();
+  if (error) throw new Error(`No se pudo leer el caso: ${error.message}`);
+  return (data as unknown as ConversationCase | null) ?? null;
+}
+
 /** A client's cases, newest first. */
 export async function listCases(clientId: string): Promise<ConversationCase[]> {
   const sb = getSupabase();

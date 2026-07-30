@@ -8,3 +8,9 @@ export const createCaseSchema = z.object({
    *  a whole; the replay needs one, so the UI nudges toward tagging. */
   turnoIndex: z.number().int().min(0).nullable().optional(),
 });
+
+/** Re-running a case. Omitting the version means "the one in production now",
+ *  which is the usual question: did what I just promoted fix this? */
+export const replayCaseSchema = z.object({
+  versionId: z.string().uuid().optional(),
+});

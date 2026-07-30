@@ -3680,6 +3680,26 @@ body[data-theme="light"] .dot-grid::after {
   padding-right: 4px;
 }
 
+/* Replay: one filed case, and the two replies it compares. */
+.case-item {
+  border-top: 0.5px solid var(--border);
+  padding: 8px 2px;
+}
+.replay-compare {
+  display: grid;
+  gap: 10px;
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 0.5px dashed var(--border);
+}
+/* Side by side only where there is room for it; the client detail sidebar is
+   narrow, so the default is stacked. */
+@media (min-width: 1100px) {
+  .replay-compare {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
 /* Marking a real conversation as a case, under the transcript. */
 .case-compose {
   display: grid;

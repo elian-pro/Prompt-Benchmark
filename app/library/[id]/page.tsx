@@ -25,6 +25,7 @@ import { N8nDeploymentCard } from "@/components/library/N8nDeploymentCard";
 import { N8nSyncHistory } from "@/components/library/N8nSyncHistory";
 import { N8nSyncModal } from "@/components/library/N8nSyncModal";
 import { ConversationHistory } from "@/components/library/ConversationHistory";
+import { CaseList } from "@/components/library/CaseList";
 
 const SOURCE_LABELS: Record<string, string> = {
   manual: "Manual",
@@ -770,6 +771,7 @@ export default function ClientDetailPage() {
           />
           <N8nSyncHistory clientId={id} />
           <ConversationHistory clientId={id} clientName={detail.name} />
+          <CaseList clientId={id} />
         </aside>
 
         {viewingVersion ? (
