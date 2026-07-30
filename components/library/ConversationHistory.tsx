@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import Link from "next/link";
 import {
   IconChevronDown,
   IconChevronRight,
@@ -17,6 +18,10 @@ type Props = {
   clientId: string;
   /** Used to name the table the "Crear tabla" shortcut would create. */
   clientName: string;
+  /** Rendered expanded and without the collapsible header, for the Replay
+   *  page where browsing the history IS the screen rather than a sidebar
+   *  aside. Also enables filing a case from a transcript. */
+  embedded?: boolean;
 };
 
 type Page = {
@@ -67,8 +72,8 @@ function formatDate(iso: string): string {
  * connected yet, shows a picker to connect one (persisted as clients.chats_table).
  * Lazy-loads on first open, like N8nSyncHistory.
  */
-export function ConversationHistory({ clientId, clientName }: Props) {
-  const [open, setOpen] = useState(false);
+export function ConversationHistory({ clientId, clientName, embedded = false }: Props) {
+  const [open, setOpen] = useState(embedded);
   const [creating, setCreating] = useState(false);
   const suggestedTable = chatsTableName(clientName);
 
@@ -226,17 +231,19 @@ export function ConversationHistory({ clientId, clientName }: Props) {
   const connected = page?.connected ?? false;
 
   return (
-    <div className="n8n-card">
-      <button className="n8n-history-toggle" onClick={() => setOpen((v) => !v)}>
-        {open ? <IconChevronDown size={16} /> : <IconChevronRight size={16} />}
-        <IconMessages size={14} />
-        <span>Historial de conversaciones</span>
-        {connected && total > 0 && (
-          <span className="muted" style={{ fontSize: 11, marginLeft: "auto" }}>
-            {total}
-          </span>
-        )}
-      </button>
+    <div className={embedded ? "" : "n8n-card"}>
+      {!embedded && (
+        <button className="n8n-history-toggle" onClick={() => setOpen((v) => !v)}>
+          {open ? <IconChevronDown size={16} /> : <IconChevronRight size={16} />}
+          <IconMessages size={14} />
+          <span>Historial de conversaciones</span>
+          {connected && total > 0 && (
+            <span className="muted" style={{ fontSize: 11, marginLeft: "auto" }}>
+              {total}
+            </span>
+          )}
+        </button>
+      )}
 
       {open && (
         <div style={{ marginTop: 10 }}>
@@ -427,17 +434,25 @@ export function ConversationHistory({ clientId, clientName }: Props) {
                 </Button>
               )}
 
-              <button
-                type="button"
-                className="version-changes-link"
-                style={{ marginTop: 8 }}
-                onClick={() => {
-                  setChosen(page?.table ?? "");
-                  openPicker();
-                }}
-              >
-                Cambiar tabla
-              </button>
+              <div className="row-between" style={{ marginTop: 8 }}>
+                <button
+                  type="button"
+                  className="version-changes-link"
+                  onClick={() => {
+                    setChosen(page?.table ?? "");
+                    openPicker();
+                  }}
+                >
+                  Cambiar tabla
+                </button>
+                {/* Filing a case and replaying it live in Lab; this panel is
+                    reference material. */}
+                {!embedded && (
+                  <Link className="version-changes-link" href={`/lab/replay/${clientId}`}>
+                    Abrir en Replay
+                  </Link>
+                )}
+              </div>
             </div>
           )}
         </div>
@@ -460,7 +475,11 @@ export function ConversationHistory({ clientId, clientName }: Props) {
                 ? ` · ${selected.numero_de_mensajes} mensaje(s)`
                 : ""}
             </p>
-            <ConversationTranscript row={selected} clientId={clientId} />
+            <ConversationTranscript
+              row={selected}
+              clientId={clientId}
+              canFileCase={embedded}
+            />
           </>
         )}
       </Modal>

@@ -1,12 +1,11 @@
 import Link from "next/link";
-import { IconMessage2, IconTarget } from "@tabler/icons-react";
+import { IconMessage2, IconPlayerPlay, IconTarget } from "@tabler/icons-react";
 
 /**
- * Lab hub: two ways to put a client's prompt to the test before publishing.
- * "IA vs IA" is the existing Adversarial run (lives at /adversarial,
- * untouched). "Playground" (you converse with the prompt yourself) lives at
- * /lab/playground. Tagging messages and sending feedback notes to the
- * Editor land later this sprint (T3-T4).
+ * Lab hub: three ways to put a client's prompt to the test, ordered by how
+ * real the lead is. "IA vs IA" is the Adversarial run (lives at /adversarial),
+ * "Playground" is you conversing with the prompt, and "Replay" works from
+ * conversations that actually happened in production.
  */
 export default function LabPage() {
   return (
@@ -37,6 +36,16 @@ export default function LabPage() {
           <p className="lab-card-desc">
             Conversa tú mismo con el prompt, como un lead real. Ideal para
             demos en vivo.
+          </p>
+        </Link>
+
+        <Link href="/lab/replay" className="lab-card">
+          <IconPlayerPlay size={28} stroke={1.5} className="lab-card-icon" />
+          <span className="lab-card-title">Replay</span>
+          <p className="lab-card-desc">
+            El lead es real y la conversación ya ocurrió. Encuentra la que
+            salió mal, márcala, y vuelve a correr ese turno contra el prompt
+            corregido.
           </p>
         </Link>
       </div>

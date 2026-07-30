@@ -77,9 +77,13 @@ function Turn({
 export function ConversationTranscript({
   row,
   clientId,
+  /** Filing a case belongs to Replay (Lab). The Library panel is reference
+   *  material only, so it renders the transcript without the compose box. */
+  canFileCase = false,
 }: {
   row: ConversationRow;
   clientId: string;
+  canFileCase?: boolean;
 }) {
   const router = useRouter();
   const [showRaw, setShowRaw] = useState(false);
@@ -148,12 +152,15 @@ export function ConversationTranscript({
               <Turn
                 key={i}
                 turn={turn}
-                selected={failedAt === i}
-                onSelect={() => setFailedAt((current) => (current === i ? null : i))}
+                selected={canFileCase && failedAt === i}
+                onSelect={() =>
+                  canFileCase && setFailedAt((current) => (current === i ? null : i))
+                }
               />
             ))}
           </div>
 
+          {canFileCase && (
           <div className="case-compose">
             <p className="muted" style={{ fontSize: 11 }}>
               {failedAt === null
@@ -182,6 +189,7 @@ export function ConversationTranscript({
               </Button>
             </div>
           </div>
+          )}
         </>
       )}
     </>

@@ -9,7 +9,9 @@
 > Dos desvíos respecto a este plan, ambos por buenas razones:
 >
 > - T4 tuvo que incluir el panel de casos, porque un endpoint sin punto de
->   entrada es código muerto. T5 quedó reducido al veredicto.
+>   entrada es código muerto. T5 quedó reducido al veredicto. Ese panel nació
+>   por error en la ficha de Biblioteca y se movió a Lab, que es donde este
+>   plan siempre dijo que vivía.
 > - El filtro de estado final de T1 no se implementó como columna propia: hoy
 >   se alcanza por la búsqueda de texto, porque los flujos escriben el estado
 >   también en `historial`. La versión precisa (`turnos @> [{"estado": X}]`)

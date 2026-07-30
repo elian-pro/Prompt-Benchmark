@@ -211,8 +211,14 @@ function CaseItem({ kase }: { kase: CaseRow }) {
  * because for a handful of cases a person reading both is better than a judge
  * that can be wrong in a way nobody notices.
  */
-export function CaseList({ clientId }: { clientId: string }) {
-  const [open, setOpen] = useState(false);
+export function CaseList({
+  clientId,
+  embedded = false,
+}: {
+  clientId: string;
+  embedded?: boolean;
+}) {
+  const [open, setOpen] = useState(embedded);
   const [cases, setCases] = useState<CaseRow[] | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -232,17 +238,19 @@ export function CaseList({ clientId }: { clientId: string }) {
   }, [open, cases, error, load]);
 
   return (
-    <div className="n8n-card">
-      <button className="n8n-history-toggle" onClick={() => setOpen((v) => !v)}>
-        {open ? <IconChevronDown size={16} /> : <IconChevronRight size={16} />}
-        <IconPlayerPlay size={14} />
-        <span>Replay</span>
-        {cases && cases.length > 0 && (
-          <span className="muted" style={{ fontSize: 11, marginLeft: "auto" }}>
-            {cases.length}
-          </span>
-        )}
-      </button>
+    <div className={embedded ? "" : "n8n-card"}>
+      {!embedded && (
+        <button className="n8n-history-toggle" onClick={() => setOpen((v) => !v)}>
+          {open ? <IconChevronDown size={16} /> : <IconChevronRight size={16} />}
+          <IconPlayerPlay size={14} />
+          <span>Replay</span>
+          {cases && cases.length > 0 && (
+            <span className="muted" style={{ fontSize: 11, marginLeft: "auto" }}>
+              {cases.length}
+            </span>
+          )}
+        </button>
+      )}
 
       {open && (
         <div style={{ marginTop: 10 }}>
