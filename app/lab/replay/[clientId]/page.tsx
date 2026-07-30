@@ -3,18 +3,30 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
-import { IconArrowLeft } from "@tabler/icons-react";
+import { IconArrowLeft, IconMessages } from "@tabler/icons-react";
 import type { Client } from "@/lib/db/clients";
+import type { ConversationRow } from "@/lib/db/chats-history";
 import { ConversationHistory } from "@/components/library/ConversationHistory";
-import { CaseList } from "@/components/library/CaseList";
+import { ConversationTranscript } from "@/components/library/ConversationTranscript";
+import { EmptyState } from "@/components/ui/EmptyState";
+
+function formatDate(iso: string): string {
+  return new Date(iso).toLocaleString("es-MX", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
 
 /**
- * Replay for one client: browse the real conversations, mark the turn that
- * failed, and re-run the marked cases against a candidate version.
+ * Filing a case for one client: the conversations on the left, the one you
+ * picked open on the right.
  *
- * The two halves are the two ends of the same loop, so they share a screen:
- * you file a case on the left and, once the prompt has been edited, you
- * confirm the fix on the right without changing sections.
+ * The transcript is not a modal on purpose. Finding the conversation that
+ * failed usually takes several tries, and a dialog that has to be dismissed
+ * between each one turns scanning into a chore.
  */
 export default function ReplayClientPage() {
   const params = useParams();
@@ -24,6 +36,7 @@ export default function ReplayClientPage() {
 
   const [client, setClient] = useState<Client | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [selected, setSelected] = useState<ConversationRow | null>(null);
 
   useEffect(() => {
     fetch(`/api/clients/${clientId}`)
@@ -44,7 +57,7 @@ export default function ReplayClientPage() {
           </Link>
           <h1 className="library-title">{client?.name ?? "…"}</h1>
           <p className="section-label library-subtitle">
-            Marca el mensaje donde el bot falló y comprueba si tu cambio lo arregla
+            Abre la conversación que falló y marca el mensaje del problema
           </p>
         </div>
       </div>
@@ -55,11 +68,36 @@ export default function ReplayClientPage() {
         <div className="replay-layout">
           <section>
             <h2 className="section-label">Conversaciones</h2>
-            <ConversationHistory clientId={clientId} clientName={client.name} embedded />
+            <ConversationHistory
+              clientId={clientId}
+              clientName={client.name}
+              embedded
+              onSelectRow={setSelected}
+              selectedId={selected?.id ?? null}
+            />
           </section>
+
           <section>
-            <h2 className="section-label">Casos</h2>
-            <CaseList clientId={clientId} embedded />
+            {selected ? (
+              <>
+                <h2 className="section-label">
+                  {selected.id_de_kommo ? `Lead ${selected.id_de_kommo}` : `Conversación #${selected.id}`}
+                </h2>
+                <p className="muted" style={{ fontSize: 12, marginBottom: 8 }}>
+                  {formatDate(selected.created_at)}
+                  {selected.numero_de_mensajes != null
+                    ? ` · ${selected.numero_de_mensajes} mensaje(s)`
+                    : ""}
+                </p>
+                <ConversationTranscript row={selected} clientId={clientId} canFileCase />
+              </>
+            ) : (
+              <EmptyState
+                icon={<IconMessages size={22} />}
+                title="Ninguna conversación abierta"
+                description="Elige una de la lista para leerla y marcar dónde falló el bot."
+              />
+            )}
           </section>
         </div>
       )}

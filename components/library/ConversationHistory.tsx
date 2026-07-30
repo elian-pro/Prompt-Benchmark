@@ -22,6 +22,15 @@ type Props = {
    *  page where browsing the history IS the screen rather than a sidebar
    *  aside. Also enables filing a case from a transcript. */
   embedded?: boolean;
+  /**
+   * When given, picking a conversation reports it instead of opening the
+   * modal, and the caller renders it. Replay puts the transcript in its own
+   * column, next to the list, so you can keep scanning without closing a
+   * dialog every time.
+   */
+  onSelectRow?: (row: ConversationRow) => void;
+  /** Which row the caller is currently showing, to mark it in the list. */
+  selectedId?: number | null;
 };
 
 type Page = {
@@ -78,7 +87,13 @@ function formatDate(iso: string): string {
  * connected yet, shows a picker to connect one (persisted as clients.chats_table).
  * Lazy-loads on first open, like N8nSyncHistory.
  */
-export function ConversationHistory({ clientId, clientName, embedded = false }: Props) {
+export function ConversationHistory({
+  clientId,
+  clientName,
+  embedded = false,
+  onSelectRow,
+  selectedId = null,
+}: Props) {
   const [open, setOpen] = useState(embedded);
   const [creating, setCreating] = useState(false);
   const suggestedTable = chatsTableName(clientName);
@@ -436,8 +451,8 @@ export function ConversationHistory({ clientId, clientName, embedded = false }: 
                   <button
                     key={r.id}
                     type="button"
-                    className="conversation-item"
-                    onClick={() => setSelected(r)}
+                    className={`conversation-item${selectedId === r.id ? " is-selected" : ""}`}
+                    onClick={() => (onSelectRow ? onSelectRow(r) : setSelected(r))}
                   >
                     <div className="row-between">
                       <span style={{ fontSize: 13 }}>
@@ -492,31 +507,34 @@ export function ConversationHistory({ clientId, clientName, embedded = false }: 
         </div>
       )}
 
-      <Modal
-        open={selected !== null}
-        onClose={() => setSelected(null)}
-        title={
-          selected
-            ? `Conversación · ${selected.id_de_kommo ? `Lead ${selected.id_de_kommo}` : `#${selected.id}`}`
-            : ""
-        }
-      >
-        {selected && (
-          <>
-            <p className="muted" style={{ fontSize: 12, marginBottom: 8 }}>
-              {formatDate(selected.created_at)}
-              {selected.numero_de_mensajes != null
-                ? ` · ${selected.numero_de_mensajes} mensaje(s)`
-                : ""}
-            </p>
-            <ConversationTranscript
-              row={selected}
-              clientId={clientId}
-              canFileCase={embedded}
-            />
-          </>
-        )}
-      </Modal>
+      {/* Only when the caller does not render the transcript itself. */}
+      {!onSelectRow && (
+        <Modal
+          open={selected !== null}
+          onClose={() => setSelected(null)}
+          title={
+            selected
+              ? `Conversación · ${selected.id_de_kommo ? `Lead ${selected.id_de_kommo}` : `#${selected.id}`}`
+              : ""
+          }
+        >
+          {selected && (
+            <>
+              <p className="muted" style={{ fontSize: 12, marginBottom: 8 }}>
+                {formatDate(selected.created_at)}
+                {selected.numero_de_mensajes != null
+                  ? ` · ${selected.numero_de_mensajes} mensaje(s)`
+                  : ""}
+              </p>
+              <ConversationTranscript
+                row={selected}
+                clientId={clientId}
+                canFileCase={embedded}
+              />
+            </>
+          )}
+        </Modal>
+      )}
     </div>
   );
 }

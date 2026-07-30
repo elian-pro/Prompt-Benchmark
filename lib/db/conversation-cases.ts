@@ -104,14 +104,45 @@ export async function setCaseResolution(
   return data as unknown as ConversationCase;
 }
 
-/** A client's cases, newest first. */
-export async function listCases(clientId: string): Promise<ConversationCase[]> {
+/** A case as the list shows it: no snapshots (heavy, and only the replay reads
+ *  them) and with the client's name, since Replay lists every client's cases
+ *  together. */
+export type CaseListItem = Omit<
+  ConversationCase,
+  "historial_snapshot" | "turnos_snapshot"
+> & { client_name: string };
+
+/** CASE_COLS minus the snapshots, plus the client's name. Spelled out rather
+ *  than derived: supabase-js parses this string at the type level and cannot
+ *  read one built at runtime. */
+const LIST_COLS =
+  "id, client_id, chats_table, row_id, id_de_kommo, conversation_at, " +
+  "version_id, turno_index, nota, editor_session_id, resolved_version_id, " +
+  "resolved_at, created_at, clients(name)";
+
+/**
+ * Cases newest first, for one client or for all of them. Replay opens on the
+ * whole list, because "what is still broken anywhere" is the question you
+ * arrive with; narrowing to a client is the exception.
+ */
+export async function listCases(clientId?: string): Promise<CaseListItem[]> {
   const sb = getSupabase();
-  const { data, error } = await sb
+  let query = sb
     .from("conversation_cases")
-    .select(CASE_COLS)
-    .eq("client_id", clientId)
+    .select(LIST_COLS)
     .order("created_at", { ascending: false });
+  if (clientId) query = query.eq("client_id", clientId);
+
+  const { data, error } = await query;
   if (error) throw new Error(`No se pudieron listar los casos: ${error.message}`);
-  return (data ?? []) as unknown as ConversationCase[];
+  // Cast because LIST_COLS is assembled from literals, which supabase-js
+  // cannot parse at the type level; the shape is checked by CaseListItem.
+  const rows = (data ?? []) as unknown as Record<string, unknown>[];
+  return rows.map((row) => {
+    const { clients, ...rest } = row;
+    return {
+      ...rest,
+      client_name: (clients as { name?: string } | null)?.name ?? "Cliente eliminado",
+    };
+  }) as CaseListItem[];
 }

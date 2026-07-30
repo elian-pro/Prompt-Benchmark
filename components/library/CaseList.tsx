@@ -10,6 +10,8 @@ import type { ConversationTurn } from "@/lib/conversation-turns";
 /** The case as the list endpoint returns it: no snapshots. */
 type CaseRow = {
   id: string;
+  client_id: string;
+  client_name: string;
   id_de_kommo: string | null;
   conversation_at: string | null;
   turno_index: number | null;
@@ -61,7 +63,7 @@ function Reply({ bubbles, estado }: { bubbles: string[]; estado: string | null }
   );
 }
 
-function CaseItem({ kase }: { kase: CaseRow }) {
+function CaseItem({ kase, showClient }: { kase: CaseRow; showClient: boolean }) {
   const [running, setRunning] = useState(false);
   const [result, setResult] = useState<ReplayResult | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -117,6 +119,7 @@ function CaseItem({ kase }: { kase: CaseRow }) {
     <div className="case-item">
       <div className="row-between">
         <span style={{ fontSize: 13 }}>
+          {showClient && <strong>{kase.client_name} · </strong>}
           {kase.id_de_kommo ? `Lead ${kase.id_de_kommo}` : "Conversación"}
           {resolved.at && <Badge variant="new">Ya pasa</Badge>}
         </span>
@@ -215,7 +218,8 @@ export function CaseList({
   clientId,
   embedded = false,
 }: {
-  clientId: string;
+  /** Omitted on the Replay index, which shows every client's cases together. */
+  clientId?: string;
   embedded?: boolean;
 }) {
   const [open, setOpen] = useState(embedded);
@@ -224,7 +228,7 @@ export function CaseList({
 
   const load = useCallback(async () => {
     try {
-      const res = await fetch(`/api/clients/${clientId}/cases`);
+      const res = await fetch(`/api/cases${clientId ? `?clientId=${clientId}` : ""}`);
       if (!res.ok) throw new Error((await res.json()).error ?? "No se pudieron cargar los casos.");
       const data = await res.json();
       setCases(data.cases);
@@ -260,7 +264,8 @@ export function CaseList({
           )}
           {cases?.length === 0 && (
             <p className="muted" style={{ fontSize: 13 }}>
-              Todavía no hay casos. Marca una conversación desde el historial.
+              Todavía no hay casos. Empieza por elegir un cliente y marcar una
+              conversación que haya salido mal.
             </p>
           )}
           {cases && cases.length > 0 && (
@@ -268,7 +273,9 @@ export function CaseList({
               {cases.filter((c) => c.resolved_at).length} de {cases.length} resueltos.
             </p>
           )}
-          {cases?.map((kase) => <CaseItem key={kase.id} kase={kase} />)}
+          {cases?.map((kase) => (
+            <CaseItem key={kase.id} kase={kase} showClient={!clientId} />
+          ))}
         </div>
       )}
     </div>

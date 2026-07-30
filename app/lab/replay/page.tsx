@@ -1,30 +1,20 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import Link from "next/link";
-import { IconArrowLeft, IconPlayerPlay } from "@tabler/icons-react";
-import type { Client } from "@/lib/db/clients";
-import { EmptyState } from "@/components/ui/EmptyState";
-import { SkeletonRows } from "@/components/ui/Skeleton";
+import { IconArrowLeft, IconPlus } from "@tabler/icons-react";
+import { Button } from "@/components/ui/Button";
+import { CaseList } from "@/components/library/CaseList";
+import { NewCaseModal } from "@/components/replay/NewCaseModal";
 
 /**
- * Replay's client picker. Only clients with a connected history table appear:
- * without one there are no real conversations to work from, and sending the
- * user into an empty screen to find that out helps nobody.
+ * Replay opens on every client's cases, because the question you arrive with
+ * is "what is still broken", not "what is broken for this one client".
+ * Narrowing to a client is what filing a NEW case starts with, since a
+ * conversation only exists inside one client's history.
  */
 export default function ReplayIndexPage() {
-  const [clients, setClients] = useState<Client[] | null>(null);
-  const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    fetch("/api/clients")
-      .then(async (res) => {
-        if (!res.ok) throw new Error((await res.json()).error ?? "Error al cargar.");
-        return res.json();
-      })
-      .then((data: Client[]) => setClients(data.filter((c) => c.chats_table)))
-      .catch((e) => setError(e instanceof Error ? e.message : "Error al cargar los clientes."));
-  }, []);
+  const [picking, setPicking] = useState(false);
 
   return (
     <div>
@@ -39,28 +29,14 @@ export default function ReplayIndexPage() {
             márcala y comprueba si tu cambio la arregla
           </p>
         </div>
+        <Button variant="primary" onClick={() => setPicking(true)}>
+          <IconPlus size={15} /> Nuevo caso
+        </Button>
       </div>
 
-      {error && <p className="form-error">{error}</p>}
-      {!clients && !error && <SkeletonRows />}
+      <CaseList embedded />
 
-      {clients?.length === 0 && (
-        <EmptyState
-          icon={<IconPlayerPlay size={22} />}
-          title="Ningún cliente tiene historial conectado"
-          description="Conecta la tabla de conversaciones de un cliente desde su ficha en Biblioteca."
-        />
-      )}
-
-      <div className="lab-grid">
-        {clients?.map((client) => (
-          <Link key={client.id} href={`/lab/replay/${client.id}`} className="lab-card">
-            <IconPlayerPlay size={28} stroke={1.5} className="lab-card-icon" />
-            <span className="lab-card-title">{client.name}</span>
-            <p className="lab-card-desc">{client.chats_table}</p>
-          </Link>
-        ))}
-      </div>
+      <NewCaseModal open={picking} onClose={() => setPicking(false)} />
     </div>
   );
 }

@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getClient } from "@/lib/db/clients";
 import { getConversation } from "@/lib/db/chats-history";
 import { listVersions } from "@/lib/db/versions";
-import { createCase, listCases } from "@/lib/db/conversation-cases";
+import { createCase } from "@/lib/db/conversation-cases";
 import { createSession as createChatSession } from "@/lib/db/chat-sessions";
 import { transcriptOf } from "@/lib/conversation-turns";
 import { buildReplayHandoff } from "@/lib/prompts/replay-handoff";
@@ -13,20 +13,6 @@ import { handleError, jsonError } from "@/lib/http";
 export const dynamic = "force-dynamic";
 
 type Params = { params: Promise<{ id: string }> };
-
-/** A client's cases, newest first. The snapshots are left out: the list only
- *  needs to identify each case, and a transcript per row would be heavy. */
-export async function GET(_req: NextRequest, { params }: Params) {
-  try {
-    const { id } = await params;
-    const cases = await listCases(id);
-    return NextResponse.json({
-      cases: cases.map(({ historial_snapshot, turnos_snapshot, ...rest }) => rest),
-    });
-  } catch (err) {
-    return handleError(err);
-  }
-}
 
 /**
  * Files a real conversation as a case and opens an Editor session on it.

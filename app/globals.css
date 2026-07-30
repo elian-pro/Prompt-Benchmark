@@ -3674,6 +3674,11 @@ body[data-theme="light"] .dot-grid::after {
 .conversation-item:hover {
   background: var(--surface-2, rgba(127, 127, 127, 0.08));
 }
+/* The row whose transcript is open in the next column. */
+.conversation-item.is-selected {
+  background: var(--surface2);
+  box-shadow: inset 2px 0 0 var(--accent);
+}
 
 /* A real conversation reuses the Playground's whole chat layout: the
    .chat-messages container (flex column, bounded height) plus the chat-turn /
