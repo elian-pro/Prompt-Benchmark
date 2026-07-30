@@ -7,8 +7,8 @@
  *   turnos (the same conversation as one object per turn, see
  *   supabase/chats/002_add_turnos.sql). Only flows duplicated from the updated
  *   template write turnos, so it is null for every row written before
- *   2026-07-30 and for every client still on an older flow. Nothing reads it
- *   yet: this module still selects historial.
+ *   2026-07-30 and for every client still on an older flow; those rows are
+ *   reconstructed from historial by lib/conversation-turns.ts.
  *
  * Client names do not map to table names, so the mapping is stored explicitly
  * as clients.chats_table (see migration 018). This module never writes.
@@ -30,6 +30,9 @@ export type ConversationRow = {
   numero_de_mensajes: number | string | null;
   id_de_kommo: string | null;
   historial: string | null;
+  /** jsonb, so it arrives already parsed. Null on rows written by a flow that
+   *  does not fill it yet. Shape validated in lib/conversation-turns.ts. */
+  turnos: unknown;
 };
 
 export type ConversationPage = {
@@ -88,7 +91,7 @@ export async function getClientHistory(
   const sb = getChatsSupabase();
   let query = sb
     .from(chatsTable)
-    .select("id, created_at, numero_de_mensajes, id_de_kommo, historial", {
+    .select("id, created_at, numero_de_mensajes, id_de_kommo, historial, turnos", {
       count: "exact",
     });
 

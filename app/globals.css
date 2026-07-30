@@ -3671,6 +3671,15 @@ body[data-theme="light"] .dot-grid::after {
   background: var(--surface-2, rgba(127, 127, 127, 0.08));
 }
 
+/* A real conversation rendered inside the history modal. The chat-turn /
+   chat-msg / chat-state classes come from the Playground; this only bounds
+   the height so a long transcript scrolls instead of pushing the modal. */
+.chat-transcript {
+  max-height: 60vh;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+
 /* Conversation history: search box + filter row, in a narrow sidebar card. */
 .history-filters {
   display: grid;

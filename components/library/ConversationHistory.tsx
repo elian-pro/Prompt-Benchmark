@@ -11,6 +11,7 @@ import { Button } from "@/components/ui/Button";
 import { Modal } from "@/components/ui/Modal";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { chatsTableName } from "@/lib/chats-table-name";
+import { ConversationTranscript } from "./ConversationTranscript";
 
 type Props = {
   clientId: string;
@@ -459,9 +460,7 @@ export function ConversationHistory({ clientId, clientName }: Props) {
                 ? ` · ${selected.numero_de_mensajes} mensaje(s)`
                 : ""}
             </p>
-            <pre className="version-view-content">
-              {selected.historial?.trim() ? selected.historial : "(Sin contenido.)"}
-            </pre>
+            <ConversationTranscript row={selected} />
           </>
         )}
       </Modal>
