@@ -75,20 +75,26 @@ export default function ReplayClientPage() {
               : "Abre la conversación que falló y marca el mensaje del problema"}
           </p>
         </div>
-        {selected && !listOpen && (
-          <Button variant="ghost" onClick={() => setListOpen(true)}>
-            <IconList size={15} /> Ver conversaciones
-          </Button>
-        )}
       </div>
 
       {error && <p className="form-error">{error}</p>}
+
+      {/* Left aligned and above the columns, next to the one it folds. Shown
+          in both directions: collapsing is what you do once you found the
+          conversation, and reopening is what you do when it was not the one. */}
+      {selected && (
+        <div className="replay-toolbar">
+          <Button variant="ghost" size="sm" onClick={() => setListOpen((v) => !v)}>
+            <IconList size={15} />
+            {listOpen ? "Ocultar conversaciones" : "Ver conversaciones"}
+          </Button>
+        </div>
+      )}
 
       {client && (
         <div className={`replay-layout${listOpen ? "" : " is-collapsed"}`}>
           {listOpen && (
             <section>
-              <h2 className="section-label">Conversaciones</h2>
               <ConversationHistory
                 clientId={clientId}
                 clientName={client.name}

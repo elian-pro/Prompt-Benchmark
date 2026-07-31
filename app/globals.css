@@ -3700,15 +3700,22 @@ body[data-theme="light"] .dot-grid::after {
   }
 }
 
-/* The workspace itself mirrors the Playground: chat, then notes. */
+.replay-toolbar {
+  display: flex;
+  margin-bottom: 12px;
+}
+
+/* The workspace itself mirrors the Playground: chat, then notes. The notes
+   only take a column of their own once the conversation list is folded away;
+   with all three side by side nothing gets enough width to be readable. */
 .replay-workspace {
   display: grid;
   gap: 20px;
   align-items: start;
 }
 @media (min-width: 900px) {
-  .replay-workspace {
-    grid-template-columns: 1fr minmax(260px, 22rem);
+  .replay-layout.is-collapsed .replay-workspace {
+    grid-template-columns: 1fr minmax(260px, 24rem);
   }
 }
 
