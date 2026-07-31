@@ -2290,7 +2290,8 @@ a.lab-card:hover {
   gap: 12px;
   max-height: 60vh;
   overflow-y: auto;
-  padding-right: 4px;
+  /* Horizontal room so the selection ring is not clipped by the scroll box. */
+  padding: 4px 6px;
 }
 .chat-bubble {
   display: flex;
@@ -3902,7 +3903,9 @@ body[data-theme="dark"] .history-filters input[type="date"]::-webkit-calendar-pi
   border-radius: 6px;
 }
 .chat-msg {
-  padding: 9px 13px;
+  /* Roomy enough that the selection ring, drawn right on the border, does not
+     read as touching the first and last character of every line. */
+  padding: 10px 16px;
   border-radius: 14px;
   border: 0.5px solid var(--border);
   max-width: 100%;
@@ -3936,8 +3939,13 @@ body[data-theme="dark"] .history-filters input[type="date"]::-webkit-calendar-pi
    Not scoped to .playground-chat: Replay marks the turn that failed with the
    same gesture, and picking a message should look the same wherever a
    transcript is shown. */
+/* Two rings: one in the page background first, then the accent. That gap is
+   what keeps the highlight from reading as the bubble's own border sitting on
+   top of the text. */
 .chat-turn.is-selected .chat-msg {
-  box-shadow: 0 0 0 1.5px var(--accent);
+  box-shadow:
+    0 0 0 2px var(--bg),
+    0 0 0 3.5px var(--accent);
 }
 /* A transcript shown for reading only: no pointer promising a click that does
    nothing. */
