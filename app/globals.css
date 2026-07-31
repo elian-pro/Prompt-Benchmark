@@ -3663,7 +3663,10 @@ body[data-theme="light"] .dot-grid::after {
   background: none;
   border: none;
   border-top: 0.5px solid var(--border);
-  padding: 8px 2px;
+  /* The left padding leaves room for the accent bar of the selected row. It
+     is on every row, not only the selected one, so picking one does not shove
+     the text sideways. */
+  padding: 8px 2px 8px 10px;
   cursor: pointer;
   border-radius: 4px;
   /* A <button> does not inherit color: without this it falls back to the UA
