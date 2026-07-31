@@ -3692,26 +3692,35 @@ body[data-theme="light"] .dot-grid::after {
   align-items: start;
 }
 @media (min-width: 1000px) {
+  /* Both tracks are plain lengths so the browser can interpolate between
+     them. A minmax() collapsing to 0fr cannot be interpolated at all: the
+     column just snaps shut, which is what this looked like before. */
   .replay-layout {
-    grid-template-columns: minmax(280px, 22rem) 1fr;
-    transition: grid-template-columns 0.28s ease;
+    grid-template-columns: 22rem minmax(0, 1fr);
+    transition:
+      grid-template-columns 0.32s cubic-bezier(0.4, 0, 0.2, 1),
+      gap 0.32s cubic-bezier(0.4, 0, 0.2, 1);
   }
-  /* 0fr rather than removing the column, so the width animates. The child
-     needs min-width:0 or its content would hold the track open. */
   .replay-layout.is-collapsed {
-    grid-template-columns: 0fr 1fr;
+    grid-template-columns: 0rem minmax(0, 1fr);
+    gap: 0;
   }
 }
 .replay-list {
   min-width: 0;
   overflow: hidden;
-  transition: opacity 0.2s ease, visibility 0.2s;
+  transition:
+    opacity 0.2s ease,
+    visibility 0.32s,
+    transform 0.32s cubic-bezier(0.4, 0, 0.2, 1);
 }
-/* visibility, not just opacity: a transparent column still takes keyboard
-   focus, so tabbing would walk through a list nobody can see. */
+/* Slides out as it narrows instead of being clipped in place, and goes
+   invisible rather than merely transparent: a transparent column still takes
+   keyboard focus, so tabbing would walk through a list nobody can see. */
 .replay-layout.is-collapsed .replay-list {
   opacity: 0;
   visibility: hidden;
+  transform: translateX(-16px);
 }
 /* Below the breakpoint the columns stack, so a folded list has to actually
    disappear instead of sitting above the workspace at zero width. */
@@ -3725,6 +3734,9 @@ body[data-theme="light"] .dot-grid::after {
   .replay-list {
     transition: none;
   }
+  .replay-layout.is-collapsed .replay-list {
+    transform: none;
+  }
 }
 
 .replay-toolbar {
@@ -3732,17 +3744,19 @@ body[data-theme="light"] .dot-grid::after {
   margin-bottom: 12px;
 }
 
-/* The workspace itself mirrors the Playground: chat, then notes. The notes
-   only take a column of their own once the conversation list is folded away;
-   with all three side by side nothing gets enough width to be readable. */
+/* The workspace itself mirrors the Playground: chat, then notes.
+   The column count does not depend on whether the list is folded. Changing it
+   on toggle meant the notes jumped from under the chat to beside it, and a
+   grid cannot interpolate between a different number of tracks, so that jump
+   could never be animated away. Wide enough for three columns: three columns. */
 .replay-workspace {
   display: grid;
   gap: 20px;
   align-items: start;
 }
-@media (min-width: 900px) {
-  .replay-layout.is-collapsed .replay-workspace {
-    grid-template-columns: 1fr minmax(260px, 24rem);
+@media (min-width: 1200px) {
+  .replay-workspace {
+    grid-template-columns: minmax(0, 1fr) minmax(240px, 22rem);
   }
 }
 
