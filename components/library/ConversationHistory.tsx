@@ -11,6 +11,7 @@ import type { ConversationRow } from "@/lib/db/chats-history";
 import { Button } from "@/components/ui/Button";
 import { Modal } from "@/components/ui/Modal";
 import { EmptyState } from "@/components/ui/EmptyState";
+import { SearchableChip } from "@/components/ui/SearchableChip";
 import { chatsTableName } from "@/lib/chats-table-name";
 import { ConversationTranscript } from "./ConversationTranscript";
 
@@ -327,24 +328,23 @@ export function ConversationHistory({
           {!unconfigured && picking && (
             <div style={{ display: "grid", gap: 8 }}>
               <label className="field-label">Tabla de historial</label>
-              {tables === null ? (
-                <p className="muted" style={{ fontSize: 13 }}>Cargando tablas…</p>
-              ) : tables.length === 0 ? (
-                <p className="muted" style={{ fontSize: 13 }}>No hay tablas chats_* disponibles.</p>
-              ) : (
-                <select
-                  className="select"
-                  value={chosen}
-                  onChange={(e) => setChosen(e.target.value)}
-                >
-                  <option value="">Selecciona una tabla…</option>
-                  {tables.map((t) => (
-                    <option key={t.table} value={t.table}>
-                      {t.table} ({t.rows})
-                    </option>
-                  ))}
-                </select>
-              )}
+              {/* Same picker the n8n binding modal uses: 16 tables named alike
+                  are hard to spot in a native select, and this one filters as
+                  you type and looks like the rest of the app. */}
+              <SearchableChip
+                icon={<IconMessages size={13} />}
+                placeholder="Elige una tabla"
+                searchPlaceholder="Buscar tabla por nombre…"
+                items={(tables ?? []).map((t) => ({
+                  id: t.table,
+                  label: t.table,
+                  meta: `${t.rows} conversaciones`,
+                }))}
+                value={chosen}
+                onChange={setChosen}
+                loading={tables === null}
+                emptyText="No hay tablas chats_* disponibles."
+              />
               <div className="row-between">
                 <Button
                   size="sm"

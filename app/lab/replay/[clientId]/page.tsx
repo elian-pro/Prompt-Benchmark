@@ -93,17 +93,18 @@ export default function ReplayClientPage() {
 
       {client && (
         <div className={`replay-layout${listOpen ? "" : " is-collapsed"}`}>
-          {listOpen && (
-            <section>
-              <ConversationHistory
-                clientId={clientId}
-                clientName={client.name}
-                embedded
-                onSelectRow={openConversation}
-                selectedId={selected?.id ?? null}
-              />
-            </section>
-          )}
+          {/* Kept mounted while collapsed: a column that unmounts cannot be
+              animated, and folding it would also throw away the search you
+              typed to find the conversation in the first place. */}
+          <section className="replay-list" aria-hidden={!listOpen}>
+            <ConversationHistory
+              clientId={clientId}
+              clientName={client.name}
+              embedded
+              onSelectRow={openConversation}
+              selectedId={selected?.id ?? null}
+            />
+          </section>
 
           <section>
             {selected ? (

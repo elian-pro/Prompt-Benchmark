@@ -3694,9 +3694,36 @@ body[data-theme="light"] .dot-grid::after {
 @media (min-width: 1000px) {
   .replay-layout {
     grid-template-columns: minmax(280px, 22rem) 1fr;
+    transition: grid-template-columns 0.28s ease;
   }
+  /* 0fr rather than removing the column, so the width animates. The child
+     needs min-width:0 or its content would hold the track open. */
   .replay-layout.is-collapsed {
-    grid-template-columns: 1fr;
+    grid-template-columns: 0fr 1fr;
+  }
+}
+.replay-list {
+  min-width: 0;
+  overflow: hidden;
+  transition: opacity 0.2s ease, visibility 0.2s;
+}
+/* visibility, not just opacity: a transparent column still takes keyboard
+   focus, so tabbing would walk through a list nobody can see. */
+.replay-layout.is-collapsed .replay-list {
+  opacity: 0;
+  visibility: hidden;
+}
+/* Below the breakpoint the columns stack, so a folded list has to actually
+   disappear instead of sitting above the workspace at zero width. */
+@media (max-width: 999px) {
+  .replay-layout.is-collapsed .replay-list {
+    display: none;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .replay-layout,
+  .replay-list {
+    transition: none;
   }
 }
 
