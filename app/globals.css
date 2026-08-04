@@ -4586,3 +4586,17 @@ body[data-theme="dark"] .history-filters input[type="date"]::-webkit-calendar-pi
   align-items: center;
   gap: 4px;
 }
+
+/* The client's own action reads in their voice, not the Studio's: white on
+   black, the same tokens as their chat bubble (.turn-lead .chat-msg). The
+   accent yellow is Studio chrome and means nothing to someone who only ever
+   sees this page. Scoped to .public-demo so the Studio's own buttons are
+   untouched. */
+.public-demo .note-composer-actions .btn {
+  background: var(--fg);
+  color: var(--bg);
+  border-color: var(--fg);
+}
+.public-demo .note-composer-actions .btn:disabled {
+  opacity: 0.35;
+}
