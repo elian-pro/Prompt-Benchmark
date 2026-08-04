@@ -34,8 +34,8 @@ export type TurnLabels = {
 export const STUDIO_LABELS: TurnLabels = { bot: "Bot del cliente", human: "Tú (lead)" };
 
 /** What the client sees on their own link. No jargon, no "bot del cliente":
- *  from their side it is simply their assistant, and they are themselves. */
-export const CLIENT_LABELS: TurnLabels = { bot: "Asistente", human: "Tú" };
+ *  from their side it is simply their agent, and they are themselves. */
+export const CLIENT_LABELS: TurnLabels = { bot: "Agente", human: "Tú" };
 
 export function DemoTurn({
   id,

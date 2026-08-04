@@ -25,10 +25,10 @@ export function DemoInstructions({
       <div className="demo-gate-card">
         <p className="section-label">Pruebas y validación</p>
         <h1 className="demo-gate-title">
-          Prueba el asistente{clientName ? ` de ${clientName}` : ""}
+          Prueba el agente{clientName ? ` de ${clientName}` : ""}
         </h1>
         <p className="demo-gate-lead">
-          Conversa con el asistente como lo haría un cliente real. Pregunta de todo: dudas
+          Conversa con el agente como lo haría un cliente real. Pregunta de todo: dudas
           fáciles, dudas raras, precios, horarios, casos que creas que se le pueden complicar.
           Entre más lo pongas a prueba, mejor queda.
         </p>
@@ -37,7 +37,7 @@ export function DemoInstructions({
           <li>
             <IconMessage2 size={18} stroke={1.5} />
             <div>
-              <strong>Escribe abajo, como en WhatsApp.</strong> El asistente responde con la
+              <strong>Escribe abajo, como en WhatsApp.</strong> El agente responde con la
               información con la que fue entrenado.
             </div>
           </li>

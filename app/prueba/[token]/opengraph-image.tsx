@@ -7,14 +7,14 @@ import { getClient } from "@/lib/db/clients";
  * The card that shows up when the link is pasted into WhatsApp, which is where
  * these links actually travel. Drawn here rather than shipped as a file so it
  * carries the client's own name: a generic image would look like spam next to
- * the message asking them to test their assistant.
+ * the message asking them to test their agent.
  *
  * `ImageResponse` comes with Next, so this adds no dependency. It renders on
  * the server with a plain flex layout, no external fonts and no remote images,
  * which is all this needs and all it supports without extra work.
  */
 export const runtime = "nodejs";
-export const alt = "Prueba el asistente";
+export const alt = "Prueba el agente";
 export const size = { width: 1200, height: 630 };
 export const contentType = "image/png";
 
@@ -60,7 +60,7 @@ export default async function Image({ params }: { params: Promise<{ token: strin
             PRUEBAS Y VALIDACIÓN
           </div>
           <div style={{ fontSize: 68, lineHeight: 1.1, letterSpacing: -2 }}>
-            {name ? `Prueba el asistente de ${name}` : "Prueba el asistente"}
+            {name ? `Prueba el agente de ${name}` : "Prueba el agente"}
           </div>
           <div style={{ fontSize: 30, color: "#8A8A8A", lineHeight: 1.4 }}>
             Conversa con él y repórtanos lo que no cuadre.

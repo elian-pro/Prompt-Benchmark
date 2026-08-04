@@ -18,7 +18,7 @@ type Params = { params: Promise<{ token: string }> };
  * JavaScript runs.
  *
  * Nothing about the prompt or the version reaches this component. The client is
- * testing the assistant, not looking at how it is built.
+ * testing the agent, not looking at how it is built.
  */
 async function resolve(token: string) {
   const link = await getLinkByToken(token);
@@ -36,10 +36,10 @@ export async function generateMetadata({ params }: Params): Promise<Metadata> {
   }
 
   const title = resolved.clientName
-    ? `Prueba el asistente de ${resolved.clientName}`
-    : "Prueba el asistente";
+    ? `Prueba el agente de ${resolved.clientName}`
+    : "Prueba el agente";
   const description =
-    "Conversa con el asistente, repórtanos lo que no cuadre y ayúdanos a afinarlo antes de que salga a producción.";
+    "Conversa con el agente, repórtanos lo que no cuadre y ayúdanos a afinarlo antes de que salga a producción.";
 
   return {
     title,

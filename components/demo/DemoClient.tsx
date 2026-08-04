@@ -17,7 +17,7 @@ import { DemoInstructions } from "@/components/demo/DemoInstructions";
 
 /**
  * The client's whole experience of a demo link: read the instructions, talk to
- * the assistant, tag what went wrong.
+ * the agent, tag what went wrong.
  *
  * Deliberately missing, compared to the Playground this is modelled on: no
  * version picker, no reset, no editing the opening message, no "Enviar al
@@ -288,11 +288,11 @@ export function DemoClient({
             it the screen is a chat with a client's name on it and no clue that
             this is a testing round. */}
         <div className="demo-header-id">
-          <span className="pill-logo">{clientName ?? "Asistente"}</span>
+          <span className="pill-logo">{clientName ?? "Agente"}</span>
           <div>
             <p className="section-label">Pruebas y validación</p>
             <p className="demo-header-title">
-              Prueba el asistente y repórtanos lo que no cuadre
+              Prueba el agente y repórtanos lo que no cuadre
             </p>
           </div>
         </div>
