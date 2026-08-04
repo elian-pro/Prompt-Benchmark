@@ -11,6 +11,7 @@
  */
 
 import { allowedDomain } from "./session";
+import { baseUrlFromHeaders } from "../base-url";
 
 export const GOOGLE_AUTH_ENDPOINT = "https://accounts.google.com/o/oauth2/v2/auth";
 export const GOOGLE_TOKEN_ENDPOINT = "https://oauth2.googleapis.com/token";
@@ -22,13 +23,7 @@ export const GOOGLE_TOKEN_ENDPOINT = "https://oauth2.googleapis.com/token";
  * redirect URI is registered under in Google Cloud.
  */
 export function getBaseUrl(request: Request): string {
-  const configured = process.env.AUTH_BASE_URL;
-  if (configured) return configured.replace(/\/+$/, "");
-  const proto = request.headers.get("x-forwarded-proto") ?? "https";
-  const host =
-    request.headers.get("x-forwarded-host") ?? request.headers.get("host");
-  if (host) return `${proto}://${host}`;
-  return new URL(request.url).origin;
+  return baseUrlFromHeaders(request.headers) ?? new URL(request.url).origin;
 }
 
 export function redirectUri(request: Request): string {

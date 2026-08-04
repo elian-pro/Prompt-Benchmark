@@ -1,8 +1,10 @@
 import type { Metadata } from "next";
+import { headers } from "next/headers";
 import { notFound } from "next/navigation";
 
 import { getLinkByToken } from "@/lib/db/demo-links";
 import { getClient } from "@/lib/db/clients";
+import { baseUrlFromHeaders } from "@/lib/base-url";
 import { DemoClient } from "@/components/demo/DemoClient";
 
 export const dynamic = "force-dynamic";
@@ -41,7 +43,15 @@ export async function generateMetadata({ params }: Params): Promise<Metadata> {
   const description =
     "Conversa con el agente, repórtanos lo que no cuadre y ayúdanos a afinarlo antes de que salga a producción.";
 
+  // Derived from the request, not from AUTH_BASE_URL alone. WhatsApp fetches
+  // og:image from wherever this points, so if it were left at the localhost
+  // fallback the card would render with no image at all, which is exactly what
+  // was happening. The image itself is opengraph-image.png in this folder; Next
+  // turns it into og:image and resolves it against this base.
+  const base = baseUrlFromHeaders(await headers());
+
   return {
+    ...(base ? { metadataBase: new URL(base) } : {}),
     title,
     description,
     // A demo link is private by convention, not by secrecy. Keeping it out of

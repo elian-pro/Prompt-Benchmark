@@ -126,6 +126,14 @@ enseñárselo al cliente sin darle el Studio.
 4. **La página dice qué es.** Cerrado el modal de instrucciones solo quedaba un
    chat con el nombre del cliente. Ahora el header lleva título.
 
+4b. **La tarjeta de WhatsApp no mostraba imagen.** No era la imagen, era la URL:
+   `metadataBase` salía de `AUTH_BASE_URL`, y si esa variable no está puesta
+   caía a `http://localhost:3000`, así que WhatsApp intentaba bajar el
+   `og:image` de ahí y se quedaba sin nada. Ahora el origen se deriva de las
+   cabeceras de la petición (`lib/base-url.ts`, compartido con el redirect de
+   OAuth), así que funciona esté o no la variable. La imagen generada con
+   `next/og` se sustituyó por el arte de marca, `opengraph-image.png`.
+
 5. **El botón de reiniciar explica qué hace**, con un `InfoHint` que aclara lo
    que más preocupa: que no borra los reportes ya enviados.
 
