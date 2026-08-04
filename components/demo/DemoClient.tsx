@@ -297,24 +297,24 @@ export function DemoClient({
           </div>
         </div>
 
-        <div className="demo-header-right">
-          <span className="demo-header-hint">
-            Toca cualquier mensaje para reportar algo sobre él
+        {/* No "toca un mensaje para reportar" here: the notes panel already
+            says it, right where the reporting happens. */}
+        {messages.length > 0 && (
+          <span className="demo-reset">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setResetOpen(true)}
+              icon={<IconRefresh size={14} stroke={1.5} />}
+            >
+              Reiniciar
+            </Button>
+            <InfoHint
+              placement="bottom"
+              text="Empieza el chat de nuevo, desde cero, para probar otra conversación. Lo que ya reportaste no se borra."
+            />
           </span>
-          {messages.length > 0 && (
-            <span className="demo-reset">
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => setResetOpen(true)}
-                icon={<IconRefresh size={14} stroke={1.5} />}
-              >
-                Reiniciar
-              </Button>
-              <InfoHint text="Empieza el chat de nuevo, desde cero, para probar otra conversación. Lo que ya reportaste no se borra." />
-            </span>
-          )}
-        </div>
+        )}
       </header>
 
       <div className="playground-layout demo-body">

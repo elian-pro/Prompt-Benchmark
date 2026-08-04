@@ -900,9 +900,6 @@ button {
 }
 .info-hint-tip {
   position: absolute;
-  bottom: calc(100% + 8px);
-  left: 50%;
-  transform: translateX(-50%);
   width: 220px;
   background: var(--surface2);
   border: 0.5px solid var(--border2);
@@ -919,6 +916,18 @@ button {
   z-index: 30;
   pointer-events: none;
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+}
+/* Default: above the icon, centered. Right for a hint inside a form or card. */
+.info-hint-top {
+  bottom: calc(100% + 8px);
+  left: 50%;
+  transform: translateX(-50%);
+}
+/* For a hint near the top of the page, where opening upward means opening off
+   screen. Anchored right because that position is usually a corner. */
+.info-hint-bottom {
+  top: calc(100% + 8px);
+  right: 0;
 }
 .info-hint:hover .info-hint-tip,
 .info-hint:focus-visible .info-hint-tip {
@@ -4383,12 +4392,6 @@ body[data-theme="dark"] .history-filters input[type="date"]::-webkit-calendar-pi
   padding-bottom: 14px;
   border-bottom: 0.5px solid var(--border);
 }
-.demo-header-hint {
-  font-size: 11px;
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
-  color: var(--faint);
-}
 
 /* Where a client's report stands. Deliberately vague on the client's side:
    they see that it arrived and was read, not the internal verdict. */
@@ -4561,12 +4564,6 @@ body[data-theme="dark"] .history-filters input[type="date"]::-webkit-calendar-pi
 .note-ref-drop {
   margin-left: 6px;
   vertical-align: middle;
-}
-.demo-header-right {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  flex-wrap: wrap;
 }
 
 /* Header of the client's demo page: says what the page is, not just whose
