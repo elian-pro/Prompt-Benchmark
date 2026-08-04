@@ -4542,3 +4542,16 @@ body[data-theme="dark"] .history-filters input[type="date"]::-webkit-calendar-pi
   font-size: 10.5px;
   color: var(--faint);
 }
+
+/* Review controls on a client's report (Sprint 18, T6). */
+.note-review-actions {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin-top: 10px;
+}
+.note-review-edit {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}

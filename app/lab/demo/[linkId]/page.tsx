@@ -163,7 +163,7 @@ export default function DemoLinkDetailPage() {
 
           <section>
             {selectedId ? (
-              <DemoLinkWorkspace linkId={linkId} sessionId={selectedId} />
+              <DemoLinkWorkspace linkId={linkId} sessionId={selectedId} onReviewed={load} />
             ) : (
               <EmptyState
                 icon={<IconMessages size={22} />}

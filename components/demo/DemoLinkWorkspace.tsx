@@ -1,11 +1,13 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { IconNotes } from "@tabler/icons-react";
+import { useRouter } from "next/navigation";
+import { IconArrowRight, IconCheck, IconNotes, IconPencil, IconX } from "@tabler/icons-react";
 
 import type { DemoSessionDetail } from "@/lib/db/demo-sessions";
-import type { DemoNoteRow } from "@/lib/db/demo-notes";
+import type { DemoNoteRow, DemoNoteStatus } from "@/lib/db/demo-notes";
 import { DemoTurn } from "@/components/demo/DemoTurn";
+import { Button } from "@/components/ui/Button";
 import { EmptyState } from "@/components/ui/EmptyState";
 
 /**
@@ -20,19 +22,22 @@ import { EmptyState } from "@/components/ui/EmptyState";
 export function DemoLinkWorkspace({
   linkId,
   sessionId,
-  renderNoteActions,
-  refreshKey = 0,
+  onReviewed,
 }: {
   linkId: string;
   sessionId: string;
-  /** Supplied by the page so the review controls can live in one place
-   *  (S18-T6) without this component knowing how approval works. */
-  renderNoteActions?: (note: DemoNoteRow) => React.ReactNode;
-  refreshKey?: number;
+  /** Lets the page refresh its pending counters after a verdict. */
+  onReviewed?: () => void;
 }) {
+  const router = useRouter();
   const [session, setSession] = useState<DemoSessionDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [busyNoteId, setBusyNoteId] = useState<string | null>(null);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [draftText, setDraftText] = useState("");
+  const [draftExpected, setDraftExpected] = useState("");
+  const [handingOff, setHandingOff] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -50,13 +55,69 @@ export function DemoLinkWorkspace({
 
   useEffect(() => {
     void load();
-  }, [load, refreshKey]);
+  }, [load]);
+
+  async function review(
+    note: DemoNoteRow,
+    patch: { status?: DemoNoteStatus; text?: string; expected?: string | null },
+  ) {
+    setBusyNoteId(note.id);
+    setError(null);
+    try {
+      const res = await fetch(
+        `/api/demo-links/${linkId}/sessions/${sessionId}/notes/${note.id}`,
+        {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(patch),
+        },
+      );
+      if (!res.ok) throw new Error((await res.json()).error ?? "No se pudo guardar.");
+      const updated: DemoNoteRow = await res.json();
+      setSession((prev) =>
+        prev ? { ...prev, notes: prev.notes.map((n) => (n.id === updated.id ? updated : n)) } : prev,
+      );
+      setEditingId(null);
+      onReviewed?.();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Error al guardar la revisión.");
+    } finally {
+      setBusyNoteId(null);
+    }
+  }
+
+  function startEdit(note: DemoNoteRow) {
+    setEditingId(note.id);
+    setDraftText(note.text);
+    setDraftExpected(note.expected ?? "");
+  }
+
+  // Same handoff contract as the Playground: the Editor session is created
+  // here, the composed message crosses the navigation through sessionStorage
+  // and lands in the composer without being sent.
+  async function sendToEditor() {
+    if (handingOff) return;
+    setHandingOff(true);
+    setError(null);
+    try {
+      const res = await fetch(`/api/demo-links/${linkId}/sessions/${sessionId}/handoff`, {
+        method: "POST",
+      });
+      if (!res.ok) throw new Error((await res.json()).error ?? "No se pudo enviar al Editor.");
+      const { editorSessionId, draftMessage } = await res.json();
+      window.sessionStorage.setItem(`playground-handoff:${editorSessionId}`, draftMessage);
+      router.push(`/editor/${editorSessionId}`);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Error al enviar al Editor.");
+      setHandingOff(false);
+    }
+  }
 
   if (loading && !session) return <p className="empty-hint">Cargando conversación…</p>;
-  if (error) return <p className="form-error">{error}</p>;
-  if (!session) return null;
+  if (!session) return error ? <p className="form-error">{error}</p> : null;
 
   const notes = session.notes;
+  const approvedCount = notes.filter((n) => n.status === "approved").length;
   // A note's number in this column is the pin drawn on the turns it tags, the
   // same convention the Playground uses.
   const pinsByMessage = new Map<string, number[]>();
@@ -113,18 +174,114 @@ export function DemoLinkWorkspace({
                       ? "Aprobada"
                       : "Descartada"}
                 </span>
+                {note.status !== "pending" && editingId !== note.id && (
+                  <div className="note-actions">
+                    <button
+                      type="button"
+                      className="icon-btn"
+                      onClick={() => startEdit(note)}
+                      aria-label="Editar nota"
+                    >
+                      <IconPencil size={14} />
+                    </button>
+                  </div>
+                )}
               </div>
-              <p className="note-text">{note.text}</p>
-              {note.expected && (
-                <p className="note-expected">
-                  <span className="section-label">Debió responder</span>
-                  {note.expected}
-                </p>
+
+              {editingId === note.id ? (
+                <div className="note-review-edit">
+                  <textarea
+                    className="textarea"
+                    rows={3}
+                    value={draftText}
+                    onChange={(e) => setDraftText(e.target.value)}
+                    placeholder="Qué está mal"
+                  />
+                  <textarea
+                    className="textarea"
+                    rows={2}
+                    value={draftExpected}
+                    onChange={(e) => setDraftExpected(e.target.value)}
+                    placeholder="Qué debió responder (opcional)"
+                  />
+                  <div className="note-composer-actions">
+                    <Button variant="ghost" size="sm" onClick={() => setEditingId(null)}>
+                      Cancelar
+                    </Button>
+                    <Button
+                      size="sm"
+                      disabled={!draftText.trim() || busyNoteId === note.id}
+                      onClick={() =>
+                        review(note, {
+                          text: draftText.trim(),
+                          expected: draftExpected.trim() || null,
+                        })
+                      }
+                    >
+                      Guardar
+                    </Button>
+                  </div>
+                </div>
+              ) : (
+                <>
+                  <p className="note-text">{note.text}</p>
+                  {note.expected && (
+                    <p className="note-expected">
+                      <span className="section-label">Debió responder</span>
+                      {note.expected}
+                    </p>
+                  )}
+                </>
               )}
-              {renderNoteActions?.(note)}
+
+              {note.status === "pending" && editingId !== note.id && (
+                <div className="note-review-actions">
+                  <Button
+                    size="sm"
+                    disabled={busyNoteId === note.id}
+                    onClick={() => review(note, { status: "approved" })}
+                    icon={<IconCheck size={14} />}
+                  >
+                    Aprobar
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    disabled={busyNoteId === note.id}
+                    onClick={() => startEdit(note)}
+                    icon={<IconPencil size={14} />}
+                  >
+                    Editar
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    disabled={busyNoteId === note.id}
+                    onClick={() => review(note, { status: "rejected" })}
+                    icon={<IconX size={14} />}
+                  >
+                    Descartar
+                  </Button>
+                </div>
+              )}
             </div>
           ))}
         </div>
+
+        {error && <p className="form-error">{error}</p>}
+
+        {approvedCount > 0 && (
+          <Button
+            variant="primary"
+            onClick={sendToEditor}
+            disabled={handingOff}
+            icon={<IconArrowRight size={14} />}
+          >
+            {handingOff
+              ? "Abriendo el Editor…"
+              : `Enviar ${approvedCount} al Editor`}
+          </Button>
+        )}
       </aside>
     </div>
   );
