@@ -12,6 +12,7 @@ import {
 
 import { ThemeToggle } from "@/components/ui/ThemeToggle";
 import { GenerationWatcher } from "@/components/sessions/GenerationWatcher";
+import { PendingNotesWatcher } from "@/components/demo/PendingNotesWatcher";
 
 /**
  * The Studio chrome. Split out of the root layout so it can be absent, not just
@@ -51,6 +52,7 @@ export function AppHeader() {
             </a>
           ))}
         </nav>
+        <PendingNotesWatcher />
         <GenerationWatcher />
         <ThemeToggle />
         <form action="/api/auth/logout" method="post" className="logout-form">

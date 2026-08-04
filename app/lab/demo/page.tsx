@@ -55,6 +55,15 @@ export default function DemoLinksPage() {
     void load();
   }, [load]);
 
+  // Asked here rather than on every page: this is where the user opts into
+  // handing a link to a client, so it is the moment a "the client reported
+  // something" notification starts making sense (same pattern as SessionChat).
+  useEffect(() => {
+    if (typeof Notification !== "undefined" && Notification.permission === "default") {
+      void Notification.requestPermission();
+    }
+  }, []);
+
   async function copy(token: string) {
     const url = `${window.location.origin}/prueba/${token}`;
     try {
