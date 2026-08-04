@@ -53,6 +53,20 @@ async function loadOrCreate(context: DemoContext) {
   });
 }
 
+const publicMessage = (m: {
+  id: string;
+  role: "human" | "bot";
+  content: string;
+  turn_number: number;
+  created_at: string;
+}) => ({
+  id: m.id,
+  role: m.role,
+  content: m.content,
+  turn_number: m.turn_number,
+  created_at: m.created_at,
+});
+
 /** What the public page renders. Only this visitor's own messages and notes,
  *  plus the client name for the header. Never the prompt, never the version
  *  number, never another conversation. */
@@ -60,13 +74,10 @@ function publicView(detail: NonNullable<Awaited<ReturnType<typeof getSession>>>)
   return {
     id: detail.id,
     client_name: detail.client_name,
-    messages: detail.messages.map((m) => ({
-      id: m.id,
-      role: m.role,
-      content: m.content,
-      turn_number: m.turn_number,
-      created_at: m.created_at,
-    })),
+    messages: detail.messages.map(publicMessage),
+    // Messages a note points at that live in an earlier round, after the client
+    // restarted the chat. Without these the note would show up quoting nothing.
+    note_messages: detail.note_messages.map(publicMessage),
     notes: detail.notes.map((n) => ({
       id: n.id,
       text: n.text,
@@ -101,10 +112,10 @@ export async function GET(req: NextRequest, { params }: Params) {
     // A GET never creates: a crawler unfurling the link preview must not burn
     // one of the link's conversations.
     const existing = await getVisitorSession(context.link.id, context.visitorId);
-    if (!existing) return NextResponse.json({ id: null, messages: [], notes: [] });
+    if (!existing) return NextResponse.json({ id: null, messages: [], note_messages: [], notes: [] });
 
     const detail = await getSession(existing.id);
-    if (!detail) return NextResponse.json({ id: null, messages: [], notes: [] });
+    if (!detail) return NextResponse.json({ id: null, messages: [], note_messages: [], notes: [] });
     return NextResponse.json(publicView(detail));
   } catch (err) {
     return handleError(err);

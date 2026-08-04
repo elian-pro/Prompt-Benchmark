@@ -15,7 +15,7 @@ import { getSupabase } from "../supabase";
 import { getVersion } from "./versions";
 import { getRoleDefault } from "./role-defaults";
 import { RoleNotConfiguredError } from "./runs";
-import { randomToken } from "../auth/signed-token.ts";
+import { LINK_TOKEN_BYTES, randomToken } from "../auth/signed-token.ts";
 
 export type DemoLinkStatus = "active" | "closed";
 
@@ -71,7 +71,7 @@ export async function createLink(input: {
   const { data, error } = await sb
     .from("demo_links")
     .insert({
-      token: randomToken(),
+      token: randomToken(LINK_TOKEN_BYTES),
       client_id: input.clientId,
       version_id: input.versionId,
       version_number_snapshot: version.version_number,

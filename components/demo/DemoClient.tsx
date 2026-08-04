@@ -1,9 +1,11 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { IconNotes, IconSend, IconTrash, IconX } from "@tabler/icons-react";
+import { IconNotes, IconRefresh, IconSend, IconTrash, IconX } from "@tabler/icons-react";
 
+import { messagePreview } from "@/lib/adversarial-message";
 import { Button } from "@/components/ui/Button";
+import { Modal } from "@/components/ui/Modal";
 import {
   CLIENT_LABELS,
   DemoTurn,
@@ -43,6 +45,9 @@ type PublicSession = {
   id: string | null;
   client_name?: string | null;
   messages: PublicMessage[];
+  /** Messages from an earlier round, kept so a note written before the client
+   *  restarted the chat still quotes what it was about. */
+  note_messages: PublicMessage[];
   notes: PublicNote[];
 };
 
@@ -77,6 +82,8 @@ export function DemoClient({
   const [noteExpected, setNoteExpected] = useState("");
   const [savingNote, setSavingNote] = useState(false);
   const [noteError, setNoteError] = useState<string | null>(null);
+  const [resetOpen, setResetOpen] = useState(false);
+  const [resetting, setResetting] = useState(false);
 
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
   const bottomRef = useRef<HTMLDivElement | null>(null);
@@ -102,26 +109,24 @@ export function DemoClient({
   // Opening the conversation is a POST: it creates the session on first visit
   // and resumes it after that. A GET would be wrong here, and is what link
   // preview crawlers hit.
+  const openSession = useCallback(async () => {
+    setLoading(true);
+    try {
+      const res = await fetch(`/api/prueba/${token}/session`, { method: "POST" });
+      const body = await res.json();
+      if (!res.ok) throw new Error(body.error ?? "No se pudo abrir el chat.");
+      setSession(body);
+    } catch (e) {
+      setFatal(e instanceof Error ? e.message : "No se pudo abrir el chat.");
+    } finally {
+      setLoading(false);
+    }
+  }, [token]);
+
   useEffect(() => {
     if (!started || session) return;
-    let cancelled = false;
-    setLoading(true);
-    (async () => {
-      try {
-        const res = await fetch(`/api/prueba/${token}/session`, { method: "POST" });
-        const body = await res.json();
-        if (!res.ok) throw new Error(body.error ?? "No se pudo abrir el chat.");
-        if (!cancelled) setSession(body);
-      } catch (e) {
-        if (!cancelled) setFatal(e instanceof Error ? e.message : "No se pudo abrir el chat.");
-      } finally {
-        if (!cancelled) setLoading(false);
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [started, session, token]);
+    void openSession();
+  }, [started, session, openSession]);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -200,6 +205,26 @@ export function DemoClient({
     }
   }
 
+  // Starts a fresh round. The reports already sent are kept: they are about
+  // messages that really happened, and the client may want to keep testing
+  // from zero without losing them.
+  async function reset() {
+    if (resetting) return;
+    setResetting(true);
+    setError(null);
+    try {
+      const res = await fetch(`/api/prueba/${token}/reset`, { method: "POST" });
+      if (!res.ok) throw new Error((await res.json()).error ?? "No se pudo reiniciar.");
+      setSelectedIds([]);
+      setResetOpen(false);
+      await openSession();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Error al reiniciar la conversación.");
+    } finally {
+      setResetting(false);
+    }
+  }
+
   async function removeNote(noteId: string) {
     try {
       const res = await fetch(`/api/prueba/${token}/notes/${noteId}`, { method: "DELETE" });
@@ -243,13 +268,37 @@ export function DemoClient({
     }
   });
 
+  // Includes messages from earlier rounds, so a report written before a reset
+  // still shows what it was about.
+  const messagesById = new Map(
+    [...messages, ...(session?.note_messages ?? [])].map((m) => [m.id, m]),
+  );
+  const currentIds = new Set(messages.map((m) => m.id));
+
+  function previewOf(messageId: string): string {
+    const m = messagesById.get(messageId);
+    return m ? messagePreview(m.content) : "(mensaje no disponible)";
+  }
+
   return (
     <div className="public-demo">
       <header className="demo-header">
         <span className="pill-logo">{clientName ?? "Asistente"}</span>
-        <span className="demo-header-hint">
-          Toca cualquier mensaje para reportar algo sobre él
-        </span>
+        <div className="demo-header-right">
+          <span className="demo-header-hint">
+            Toca cualquier mensaje para reportar algo sobre él
+          </span>
+          {messages.length > 0 && (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setResetOpen(true)}
+              icon={<IconRefresh size={14} stroke={1.5} />}
+            >
+              Reiniciar
+            </Button>
+          )}
+        </div>
       </header>
 
       <div className="playground-layout demo-body">
@@ -361,6 +410,21 @@ export function DemoClient({
                     </div>
                   )}
                 </div>
+                {note.message_ids.length > 0 && (
+                  <div className="note-refs">
+                    {note.message_ids.map((mid) => (
+                      <div
+                        key={mid}
+                        className={`note-ref${currentIds.has(mid) ? "" : " note-ref-stale"}`}
+                      >
+                        “{previewOf(mid)}”
+                        {!currentIds.has(mid) && (
+                          <span className="note-ref-tag">conversación anterior</span>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
                 <p className="note-text">{note.text}</p>
                 {note.expected && (
                   <p className="note-expected">
@@ -375,20 +439,40 @@ export function DemoClient({
           <div className={`note-composer${composing ? " is-active" : ""}`}>
             <span className="note-composer-title">Reportar algo</span>
             {selectedIds.length > 0 && (
-              <div className="note-selected">
-                <span>
-                  {selectedIds.length} mensaje{selectedIds.length > 1 ? "s" : ""} seleccionado
-                  {selectedIds.length > 1 ? "s" : ""}
-                </span>
-                <button
-                  type="button"
-                  className="icon-btn"
-                  onClick={() => setSelectedIds([])}
-                  aria-label="Quitar selección"
-                >
-                  <IconX size={14} />
-                </button>
-              </div>
+              <>
+                <div className="note-selected">
+                  <span>
+                    {selectedIds.length} mensaje{selectedIds.length > 1 ? "s" : ""} seleccionado
+                    {selectedIds.length > 1 ? "s" : ""}
+                  </span>
+                  <button
+                    type="button"
+                    className="icon-btn"
+                    onClick={() => setSelectedIds([])}
+                    aria-label="Quitar selección"
+                  >
+                    <IconX size={14} />
+                  </button>
+                </div>
+                {/* Quoting them here is what makes the selection checkable: the
+                    chat scrolls away while writing, and "1 mensaje
+                    seleccionado" does not say which one. */}
+                <div className="note-refs">
+                  {selectedIds.map((mid) => (
+                    <div key={mid} className="note-ref note-ref-draft">
+                      “{previewOf(mid)}”
+                      <button
+                        type="button"
+                        className="icon-btn note-ref-drop"
+                        onClick={() => toggleSelect(mid)}
+                        aria-label="Quitar este mensaje"
+                      >
+                        <IconX size={12} />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </>
             )}
             <textarea
               className="textarea"
@@ -413,6 +497,27 @@ export function DemoClient({
           </div>
         </aside>
       </div>
+
+      <Modal
+        open={resetOpen}
+        onClose={() => setResetOpen(false)}
+        title="¿Empezar de nuevo?"
+        footer={
+          <>
+            <Button variant="ghost" onClick={() => setResetOpen(false)} disabled={resetting}>
+              Cancelar
+            </Button>
+            <Button variant="primary" onClick={reset} disabled={resetting}>
+              {resetting ? "Reiniciando…" : "Sí, reiniciar"}
+            </Button>
+          </>
+        }
+      >
+        <p className="modal-body">
+          El chat vuelve a empezar desde cero, como si fuera la primera vez. Lo que ya
+          reportaste se conserva, así que no pierdes nada de lo que nos escribiste.
+        </p>
+      </Modal>
     </div>
   );
 }

@@ -179,3 +179,18 @@ export function stripStageDirection(content: string): string {
   const rest = content.slice(match[0].length).trim();
   return rest || content;
 }
+
+/**
+ * A one line quote of a message, for the note that tags it. Runs the envelope
+ * through parseTurn first, so a note about a bot turn quotes what the lead
+ * actually read, not the raw JSON.
+ *
+ * Shared by the Playground, the client's demo link and the admin's review of
+ * it: three places that show "the message this note is about", and that must
+ * agree on what that message says.
+ */
+export function messagePreview(content: string, max = 60): string {
+  const { message } = parseTurn(content);
+  const text = message.trim() || "(sin mensaje)";
+  return text.length > max ? `${text.slice(0, max)}…` : text;
+}

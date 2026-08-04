@@ -119,12 +119,20 @@ export async function verifyPayload<T extends ExpiringPayload>(
 }
 
 /**
- * A random, unguessable id: 32 base64url characters out of 24 random bytes.
- * Used for demo link tokens (the only thing standing between the public and a
- * client's demo) and for the anonymous visitor id.
+ * A random, unguessable id. `bytes` random bytes as base64url, so 9 bytes give
+ * 12 characters and 24 give 32.
+ *
+ * The demo link token uses the short form because it travels in a URL a client
+ * reads on their phone. 9 bytes is 72 bits: guessing one is not a matter of
+ * being lucky, it is an online attack against an endpoint that answers 404 and
+ * rate limits by IP. The visitor cookie keeps the long form, where length costs
+ * nothing.
  */
-export function randomToken(): string {
-  const bytes = new Uint8Array(24);
-  crypto.getRandomValues(bytes);
-  return bytesToBase64Url(bytes);
+export function randomToken(bytes = 24): string {
+  const buf = new Uint8Array(bytes);
+  crypto.getRandomValues(buf);
+  return bytesToBase64Url(buf);
 }
+
+/** Byte count behind a demo link token. See `randomToken`. */
+export const LINK_TOKEN_BYTES = 9;

@@ -98,6 +98,30 @@ enseñárselo al cliente sin darle el Studio.
 - `middleware.test.ts`: recorre el árbol de rutas y falla si aparece una que
   comparta prefijo con las excluidas.
 
+## Ajustes después de la primera prueba (2026-08-04)
+
+1. **El reporte muestra qué mensaje marcaste.** Antes decía solo "1 mensaje
+   seleccionado", y el chat ya se había ido hacia arriba: no había forma de
+   comprobar que marcaste el correcto. Ahora cita el mensaje, tanto al escribir
+   como en los reportes ya enviados, con la misma lógica del Playground
+   (`messagePreview` en `lib/adversarial-message.ts`, compartido por las tres
+   vistas).
+
+2. **El cliente puede reiniciar la conversación.** `POST /api/prueba/<token>/reset`.
+   Sube de ronda, no borra: los mensajes viejos salen de la vista pero siguen en
+   la base, así que los reportes ya enviados siguen apuntando al mensaje exacto,
+   y un cliente no puede limpiar el historial antes de que alguien lo lea. Por
+   eso la vista pública y la de admin ahora reciben `note_messages`, los turnos
+   de rondas anteriores que alguna nota todavía cita. El tope de mensajes cuenta
+   todas las rondas, así que reiniciar no lo esquiva.
+
+3. **Token más corto**: 12 caracteres en vez de 32 (9 bytes, 72 bits). Sigue
+   siendo inadivinable contra un endpoint que responde 404 y limita por IP.
+   El prefijo `/prueba` **no** se acortó: el lookahead del matcher no está
+   anclado a un segmento, así que excluir `/p` dejaría fuera del login cualquier
+   ruta que empiece por «p». Si algún día se quiere `/p/<token>`, hay que
+   excluir `p/` con la barra incluida, no `p`.
+
 ## Los tickets
 
 Todos completos. `S18-T0` migración, `T1` capa de datos y guard, `T2` rutas

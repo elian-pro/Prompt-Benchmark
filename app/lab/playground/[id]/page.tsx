@@ -20,7 +20,7 @@ import type {
   DemoMessageRow,
 } from "@/lib/db/demo-sessions";
 import type { DemoNoteRow } from "@/lib/db/demo-notes";
-import { parseTurn } from "@/lib/adversarial-message";
+import { messagePreview } from "@/lib/adversarial-message";
 import { relativeTimeEs } from "@/lib/format";
 import type { VersionListItem } from "@/lib/db/versions";
 import { Button } from "@/components/ui/Button";
@@ -122,9 +122,7 @@ function NotesPanel({
                 {note.message_ids.map((mid) => {
                   const m = messagesById.get(mid);
                   if (!m) return null;
-                  const { message } = parseTurn(m.content);
-                  const text = message || "(sin mensaje)";
-                  const preview = text.length > 60 ? `${text.slice(0, 60)}…` : text;
+                  const preview = messagePreview(m.content);
                   // A ref to a message not in the current round: its preview
                   // still resolves, but jumping to it in the chat can't (it's
                   // not shown), so it's inert and marked.
@@ -163,9 +161,7 @@ function NotesPanel({
           <div className="note-refs">
             {selectedIds.map((mid) => {
               const m = messagesById.get(mid);
-              const { message } = m ? parseTurn(m.content) : { message: "" };
-              const text = message || "(sin mensaje)";
-              const preview = text.length > 60 ? `${text.slice(0, 60)}…` : text;
+              const preview = m ? messagePreview(m.content) : "(sin mensaje)";
               return (
                 <div key={mid} className="note-ref note-ref-draft">
                   <button

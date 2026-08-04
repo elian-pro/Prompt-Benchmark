@@ -4555,3 +4555,16 @@ body[data-theme="dark"] .history-filters input[type="date"]::-webkit-calendar-pi
   flex-direction: column;
   gap: 8px;
 }
+
+/* Quoting the tagged messages inside the client's report composer, so the
+   selection stays checkable after the chat has scrolled away (Sprint 18). */
+.note-ref-drop {
+  margin-left: 6px;
+  vertical-align: middle;
+}
+.demo-header-right {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}

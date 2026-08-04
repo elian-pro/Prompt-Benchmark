@@ -5,7 +5,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 
-import { asEnvelope, parseTurnBubbles } from "./adversarial-message.ts";
+import { asEnvelope, messagePreview, parseTurnBubbles } from "./adversarial-message.ts";
 
 const ENVELOPE_PROMPT = 'Responde con {"estado": "activo", "mensajes": ["..."]}';
 
@@ -85,4 +85,25 @@ test("valid JSON is unaffected by fence stripping", () => {
     state: "activo",
     malformed: false,
   });
+});
+
+test("messagePreview quotes what the lead read, not the envelope", () => {
+  const envelope = JSON.stringify({ estado: "perfilado", mensajes: ["Abrimos a las 8."] });
+  assert.equal(messagePreview(envelope), "Abrimos a las 8.");
+});
+
+test("messagePreview truncates long messages", () => {
+  const long = "a".repeat(80);
+  const out = messagePreview(long);
+  assert.equal(out.length, 61); // 60 chars + the ellipsis
+  assert.ok(out.endsWith("…"));
+});
+
+test("messagePreview leaves a short plain message alone", () => {
+  assert.equal(messagePreview("Hola"), "Hola");
+});
+
+test("messagePreview names an empty message instead of rendering nothing", () => {
+  const envelope = JSON.stringify({ estado: "humano", mensajes: [] });
+  assert.equal(messagePreview(envelope), "(sin mensaje)");
 });

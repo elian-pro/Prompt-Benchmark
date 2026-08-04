@@ -6,6 +6,7 @@ import { IconArrowRight, IconCheck, IconNotes, IconPencil, IconX } from "@tabler
 
 import type { DemoSessionDetail } from "@/lib/db/demo-sessions";
 import type { DemoNoteRow, DemoNoteStatus } from "@/lib/db/demo-notes";
+import { messagePreview } from "@/lib/adversarial-message";
 import { DemoTurn } from "@/components/demo/DemoTurn";
 import { Button } from "@/components/ui/Button";
 import { EmptyState } from "@/components/ui/EmptyState";
@@ -118,6 +119,13 @@ export function DemoLinkWorkspace({
 
   const notes = session.notes;
   const approvedCount = notes.filter((n) => n.status === "approved").length;
+  // note_messages carries the turns from rounds the client restarted past, so a
+  // report about one of those still quotes what it was about instead of
+  // pointing at a pin that is no longer on screen.
+  const messagesById = new Map(
+    [...session.messages, ...session.note_messages].map((m) => [m.id, m]),
+  );
+  const currentIds = new Set(session.messages.map((m) => m.id));
   // A note's number in this column is the pin drawn on the turns it tags, the
   // same convention the Playground uses.
   const pinsByMessage = new Map<string, number[]>();
@@ -187,6 +195,25 @@ export function DemoLinkWorkspace({
                   </div>
                 )}
               </div>
+
+              {note.message_ids.length > 0 && (
+                <div className="note-refs">
+                  {note.message_ids.map((mid) => {
+                    const m = messagesById.get(mid);
+                    return (
+                      <div
+                        key={mid}
+                        className={`note-ref${currentIds.has(mid) ? "" : " note-ref-stale"}`}
+                      >
+                        “{m ? messagePreview(m.content) : "(mensaje no disponible)"}”
+                        {!currentIds.has(mid) && (
+                          <span className="note-ref-tag">conversación anterior</span>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
 
               {editingId === note.id ? (
                 <div className="note-review-edit">
