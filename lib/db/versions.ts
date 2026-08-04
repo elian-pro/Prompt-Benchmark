@@ -207,6 +207,57 @@ export async function deleteVersion(id: string): Promise<void> {
   if (error) throw new Error(`No se pudo eliminar la versión: ${error.message}`);
 }
 
+/**
+ * Commits a Creator session's prompt to a client that already exists.
+ *
+ * A client created from the Library is born with an empty v1.0 seed, so the
+ * prompt belongs INSIDE that row: filling it keeps the client at one version,
+ * numbered v1.0, which is what its first prompt actually is. createClient
+ * skips syncVersionMarkers on empty seeds, so it runs here. Any other client
+ * gets a normal minor bump.
+ *
+ * Production is only claimed when the client has none yet (the provisioned
+ * case, where nothing is deployable until a production version exists). A
+ * client that already publishes something keeps publishing it until promoted
+ * by hand.
+ */
+export async function saveCreatorVersion(
+  clientId: string,
+  content: string,
+  sessionId: string,
+): Promise<Version> {
+  const existing = await listVersions(clientId, { includeContent: true });
+  // Only with a single version: with several, there is no way to tell which
+  // empty row was meant to receive this prompt.
+  const seed = existing.length === 1 && !existing[0].content?.trim() ? existing[0] : null;
+
+  let version: Version;
+  if (seed) {
+    const sb = getSupabase();
+    const { data, error } = await sb
+      .from("versions")
+      .update({
+        content: syncVersionMarkers(content, seed.version_number),
+        source: "creator_chat",
+        source_session_id: sessionId,
+      })
+      .eq("id", seed.id)
+      .select(`${SUMMARY_COLS}, content`)
+      .single();
+    if (error) throw new Error(`No se pudo guardar la versión: ${error.message}`);
+    version = data as Version;
+  } else {
+    version = await createVersion(clientId, content, {
+      bumpType: "minor",
+      source: "creator_chat",
+      sourceSessionId: sessionId,
+    });
+  }
+
+  if (existing.some((v) => v.is_production)) return version;
+  return promoteToProduction(version.id);
+}
+
 export async function promoteToProduction(versionId: string): Promise<Version> {
   const sb = getSupabase();
   const { data: target, error: tErr } = await sb

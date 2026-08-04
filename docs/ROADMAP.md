@@ -148,6 +148,24 @@ leaves. Stream resilience hotfix in
 
 > There is no Sprint 12. The numbering skips it.
 
+## Sprint 17 — Replay (real conversations as cases) ⏳
+
+A third Lab mode, after IA vs IA and Playground: the lead is a real one and
+the conversation already happened. Find the conversation that failed, mark it
+as a case, edit the prompt, then re-run that same turn against the new version
+to see whether the problem is gone. Plan in
+`docs/SPRINT-17-history-cases-plan.md`.
+
+Groundwork already shipped: the `turnos jsonb` column on the chats tables, its
+normalizing trigger, and the n8n flows that write it. Replaying a turn
+faithfully needs the bot's own JSON envelopes, which only `turnos` can
+reconstruct.
+
+**Definition of done**: a client reports a bad reply, Carlos finds that
+conversation by its Kommo id, reads it as a chat, marks the offending turn,
+lands in the Editor with the context loaded, and after editing sees the old
+and new replies side by side. No screenshots.
+
 ---
 
 ## Future (not in current scope)

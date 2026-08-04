@@ -139,6 +139,25 @@ export function parseTurnBubbles(content: string): {
   }
 }
 
+/**
+ * Re-wraps a plain-text bot turn in the JSON envelope the prompt asks for,
+ * for the history sent BACK to the model (never for storage or display).
+ *
+ * The seeded opening message is written by a human, so it is plain text. Fed
+ * to the model as its own first `assistant` turn, it reads as precedent that
+ * plain text is the output format, and the bot drops the envelope for the rest
+ * of the conversation (the format rule sits thousands of tokens away in a long
+ * prompt, the example is right there). No `estado` is invented: only the shape
+ * matters. Content that already looks like JSON, or a prompt with no envelope
+ * spec, is left untouched.
+ */
+export function asEnvelope(content: string, systemPrompt: string): string {
+  const trimmed = content.trim();
+  if (!trimmed || trimmed[0] === "{" || trimmed[0] === "[") return content;
+  const key = systemPrompt.match(/"(mensajes|messages)"\s*:/)?.[1];
+  return key ? JSON.stringify({ [key]: [trimmed] }) : content;
+}
+
 // Matches a leading parenthetical paragraph — allowing one level of nested
 // parens — followed by a blank line before more content. This is the shape of
 // a stage direction some models emit despite instructions (e.g. "(espero la

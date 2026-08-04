@@ -47,35 +47,45 @@ and pastes into the corresponding n8n node.
 
 4. **Commit small, commit often.** One logical change per commit.
    Conventional Commits: `feat:`, `fix:`, `chore:`, `refactor:`, `docs:`,
-   `test:`. Work on a branch named `sprint-N/ticket-X-short-name`.
+   `test:`.
 
-5. **Server-side only for secrets.** LLM API calls, Supabase service_role
+5. **Never create or switch branches on your own.** The repo keeps exactly
+   two active branches: `main` and the current working branch. Everything
+   goes on whichever branch is already checked out, including small fixes
+   unrelated to the branch name. Only the user opens, closes or merges a
+   branch, and only when they say so.
+
+6. **Server-side only for secrets.** LLM API calls, Supabase service_role
    client, and key decryption all live in Next.js API routes
    (`/app/api/...`) or `/lib`. Never in client components.
 
-6. **Never commit secrets.** `.env` is gitignored. New env vars get a
+7. **Never commit secrets.** `.env` is gitignored. New env vars get a
    placeholder entry in `.env.example`.
 
-7. **UI in Spanish.** All visible labels, buttons, errors, modals — in
+8. **UI in Spanish.** All visible labels, buttons, errors, modals — in
    Spanish (the team is Mexican). Code, comments, commit messages, and
    file names in English.
 
-8. **Stop and ask if uncertain.** Better to pause than to invent. Common
+9. **Stop and ask if uncertain.** Better to pause than to invent. Common
    reasons to stop: ambiguous ticket, missing context not in the docs,
    library decision with multiple valid options, anything that touches the
    SQL or security model.
 
-9. **No em dashes (—).** Never use one, anywhere: UI text, docs, commit
+10. **No em dashes (—).** Never use one, anywhere: UI text, docs, commit
    messages, code comments. Use a period, comma, colon, or restructure the
    sentence instead.
 
 ## Active sprint
 
-Sprint 16, client provisioning: plan and ticket status in
-`docs/SPRINT-16-provisioning-plan.md`. All eight tickets are implemented;
-what remains is manual verification (run `019_n8n_template_workflow.sql`, set
-`SUPABASE_ACCESS_TOKEN` / `CHATS_SUPABASE_PROJECT_REF`, pick the template in
-Settings, then the end-to-end run described in the plan).
+Sprint 17, **Replay**: a third Lab mode where the lead is real and the
+conversation already happened. Plan in
+`docs/SPRINT-17-history-cases-plan.md`. Nothing implemented yet; the data
+groundwork (the `turnos` column, its trigger, the n8n flows that write it) is
+done.
+
+Sprint 16 (client provisioning) is verified end to end: Chapur was provisioned
+from the template, retargeted to `chats_Chapur` and bound to
+`dudas/conversacion`.
 
 Sprints 1 through 15 are complete (there is no Sprint 12). Sprints 1 to 6, 8
 and 9 have archived plans in `docs/SPRINT-*-archive.md`; Sprint 7 is

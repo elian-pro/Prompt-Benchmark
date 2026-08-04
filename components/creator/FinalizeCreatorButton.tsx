@@ -5,6 +5,7 @@ import { IconCircleCheck } from "@tabler/icons-react";
 import { Modal } from "@/components/ui/Modal";
 import { Button } from "@/components/ui/Button";
 import { SegmentPicker } from "@/components/library/SegmentPicker";
+import { ClientChip, type ClientChipValue } from "@/components/sessions/ClientChip";
 
 type FinalizeResult = {
   session: unknown;
@@ -14,6 +15,9 @@ type FinalizeResult = {
 
 type Props = {
   sessionId: string;
+  /** The client picked when the session started, if any. */
+  boundClientId?: string | null;
+  boundClientName?: string | null;
   /** Disabled until a prompt has actually been built (draft non-empty). */
   disabled?: boolean;
   onDone: (result: FinalizeResult) => void;
@@ -21,27 +25,45 @@ type Props = {
 };
 
 /**
- * Finalizes a Creator session: collects the new client's metadata and commits
- * the built prompt as that client's v1.0 (S3-T7). The client doesn't exist
- * until now, so the name is required here rather than at session start.
+ * Finalizes a Creator session: commits the built prompt either as a new
+ * version of an existing client, or as the v1.0 of a client created right
+ * here. The target defaults to whatever the session was started with, and can
+ * still be changed, which is the only way an already-running session that
+ * forgot to pick one ever reaches its client.
  */
-export function FinalizeCreatorButton({ sessionId, disabled, onDone, onError }: Props) {
+export function FinalizeCreatorButton({
+  sessionId,
+  boundClientId,
+  boundClientName,
+  disabled,
+  onDone,
+  onError,
+}: Props) {
   const [open, setOpen] = useState(false);
+  const [target, setTarget] = useState<ClientChipValue>(
+    boundClientId && boundClientName
+      ? { kind: "client", id: boundClientId, name: boundClientName }
+      : { kind: "scratch" },
+  );
   const [name, setName] = useState("");
   const [segment, setSegment] = useState("");
   const [busy, setBusy] = useState(false);
 
+  const toExisting = target?.kind === "client";
+  const canSubmit = !busy && (toExisting || name.trim().length > 0);
+
   async function submit() {
-    if (busy || !name.trim()) return;
+    if (!canSubmit) return;
     setBusy(true);
     try {
       const res = await fetch(`/api/chat-sessions/${sessionId}/finalize`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          name: name.trim(),
-          segment: segment.trim() || null,
-        }),
+        body: JSON.stringify(
+          toExisting
+            ? { clientId: target.id }
+            : { name: name.trim(), segment: segment.trim() || null },
+        ),
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data.error ?? "No se pudo finalizar la creación.");
@@ -75,30 +97,48 @@ export function FinalizeCreatorButton({ sessionId, disabled, onDone, onError }: 
               <Button variant="ghost" onClick={() => setOpen(false)} disabled={busy}>
                 Cancelar
               </Button>
-              <Button variant="primary" onClick={submit} disabled={busy || !name.trim()}>
-                {busy ? "Guardando…" : "Guardar como nuevo cliente"}
+              <Button variant="primary" onClick={submit} disabled={!canSubmit}>
+                {busy
+                  ? "Guardando…"
+                  : toExisting
+                    ? `Guardar en ${target.name}`
+                    : "Guardar como nuevo cliente"}
               </Button>
             </>
           }
         >
-          <p className="field-hint" style={{ marginBottom: 16 }}>
-            Se creará un cliente nuevo en la Biblioteca con este prompt como su
-            versión v1.0.
-          </p>
           <div className="field">
-            <label className="field-label">Nombre del cliente</label>
-            <input
-              className="input"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              placeholder="Ej. Inmobiliaria del Valle"
-              autoFocus
-            />
+            <label className="field-label">Cliente</label>
+            <ClientChip mode="target" value={target} onChange={setTarget} disabled={busy} />
           </div>
-          <div className="field">
-            <label className="field-label">Segmento (opcional)</label>
-            <SegmentPicker value={segment} onChange={setSegment} />
-          </div>
+
+          {toExisting ? (
+            <p className="field-hint">
+              El prompt se guardará en &quot;{target.name}&quot;. Si es su primera versión
+              reemplaza la v1.0 vacía; si no, se guarda como versión nueva.
+            </p>
+          ) : (
+            <>
+              <p className="field-hint" style={{ marginBottom: 16 }}>
+                Se creará un cliente nuevo en la Biblioteca con este prompt como su
+                versión v1.0.
+              </p>
+              <div className="field">
+                <label className="field-label">Nombre del cliente</label>
+                <input
+                  className="input"
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  placeholder="Ej. Inmobiliaria del Valle"
+                  autoFocus
+                />
+              </div>
+              <div className="field">
+                <label className="field-label">Segmento (opcional)</label>
+                <SegmentPicker value={segment} onChange={setSegment} />
+              </div>
+            </>
+          )}
         </Modal>
       )}
     </>

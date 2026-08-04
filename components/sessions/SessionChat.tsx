@@ -869,12 +869,16 @@ export function SessionChat({
           {isActive && mode === "creator" && (
             <FinalizeCreatorButton
               sessionId={sessionId}
+              boundClientId={session.client_id}
+              boundClientName={session.client_name}
               disabled={!hasDraft}
               onDone={({ client, version }) => {
-                showToast(`Cliente "${client.name}" creado como ${version.version_number}.`);
+                showToast(
+                  `Prompt guardado en "${client.name}" como ${version.version_number}.`,
+                );
                 load({ silent: true });
               }}
-              onError={(msg) => reportError("Crear cliente", msg, msg)}
+              onError={(msg) => reportError("Guardar el prompt", msg, msg)}
             />
           )}
         </div>

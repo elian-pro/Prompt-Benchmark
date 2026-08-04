@@ -71,6 +71,9 @@ export function IdleComposer({
   const [greeting, setGreeting] = useState("");
 
   const [clientValue, setClientValue] = useState<ClientChipValue>(null);
+  /** Creator only: the client the finished prompt lands on. Optional, and a
+   *  different question from clientValue, which picks the reference prompt. */
+  const [targetValue, setTargetValue] = useState<ClientChipValue>(null);
   const [text, setText] = useState("");
   const [stagedFiles, setStagedFiles] = useState<File[]>([]);
   const [starting, setStarting] = useState(false);
@@ -150,13 +153,17 @@ export function IdleComposer({
         const baseVersionId = detail.production_version?.id ?? detail.versions[0]?.id;
         if (!baseVersionId) throw new Error("El cliente no tiene ninguna versión base.");
         body = { clientId: clientValue.id, baseVersionId };
-      } else if (clientValue?.kind === "client") {
-        const detail = await fetchClientDetail(clientValue.id);
-        const baseVersionId = detail.production_version?.id ?? detail.versions[0]?.id;
-        if (!baseVersionId) throw new Error("El prompt de referencia no tiene ninguna versión.");
-        body = { type: "creator", baseVersionId, title: `Basado en ${detail.name}` };
       } else {
-        body = { type: "creator" };
+        // Creator: the target is optional and can also be chosen at finalize.
+        const target = targetValue?.kind === "client" ? { clientId: targetValue.id } : {};
+        if (clientValue?.kind === "client") {
+          const detail = await fetchClientDetail(clientValue.id);
+          const baseVersionId = detail.production_version?.id ?? detail.versions[0]?.id;
+          if (!baseVersionId) throw new Error("El prompt de referencia no tiene ninguna versión.");
+          body = { type: "creator", baseVersionId, title: `Basado en ${detail.name}`, ...target };
+        } else {
+          body = { type: "creator", ...target };
+        }
       }
 
       const res = await fetch("/api/chat-sessions", {
@@ -220,6 +227,9 @@ export function IdleComposer({
         >
           <div className="idle-composer-toprow">
             <ClientChip mode={mode} value={clientValue} onChange={setClientValue} />
+            {mode === "creator" && (
+              <ClientChip mode="target" value={targetValue} onChange={setTargetValue} />
+            )}
             <button
               type="button"
               className="attach-trigger"

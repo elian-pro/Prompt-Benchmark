@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { IconChevronDown, IconSearch, IconTargetArrow } from "@tabler/icons-react";
+import { IconChevronDown, IconSearch, IconTargetArrow, IconTemplate } from "@tabler/icons-react";
 import type { ClientSummary } from "@/lib/db/clients";
 
 export type ClientChipValue =
@@ -9,7 +9,11 @@ export type ClientChipValue =
   | { kind: "scratch" }
   | null;
 
-type Mode = "editor" | "creator";
+/** Three questions, one chip: whose prompt am I editing (editor), what prompt
+ *  do I take as an architectural reference (creator), and which client does
+ *  this end up in (target). `scratch` is "neither": no reference, or no target
+ *  yet because the client will be created at finalize. */
+type Mode = "editor" | "creator" | "target";
 
 /**
  * Small inline chip that opens a searchable client list — the equivalent of
@@ -64,14 +68,21 @@ export function ClientChip({
       )
     : clients;
 
+  // The Creator shows two of these side by side, so each one says what it is
+  // for. The Editor has only one and needs no prefix.
+  const prefix = mode === "editor" ? "" : mode === "creator" ? "Base: " : "Destino: ";
   const label =
     value?.kind === "client"
-      ? value.name
+      ? `${prefix}${value.name}`
       : value?.kind === "scratch"
-        ? "Desde cero"
+        ? mode === "target"
+          ? "Cliente nuevo"
+          : `${prefix}desde cero`
         : mode === "editor"
           ? "Selecciona un cliente"
-          : "Selecciona un prompt base";
+          : mode === "creator"
+            ? "Selecciona un prompt base"
+            : "Cliente destino";
 
   function pick(next: ClientChipValue) {
     onChange(next);
@@ -87,7 +98,7 @@ export function ClientChip({
         disabled={disabled}
         aria-expanded={open}
       >
-        <IconTargetArrow size={13} />
+        {mode === "creator" ? <IconTemplate size={13} /> : <IconTargetArrow size={13} />}
         <span>{label}</span>
         {!disabled && <IconChevronDown size={13} />}
       </button>
@@ -107,14 +118,20 @@ export function ClientChip({
               />
             </div>
             <div className="chip-select-list">
-              {mode === "creator" && (
+              {mode !== "editor" && (
                 <button
                   type="button"
                   className={`chip-select-item${value?.kind === "scratch" ? " is-selected" : ""}`}
                   onClick={() => pick({ kind: "scratch" })}
                 >
-                  <span className="chip-select-item-name">Empezar desde cero</span>
-                  <span className="chip-select-item-meta">Sin prompt de referencia</span>
+                  <span className="chip-select-item-name">
+                    {mode === "creator" ? "Empezar desde cero" : "Crear un cliente nuevo"}
+                  </span>
+                  <span className="chip-select-item-meta">
+                    {mode === "creator"
+                      ? "Sin prompt de referencia"
+                      : "Se agrega a la Biblioteca al finalizar"}
+                  </span>
                 </button>
               )}
 

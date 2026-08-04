@@ -11,6 +11,8 @@ import {
   hasExpressionTokens,
   listAgentNodes,
   locateBoundAgent,
+  pickPromptAgent,
+  PROMPT_AGENT_NAME,
   readSystemMessage,
   setRawSystemMessage,
   toRawSystemMessage,
@@ -151,4 +153,37 @@ test("computePushWarnings is silent for a plain prompt", () => {
     nextText: "Hola de nuevo",
   });
   assert.deepEqual(w, []);
+});
+
+const summary = (node_name: string) => ({
+  node_id: node_name,
+  node_name,
+  preview: "",
+  expression_prefix: true,
+});
+
+test("pickPromptAgent takes the only agent when there is one", () => {
+  assert.equal(pickPromptAgent([summary("AI Agent")])?.node_name, "AI Agent");
+});
+
+test("pickPromptAgent picks the conversational agent out of the template's three", () => {
+  const picked = pickPromptAgent([
+    summary("Router"),
+    summary(PROMPT_AGENT_NAME),
+    summary("AI Agent"),
+  ]);
+  assert.equal(picked?.node_name, PROMPT_AGENT_NAME);
+});
+
+test("pickPromptAgent refuses to guess when no name matches", () => {
+  // Binding the wrong one would later push the client prompt over the router.
+  assert.equal(pickPromptAgent([summary("Router"), summary("AI Agent")]), null);
+});
+
+test("pickPromptAgent refuses an ambiguous duplicate name", () => {
+  assert.equal(pickPromptAgent([summary(PROMPT_AGENT_NAME), summary(PROMPT_AGENT_NAME)]), null);
+});
+
+test("pickPromptAgent returns null for a workflow with no agents", () => {
+  assert.equal(pickPromptAgent([]), null);
 });

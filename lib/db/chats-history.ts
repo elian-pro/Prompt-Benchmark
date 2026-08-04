@@ -3,7 +3,12 @@
  * store real client/lead conversations. One table per client, chats_<Cliente>,
  * each row a conversation blob:
  *   id, created_at, numero_de_mensajes, id_de_kommo (Kommo CRM lead id),
- *   historial (the full conversation as plain text: "User: ...\nIA: ...").
+ *   historial (the full conversation as plain text: "User: ...\nIA: ..."),
+ *   turnos (the same conversation as one object per turn, see
+ *   supabase/chats/002_add_turnos.sql). Only flows duplicated from the updated
+ *   template write turnos, so it is null for every row written before
+ *   2026-07-30 and for every client still on an older flow; those rows are
+ *   reconstructed from historial by lib/conversation-turns.ts.
  *
  * Client names do not map to table names, so the mapping is stored explicitly
  * as clients.chats_table (see migration 018). This module never writes.
@@ -12,6 +17,7 @@ import { getChatsSupabase, isChatsConfigured } from "../supabase";
 // The validator lives in the pure chats-table-name module so the same rule
 // guards the PostgREST path here and the CREATE TABLE that provisioning sends.
 import { isValidChatsTable } from "../chats-table-name";
+import { isDateOnly, nextDay, searchFilterFor } from "../history-filters";
 
 export { isValidChatsTable };
 
@@ -24,6 +30,9 @@ export type ConversationRow = {
   numero_de_mensajes: number | string | null;
   id_de_kommo: string | null;
   historial: string | null;
+  /** jsonb, so it arrives already parsed. Null on rows written by a flow that
+   *  does not fill it yet. Shape validated in lib/conversation-turns.ts. */
+  turnos: unknown;
 };
 
 export type ConversationPage = {
@@ -51,23 +60,59 @@ export async function listChatsTables(): Promise<ChatsTable[]> {
     .filter((t: ChatsTable) => isValidChatsTable(t.table));
 }
 
+export type HistoryFilters = {
+  /** One box, three meanings: a Kommo lead id, our own row id, or free text. */
+  search?: string;
+  /** Date-only (yyyy-mm-dd) or a full timestamp. `to` is inclusive of the day. */
+  from?: string;
+  to?: string;
+  /** Conversations with at most this many messages: the cheapest "the lead
+   *  left early" filter there is. */
+  maxMessages?: number;
+};
+
 /**
  * Reads one page of a client's conversation history, newest first. Validates
  * the table name first (defense against a bad/stale chats_table value).
+ *
+ * There is no filter for the conversation's final estado yet. It is already
+ * reachable through `search` because the flows write the state into
+ * `historial` too ("se mueve a humano"), which is imprecise but works on every
+ * row, old and new. The precise version is `turnos @> [{"estado": X}]`, worth
+ * doing once all client flows write the column (today only three do).
  */
 export async function getClientHistory(
   chatsTable: string,
-  { limit, offset }: { limit: number; offset: number },
+  { limit, offset, ...filters }: { limit: number; offset: number } & HistoryFilters,
 ): Promise<ConversationPage> {
   if (!isValidChatsTable(chatsTable)) {
     throw new Error("Tabla de historial no válida.");
   }
   const sb = getChatsSupabase();
-  const { data, error, count } = await sb
+  let query = sb
     .from(chatsTable)
-    .select("id, created_at, numero_de_mensajes, id_de_kommo, historial", {
+    .select("id, created_at, numero_de_mensajes, id_de_kommo, historial, turnos", {
       count: "exact",
-    })
+    });
+
+  const search = filters.search ? searchFilterFor(filters.search) : null;
+  if (search) {
+    query =
+      search.kind === "or"
+        ? query.or(search.filter)
+        : query.ilike(search.column, search.pattern);
+  }
+  if (filters.from) query = query.gte("created_at", filters.from);
+  if (filters.to) {
+    query = isDateOnly(filters.to)
+      ? query.lt("created_at", nextDay(filters.to))
+      : query.lte("created_at", filters.to);
+  }
+  if (filters.maxMessages != null) {
+    query = query.lte("numero_de_mensajes", filters.maxMessages);
+  }
+
+  const { data, error, count } = await query
     .order("created_at", { ascending: false })
     .range(offset, offset + limit - 1);
   if (error) {
@@ -76,6 +121,28 @@ export async function getClientHistory(
   const rows = (data ?? []) as ConversationRow[];
   const total = count ?? offset + rows.length;
   return { rows, total, hasMore: offset + rows.length < total };
+}
+
+/**
+ * One conversation by its row id. Read fresh at the moment a case is filed, so
+ * the snapshot stored with the case is what the agents had actually written by
+ * then, not whatever the list happened to be showing.
+ */
+export async function getConversation(
+  chatsTable: string,
+  rowId: number,
+): Promise<ConversationRow | null> {
+  if (!isValidChatsTable(chatsTable)) {
+    throw new Error("Tabla de historial no válida.");
+  }
+  const sb = getChatsSupabase();
+  const { data, error } = await sb
+    .from(chatsTable)
+    .select("id, created_at, numero_de_mensajes, id_de_kommo, historial, turnos")
+    .eq("id", rowId)
+    .maybeSingle();
+  if (error) throw new Error(`No se pudo leer la conversación: ${error.message}`);
+  return (data as ConversationRow | null) ?? null;
 }
 
 /** Strip accents/spaces/punctuation and lowercase, for name comparison. */

@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSession, finalizeSession } from "@/lib/db/chat-sessions";
-import { createVersion } from "@/lib/db/versions";
-import { createClient } from "@/lib/db/clients";
+import { createVersion, saveCreatorVersion, type Version } from "@/lib/db/versions";
+import { createClient, getClient } from "@/lib/db/clients";
 import { extractChangeSummary, extractPromptFromReply } from "@/lib/prompts/editor-persona";
 import { finalizeCreatorSchema } from "@/lib/schemas/chat-sessions";
 import { handleError, jsonError } from "@/lib/http";
@@ -14,8 +14,9 @@ type Params = { params: Promise<{ id: string }> };
  * Commits the session's current draft to the Library and closes the session as
  * finalized. Branches by session type:
  *  - editor:  a new MINOR version on the existing client (`editor_chat`).
- *  - creator: a brand-new client at v1.0 carrying the prompt (`creator_chat`),
- *             with metadata (name, segment) from the request body.
+ *  - creator: onto the target client when the session has one (see
+ *             saveCreatorVersion), otherwise a brand-new client at v1.0
+ *             carrying the prompt, with metadata from the request body.
  * Idempotency is not attempted: a finalized or abandoned session is rejected.
  */
 export async function POST(req: NextRequest, { params }: Params) {
@@ -34,13 +35,30 @@ export async function POST(req: NextRequest, { params }: Params) {
 
     if (session.type === "creator") {
       const input = finalizeCreatorSchema.parse(await req.json().catch(() => ({})));
-      const { client, version } = await createClient({
-        name: input.name,
-        segment: input.segment ?? null,
-        initialVersion: { content: draft, source: "creator_chat", sourceSessionId: id },
-      });
-      // initialVersion was provided, so the seed always runs and version is set.
-      if (!version) throw new Error("No se pudo crear la versión inicial del cliente.");
+      // The body wins over the target picked at session start, so the modal can
+      // still change its mind.
+      const targetId = input.clientId ?? session.client_id;
+
+      let client: { id: string; name: string };
+      let version: Version;
+      if (targetId) {
+        const target = await getClient(targetId);
+        if (!target) return jsonError("El cliente ya no existe.", 404);
+        client = target;
+        version = await saveCreatorVersion(target.id, draft, id);
+      } else {
+        const created = await createClient({
+          name: input.name!,
+          segment: input.segment ?? null,
+          initialVersion: { content: draft, source: "creator_chat", sourceSessionId: id },
+        });
+        // initialVersion was provided, so the seed always runs and version is set.
+        if (!created.version) {
+          throw new Error("No se pudo crear la versión inicial del cliente.");
+        }
+        client = created.client;
+        version = created.version;
+      }
       const finalized = await finalizeSession(id, version.id, client.id);
       return NextResponse.json({ session: finalized, version, client });
     }

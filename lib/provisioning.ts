@@ -26,7 +26,8 @@ import { createApiBinding, listBindings } from "./db/n8n-bindings";
 import { listChatsTables } from "./db/chats-history";
 import { isChatsConfigured } from "./supabase";
 import { createWorkflow, getWorkflow, listWorkflows } from "./n8n/client";
-import { listAgentNodes } from "./n8n/agent-node";
+import { listAgentNodes, pickPromptAgent, PROMPT_AGENT_NAME } from "./n8n/agent-node";
+import { retargetChatsTable } from "./n8n/chats-table";
 import { createChatsTable, isChatsAdminConfigured } from "./chats-admin";
 import { chatsTableName } from "./chats-table-name";
 
@@ -82,16 +83,33 @@ async function duplicateAndBind(
   const existing = (await listWorkflows(creds)).find((w) => w.name === wanted);
   let workflowId: string;
   let adopted = false;
+  /** How many Supabase nodes were pointed at this client's table. Reported so
+   *  a template that stopped carrying chats nodes is visible, not silent. */
+  let retargetedNodes = 0;
   if (existing) {
     workflowId = existing.id;
     adopted = true;
   } else {
+    // The template is a copy of a real client's workflow, so its Supabase
+    // nodes still point at that client's chats_* table. Retarget them before
+    // creating, or the new client's conversations land in someone else's
+    // history. The chats step runs after this one, so chats_table is usually
+    // still null here and the name is derived the same way that step derives it.
+    const table = client.chats_table ?? chatsTableName(client.name);
+    if (!table) {
+      return {
+        ok: false,
+        error: "El nombre del cliente no produce un nombre de tabla válido: no se puede duplicar el flujo sin saber a qué tabla debe escribir.",
+      };
+    }
     const source = await getWorkflow(creds, template.workflowId);
-    const created = await createWorkflow(creds, { ...source, name: wanted });
+    const { workflow: retargetedWorkflow, retargeted } = retargetChatsTable(source, table);
+    const created = await createWorkflow(creds, { ...retargetedWorkflow, name: wanted });
     workflowId = String(created.id ?? "");
     if (!workflowId) {
       return { ok: false, error: "n8n creó el flujo pero no devolvió su id." };
     }
+    retargetedNodes = retargeted;
   }
 
   const bindings = await listBindings(client.id);
@@ -101,6 +119,12 @@ async function duplicateAndBind(
 
   // The copy is fresh, so read it back rather than trusting the POST echo.
   const agents = listAgentNodes(await getWorkflow(creds, workflowId));
+  const agent = pickPromptAgent(agents);
+  if (!agent) {
+    const why =
+      agents.length === 0
+        ? "no tiene ningún nodo AI Agent"
+        : `tiene ${agents.length} nodos AI Agent y ninguno se llama «${PROMPT_AGENT_NAME}»`;
   if (agents.length === 0) {
     return {
       ok: false,
@@ -117,7 +141,6 @@ async function duplicateAndBind(
     };
   }
 
-  const agent = agents[0];
   await createApiBinding(client.id, {
     connection_id: template.connectionId,
     workflow_id: workflowId,
@@ -128,7 +151,12 @@ async function duplicateAndBind(
   });
   return {
     ok: true,
-    detail: adopted ? `${wanted} (flujo existente, vinculado)` : `${wanted} (duplicado y vinculado)`,
+    detail: adopted
+      ? // An adopted flow was not retargeted (it may be an older copy still
+        // pointing at the template's client), so say it instead of implying
+        // the copy is clean.
+        `${wanted} (flujo existente, vinculado; revisa a qué tabla de chats escribe)`
+      : `${wanted} (duplicado y vinculado, ${retargetedNodes} nodo(s) de Supabase reapuntados)`,
   };
 }
 

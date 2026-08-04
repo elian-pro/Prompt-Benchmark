@@ -5,7 +5,16 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 
-import { parseTurnBubbles } from "./adversarial-message.ts";
+import { asEnvelope, parseTurnBubbles } from "./adversarial-message.ts";
+
+const ENVELOPE_PROMPT = 'Responde con {"estado": "activo", "mensajes": ["..."]}';
+
+test("wraps a plain-text opening message in the envelope the prompt asks for", () => {
+  assert.equal(asEnvelope("Hola Shel, ¿confirmas?", ENVELOPE_PROMPT), '{"mensajes":["Hola Shel, ¿confirmas?"]}');
+  // Already an envelope, or a prompt that never asks for one: untouched.
+  assert.equal(asEnvelope('{"estado":"activo","mensajes":["Hola"]}', ENVELOPE_PROMPT), '{"estado":"activo","mensajes":["Hola"]}');
+  assert.equal(asEnvelope("Hola", "Responde en texto plano."), "Hola");
+});
 
 test("splits a JSON mensajes array into one bubble per item, estado on the side", () => {
   const content = JSON.stringify({

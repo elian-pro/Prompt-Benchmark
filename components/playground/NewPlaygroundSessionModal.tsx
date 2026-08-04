@@ -2,12 +2,12 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { IconTargetArrow } from "@tabler/icons-react";
+import { IconGitBranch, IconTargetArrow } from "@tabler/icons-react";
 import type { ClientSummary, ClientDetail } from "@/lib/db/clients";
 import type { VersionListItem } from "@/lib/db/versions";
 import { Modal } from "@/components/ui/Modal";
 import { Button } from "@/components/ui/Button";
-import { SelectChip } from "@/components/ui/SelectChip";
+import { SearchableChip } from "@/components/ui/SearchableChip";
 
 /**
  * Configures a new Playground session: pick the client + version to converse
@@ -109,37 +109,34 @@ export function NewPlaygroundSessionModal({
     >
       <div className="field">
         <label className="field-label">Cliente</label>
-        <SelectChip
+        <SearchableChip
           icon={<IconTargetArrow size={13} />}
+          placeholder="Selecciona un cliente"
+          searchPlaceholder="Buscar cliente por nombre…"
+          items={clients.map((c) => ({ id: c.id, label: c.name }))}
           value={clientId}
-          onChange={(e) => setClientId(e.target.value)}
-          disabled={loading}
-        >
-          <option value="">{loading ? "Cargando clientes…" : "Selecciona un cliente…"}</option>
-          {clients.map((c) => (
-            <option key={c.id} value={c.id}>
-              {c.name}
-            </option>
-          ))}
-        </SelectChip>
+          onChange={setClientId}
+          loading={loading}
+          emptyText="No se encontraron clientes."
+        />
       </div>
 
       {clientId && (
         <div className="field">
           <label className="field-label">Versión a probar</label>
-          <select
-            className="select"
+          <SearchableChip
+            icon={<IconGitBranch size={13} />}
+            placeholder="Elige una versión"
+            searchPlaceholder="Buscar versión…"
+            items={versions.map((v) => ({
+              id: v.id,
+              label: v.version_number,
+              meta: v.is_production ? "producción" : undefined,
+            }))}
             value={versionId}
-            onChange={(e) => setVersionId(e.target.value)}
-          >
-            {versions.length === 0 && <option value="">Sin versiones</option>}
-            {versions.map((v) => (
-              <option key={v.id} value={v.id}>
-                {v.version_number}
-                {v.is_production ? " · producción" : ""}
-              </option>
-            ))}
-          </select>
+            onChange={setVersionId}
+            emptyText="Sin versiones."
+          />
         </div>
       )}
 

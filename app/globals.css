@@ -2290,7 +2290,8 @@ a.lab-card:hover {
   gap: 12px;
   max-height: 60vh;
   overflow-y: auto;
-  padding-right: 4px;
+  /* Horizontal room so the selection ring is not clipped by the scroll box. */
+  padding: 4px 6px;
 }
 .chat-bubble {
   display: flex;
@@ -3342,53 +3343,6 @@ body[data-theme="light"] .dot-grid::after {
 /* Native <select> dressed up as a chip trigger (see SelectChip.tsx) — used
    where a plain underline select next to empty modal whitespace read as
    inert placeholder text instead of a clickable control. */
-.select-chip {
-  position: relative;
-  display: flex;
-  align-items: center;
-  width: 100%;
-}
-.select-chip-input {
-  width: 100%;
-  appearance: none;
-  padding: 10px 34px;
-  border-radius: 100px;
-  border: 0.5px dashed var(--border2);
-  background: transparent;
-  color: var(--muted);
-  font-size: 13.5px;
-  font-family: inherit;
-  cursor: pointer;
-  transition: border-color 0.15s ease, background 0.15s ease, color 0.15s ease;
-}
-.select-chip-input:hover:not(:disabled) {
-  border-color: var(--accent);
-}
-.select-chip-input.is-set {
-  border-style: solid;
-  background: var(--surface2);
-  color: var(--fg);
-}
-.select-chip-input:disabled {
-  cursor: default;
-  opacity: 0.7;
-}
-.select-chip-icon {
-  position: absolute;
-  left: 12px;
-  display: inline-flex;
-  color: var(--faint);
-  pointer-events: none;
-}
-.select-chip-input.is-set ~ .select-chip-icon {
-  color: var(--accent);
-}
-.select-chip-chevron {
-  position: absolute;
-  right: 12px;
-  color: var(--muted);
-  pointer-events: none;
-}
 .landing-history-head {
   margin-bottom: 14px;
 }
@@ -3663,12 +3617,173 @@ body[data-theme="light"] .dot-grid::after {
   background: none;
   border: none;
   border-top: 0.5px solid var(--border);
-  padding: 8px 2px;
+  /* The left padding leaves room for the accent bar of the selected row. It
+     is on every row, not only the selected one, so picking one does not shove
+     the text sideways. */
+  padding: 8px 2px 8px 10px;
   cursor: pointer;
   border-radius: 4px;
+  /* A <button> does not inherit color: without this it falls back to the UA
+     default (black), which is invisible on the dark theme. */
+  color: var(--fg);
+  font: inherit;
 }
 .conversation-item:hover {
   background: var(--surface-2, rgba(127, 127, 127, 0.08));
+}
+/* The row whose transcript is open in the next column. */
+.conversation-item.is-selected {
+  background: var(--surface2);
+  box-shadow: inset 2px 0 0 var(--accent);
+}
+
+/* A real conversation reuses the Playground's whole chat layout: the
+   .chat-messages container (flex column, bounded height) plus the chat-turn /
+   chat-msg / chat-state classes. Nothing here to add. */
+
+/* Replay (Lab): the conversation list beside the workspace, until one is open
+   and the list folds away to leave the whole width for transcript + notes. */
+.replay-layout {
+  display: grid;
+  gap: 24px;
+  align-items: start;
+}
+@media (min-width: 1000px) {
+  /* Both tracks are plain lengths so the browser can interpolate between
+     them. A minmax() collapsing to 0fr cannot be interpolated at all: the
+     column just snaps shut, which is what this looked like before. */
+  .replay-layout {
+    grid-template-columns: 22rem minmax(0, 1fr);
+    transition:
+      grid-template-columns 0.32s cubic-bezier(0.4, 0, 0.2, 1),
+      gap 0.32s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+  .replay-layout.is-collapsed {
+    grid-template-columns: 0rem minmax(0, 1fr);
+    gap: 0;
+  }
+}
+.replay-list {
+  min-width: 0;
+  overflow: hidden;
+  transition:
+    opacity 0.2s ease,
+    visibility 0.32s,
+    transform 0.32s cubic-bezier(0.4, 0, 0.2, 1);
+}
+/* Slides out as it narrows instead of being clipped in place, and goes
+   invisible rather than merely transparent: a transparent column still takes
+   keyboard focus, so tabbing would walk through a list nobody can see. */
+.replay-layout.is-collapsed .replay-list {
+  opacity: 0;
+  visibility: hidden;
+  transform: translateX(-16px);
+}
+/* Below the breakpoint the columns stack, so a folded list has to actually
+   disappear instead of sitting above the workspace at zero width. */
+@media (max-width: 999px) {
+  .replay-layout.is-collapsed .replay-list {
+    display: none;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .replay-layout,
+  .replay-list {
+    transition: none;
+  }
+  .replay-layout.is-collapsed .replay-list {
+    transform: none;
+  }
+}
+
+.replay-toolbar {
+  display: flex;
+  margin-bottom: 12px;
+}
+
+/* The workspace itself mirrors the Playground: chat, then notes.
+   The column count does not depend on whether the list is folded. Changing it
+   on toggle meant the notes jumped from under the chat to beside it, and a
+   grid cannot interpolate between a different number of tracks, so that jump
+   could never be animated away. Wide enough for three columns: three columns. */
+.replay-workspace {
+  display: grid;
+  gap: 20px;
+  align-items: start;
+}
+@media (min-width: 1200px) {
+  .replay-workspace {
+    grid-template-columns: minmax(0, 1fr) minmax(240px, 22rem);
+  }
+}
+
+/* Replay: one filed case, and the two replies it compares. The row reuses the
+   Playground session list; the body hangs off it, sharing its border. */
+.case-entry {
+  display: flex;
+  flex-direction: column;
+}
+.case-entry.open .session-item {
+  border-radius: 12px 12px 0 0;
+}
+.case-item {
+  padding: 12px 16px 14px;
+  border: 0.5px solid var(--border);
+  border-top: 0;
+  border-radius: 0 0 12px 12px;
+}
+.case-note {
+  font-size: 13px;
+  line-height: 1.55;
+  margin: 0 0 10px;
+}
+.replay-compare {
+  display: grid;
+  gap: 10px;
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 0.5px dashed var(--border);
+}
+/* Side by side only where there is room for it; the client detail sidebar is
+   narrow, so the default is stacked. */
+@media (min-width: 1100px) {
+  .replay-compare {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+/* Conversation history: search box + filter row, in a narrow sidebar card. */
+.history-filters {
+  display: grid;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+.history-filters-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+.history-filters-row .field-label {
+  margin: 0;
+}
+/* The native date picker's calendar glyph is drawn dark by the browser and
+   disappears on the dark theme, so it is inverted there. */
+body[data-theme="dark"] .history-filters input[type="date"]::-webkit-calendar-picker-indicator {
+  filter: invert(1);
+  opacity: 0.7;
+}
+.history-filters input[type="date"]::-webkit-calendar-picker-indicator {
+  cursor: pointer;
+}
+/* The date inputs share a line and shrink together; the length select takes
+   the rest of the row when they wrap. */
+.history-filters-row input[type="date"] {
+  flex: 1 1 8rem;
+  min-width: 0;
+}
+.history-filters-row .select {
+  flex: 1 1 100%;
 }
 
 /* n8n binding modal: destination-type chips + node id line */
@@ -3756,7 +3871,9 @@ body[data-theme="light"] .dot-grid::after {
   border-radius: 6px;
 }
 .chat-msg {
-  padding: 9px 13px;
+  /* Roomy enough that the selection ring, drawn right on the border, does not
+     read as touching the first and last character of every line. */
+  padding: 10px 16px;
   border-radius: 14px;
   border: 0.5px solid var(--border);
   max-width: 100%;
@@ -3785,11 +3902,25 @@ body[data-theme="light"] .dot-grid::after {
 /* Selection rings each bubble on its own, not one box around the whole turn:
    a big container ring left gaps around narrower bubbles and wrapped the role
    label. The label stays unhighlighted; the estado lives inside its bubble so
-   it rings with it. */
-.playground-chat .chat-turn.is-selected .chat-msg {
-  box-shadow: 0 0 0 1.5px var(--accent);
+   it rings with it.
+
+   Not scoped to .playground-chat: Replay marks the turn that failed with the
+   same gesture, and picking a message should look the same wherever a
+   transcript is shown. */
+/* Two rings: one in the page background first, then the accent. That gap is
+   what keeps the highlight from reading as the bubble's own border sitting on
+   top of the text. */
+.chat-turn.is-selected .chat-msg {
+  box-shadow:
+    0 0 0 2px var(--bg),
+    0 0 0 3.5px var(--accent);
 }
-.playground-chat .chat-turn.is-flashed .chat-msg {
+/* A transcript shown for reading only: no pointer promising a click that does
+   nothing. */
+.chat-turn.is-static {
+  cursor: default;
+}
+.chat-turn.is-flashed .chat-msg {
   animation: noteFlash 1.6s ease;
 }
 
@@ -3963,7 +4094,7 @@ body[data-theme="light"] .dot-grid::after {
 /* ============================================================
    Selectable-options block (chat questionnaire). Collapsible card
    mirroring .collapse-*, with option buttons that borrow the
-   dashed-to-solid + accent-border selected idiom from .select-chip.
+   dashed-to-solid + accent-border selected idiom from .chip-select.
    ============================================================ */
 .options-block {
   margin: 8px 0;

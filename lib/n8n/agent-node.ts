@@ -151,6 +151,28 @@ export function listAgentNodes(workflow: N8nWorkflow): AgentNodeSummary[] {
   });
 }
 
+/**
+ * The node name that holds the client-facing prompt in the "IA mensajes
+ * <Cliente>" workflow family, which is what the template belongs to. Those
+ * workflows carry three agents: a `Router` that dispatches, this one that
+ * talks to the lead, and an `AI Agent` that handles the calendar. All six
+ * clients on that family are bound to this node by hand today.
+ */
+export const PROMPT_AGENT_NAME = "dudas/conversacion";
+
+/**
+ * Picks the agent a fresh copy of the template should be bound to. One agent
+ * means no ambiguity. Several means we only accept an EXACT match on the
+ * convention name: binding the wrong agent would later push the client's
+ * prompt over the router's or the calendar's, so an unrecognized shape must
+ * fall through to null and be bound by hand from the client detail.
+ */
+export function pickPromptAgent(agents: AgentNodeSummary[]): AgentNodeSummary | null {
+  if (agents.length === 1) return agents[0];
+  const named = agents.filter((a) => a.node_name === PROMPT_AGENT_NAME);
+  return named.length === 1 ? named[0] : null;
+}
+
 export type LocateResult =
   | { ok: true; node: N8nNode; matched_by: "id" | "name" }
   | { ok: false; reason: "not_found" | "not_agent" };

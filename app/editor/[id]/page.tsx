@@ -25,6 +25,9 @@ export default function EditorSessionPage() {
 
   const [initialDraft, setInitialDraft] = useState<string | undefined>(undefined);
   useEffect(() => {
+    // Shared by both handoffs: the Playground's notes and Replay's case
+    // (components/library/ConversationTranscript.tsx). The key kept its
+    // original name so the channel stays one thing.
     const key = `playground-handoff:${id}`;
     const stored = window.sessionStorage.getItem(key);
     if (stored) {
