@@ -166,6 +166,26 @@ conversation by its Kommo id, reads it as a chat, marks the offending turn,
 lands in the Editor with the context loaded, and after editing sees the old
 and new replies side by side. No screenshots.
 
+## Sprint 18 — Demo (el link de pruebas del cliente) ⏳
+
+Un cuarto modo de Lab, y el primero donde quien prueba no es el equipo. Se le
+manda al cliente un link aislado, `/prueba/<token>`, con el mismo chat del
+Playground y nada de admin: conversa con su agente, toca el mensaje que no le
+cuadró y escribe qué estuvo mal y qué debió responder. Reemplaza el Google Doc
+de capturas y los audios de WhatsApp.
+
+Todas las conversaciones quedan guardadas con fecha, IP y dispositivo, que es lo
+que permite volver semanas después y enseñar quién pidió qué. Ninguna nota del
+cliente llega al Editor sin que el usuario la apruebe, y puede reescribirla
+antes. Plan en `docs/SPRINT-18-demo-link-plan.md`.
+
+Es la primera ruta pública del proyecto: deja de ser cierto que todo está detrás
+del login. Ver la sección de modelo de seguridad en `docs/ARCHITECTURE.md`.
+
+**Definition of done**: el cliente prueba desde su celular, reporta algo sobre
+un mensaje concreto, Carlos recibe el aviso, lo revisa en contexto, lo aprueba y
+aterriza en el Editor con el turno marcado y la respuesta esperada.
+
 ---
 
 ## Future (not in current scope)

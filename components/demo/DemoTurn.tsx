@@ -19,7 +19,7 @@ import { parseTurnBubbles } from "@/lib/adversarial-message";
  */
 
 /** Any special state with no readable message names itself explicitly,
- *  e.g. "El bot pasó a estado «humano» y dejó de responder." — this is
+ *  e.g. "El bot pasó a estado «humano» y dejó de responder.", which is
  *  exactly what a live test needs to verify (Sprint 6, decision 2). */
 export function emptyBotMessage(state: string | null): string {
   return state ? `El bot pasó a estado «${state}» y dejó de responder.` : "El bot no envió mensaje.";

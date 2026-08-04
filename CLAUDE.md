@@ -8,11 +8,13 @@ replace it.
 
 An internal tool for the Zebra agency's paid media team. Four sections:
 
-- **Lab** — put a client's prompt to the test. Two modes: **IA vs IA**
+- **Lab**: put a client's prompt to the test. Four modes: **IA vs IA**
   (red-teaming: two AIs converse, a judge produces a structured failure
-  report) and **Playground** (chat with the prompt yourself, as a simulated
+  report), **Playground** (chat with the prompt yourself, as a simulated
   lead, for live demos; tag messages, write feedback notes, send them to the
-  Editor).
+  Editor), **Demo** (hand the same chat to the client behind a shareable link;
+  they report, you approve), and **Replay** (the lead is real and the
+  conversation already happened).
 - **Editor** — chat with Claude Opus to make guided edits to a prompt.
 - **Creator** — chat with Claude Opus to build a new prompt from a brief.
 - **Library** — clients, versions, import existing prompts.
@@ -77,11 +79,21 @@ and pastes into the corresponding n8n node.
 
 ## Active sprint
 
+Sprint 18, **Demo**: a fourth Lab mode where the one testing is the client. A
+shareable link, `/prueba/<token>`, gives them the Playground chat with no admin
+in it; they report what went wrong on the exact message, and nothing reaches the
+Editor until it is approved. Plan in `docs/SPRINT-18-demo-link-plan.md`. Code
+complete, pending `023_demo_links.sql` and end to end verification.
+
+This is the first public route in the project. Before touching anything under
+`/prueba` or `/api/prueba`, read the security model section in
+`docs/ARCHITECTURE.md`: those handlers answer without a session and still use
+the `service_role` client.
+
 Sprint 17, **Replay**: a third Lab mode where the lead is real and the
 conversation already happened. Plan in
-`docs/SPRINT-17-history-cases-plan.md`. Nothing implemented yet; the data
-groundwork (the `turnos` column, its trigger, the n8n flows that write it) is
-done.
+`docs/SPRINT-17-history-cases-plan.md`. Code complete, pending end to end
+verification.
 
 Sprint 16 (client provisioning) is verified end to end: Chapur was provisioned
 from the template, retargeted to `chats_Chapur` and bound to

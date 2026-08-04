@@ -562,9 +562,29 @@ the old name, and archiving a client deletes neither.
   Encrypt automatically). This replaced the previous EasyPanel HTTP Basic
   Auth, which is removed at the reverse proxy once the login is live.
 
+- **The one public surface (Sprint 18)**: a client demo link, `/prueba/<token>`
+  and `/api/prueba/<token>/*`, answers without a session. It is no longer true
+  that everything is behind the login. What holds instead:
+  - The token is 32 random base64url characters (`randomToken` in
+    `lib/auth/signed-token.ts`), unguessable and revocable by closing the link.
+  - Every handler under that prefix calls `openDemoContext`
+    (`lib/demo-link-guard.ts`) before touching the database, because the
+    Supabase client behind it is still `service_role`. A route added there that
+    skips the guard is an open door.
+  - The visitor is anonymous: a signed httpOnly `zebra_demo` cookie carrying a
+    random id and nothing else. IP and user agent are recorded next to the
+    conversation as evidence, never used to authorize anything.
+  - Spend is bounded twice: per link (`max_sessions`, `max_messages` on
+    `demo_links`) and per IP (`lib/rate-limit.ts`, in memory, single instance).
+  - The middleware matcher's lookahead is not anchored to a path segment, so a
+    future top level route whose name starts with `prueba` would silently
+    escape the login. `middleware.test.ts` walks the route tree and fails if one
+    appears.
+
 - **In-app auth (Sprint 10)**: the app owns the whole flow, no external auth
   service. `middleware.ts` (Edge runtime) guards every route except the login
-  page, the OAuth callback, and `/api/auth/*`. Flow: `/api/auth/google`
+  page, the OAuth callback, `/api/auth/*`, and the client demo link. Flow:
+  `/api/auth/google`
   redirects to Google with a CSRF `state` cookie; Google returns to
   `/auth/callback`, which exchanges the code server-to-server, reads the
   `email` / `email_verified` / `hd` claims from the returned `id_token`
@@ -641,3 +661,6 @@ already work.
 | Encrypt an n8n connection key | `/app/api/integrations/n8n` → `lib/db/n8n-connections.ts` |
 | Duplicate a flow / create a chats table for a client | `/api/clients/[id]/provision` → `lib/provisioning.ts` |
 | Run DDL in the chats project | `lib/chats-admin.ts` (the only place) |
+| Guard a public demo link request | `lib/demo-link-guard.ts` (before any DB call) |
+| One turn of a demo conversation | `lib/demo-turn.ts` (Playground and demo link) |
+| Decide what reaches the Editor from notes | `approvedNotes` in `lib/prompts/playground-handoff.ts` |
