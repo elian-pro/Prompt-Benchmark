@@ -1,5 +1,6 @@
 "use client";
 
+import { useRef } from "react";
 import { useRouter } from "next/navigation";
 import { IconPencil, IconCopy, IconTrash, IconPlugConnectedX } from "@tabler/icons-react";
 import type { ClientSummary } from "@/lib/db/clients";
@@ -50,21 +51,40 @@ export function ClientCard({
     router.push(`/library/${client.id}`);
   }
 
-  async function copyProduction() {
-    try {
-      const res = await fetch(`/api/clients/${client.id}`);
-      if (!res.ok) throw new Error();
-      const detail = await res.json();
-      const content: string | undefined = detail.production_version?.content;
-      if (!content) {
-        onToast("Este cliente no tiene versión de producción.");
-        return;
-      }
-      await navigator.clipboard.writeText(content);
-      onToast("Prompt de producción copiado.");
-    } catch {
-      onToast("No se pudo copiar el prompt.");
+  /** The card only knows the version number, so the prompt has to be fetched.
+   *  Awaiting that fetch inside the click spends the user gesture, and Safari
+   *  then refuses the clipboard write, which is why copying only worked from
+   *  the client detail page (where the prompt is already in memory). Hovering
+   *  the button loads it first, so the click itself writes with nothing
+   *  awaited in between. */
+  const loading = useRef<Promise<string | null> | null>(null);
+  const loaded = useRef<string | null>(null);
+
+  function prefetchProduction() {
+    loading.current ??= fetch(`/api/clients/${client.id}`)
+      .then((res) => (res.ok ? res.json() : null))
+      .then((detail) => (loaded.current = detail?.production_version?.content ?? null))
+      .catch(() => {
+        loading.current = null; // a failed load should retry, not stick
+        return null;
+      });
+  }
+
+  function write(content: string | null) {
+    if (!content) {
+      onToast("Este cliente no tiene versión de producción.");
+      return;
     }
+    navigator.clipboard
+      .writeText(content)
+      .then(() => onToast("Prompt de producción copiado."))
+      .catch(() => onToast("No se pudo copiar el prompt."));
+  }
+
+  function copyProduction() {
+    if (loaded.current !== null) return write(loaded.current);
+    prefetchProduction();
+    loading.current?.then(write);
   }
 
   // Cap the stagger so long lists still finish quickly.
@@ -86,6 +106,8 @@ export function ClientCard({
         className="icon-btn"
         title="Copiar prompt de producción"
         onClick={copyProduction}
+        onPointerEnter={prefetchProduction}
+        onFocus={prefetchProduction}
         aria-label="Copiar"
       >
         <IconCopy size={16} />
