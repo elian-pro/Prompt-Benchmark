@@ -5,9 +5,10 @@ export const sessionTypeSchema = z.enum(["editor", "creator"], {
 });
 
 // Editor sessions belong to a client from the start and edit that client's
-// prompt (base version required). Creator sessions are client-less until
-// finalize and may start from an architectural reference OR from scratch, so
-// their base version is optional. `type` defaults to 'editor'.
+// prompt (base version required). Creator sessions may start from an
+// architectural reference OR from scratch, so their base version is optional,
+// and their clientId is the client the prompt will land on: optional too,
+// since it can also be picked at finalize. `type` defaults to 'editor'.
 export const createSessionSchema = z
   .object({
     type: sessionTypeSchema.optional().default("editor"),
@@ -69,15 +70,25 @@ export const updateDraftSchema = z.object({
   draftContent: z.string({ required_error: "El borrador es obligatorio." }),
 });
 
-// Creator sessions have no client until finalize: the new client's metadata is
-// collected then. Editor finalize needs no body (it already has a client).
-export const finalizeCreatorSchema = z.object({
-  name: z
-    .string({ required_error: "El nombre del cliente es obligatorio." })
-    .trim()
-    .min(1, "El nombre del cliente es obligatorio."),
-  segment: z.string().trim().min(1).nullable().optional(),
-});
+// A Creator session lands either on a client that already exists (clientId) or
+// on a brand-new one (name, plus optional segment). The session may already
+// carry a target picked at start; the body wins, so the finalize modal can
+// still change it. Editor finalize needs no body (it already has a client).
+export const finalizeCreatorSchema = z
+  .object({
+    clientId: z.string().uuid("El cliente no es válido.").optional(),
+    name: z.string().trim().min(1, "El nombre del cliente es obligatorio.").optional(),
+    segment: z.string().trim().min(1).nullable().optional(),
+  })
+  .superRefine((val, ctx) => {
+    if (!val.clientId && !val.name) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["name"],
+        message: "El nombre del cliente es obligatorio.",
+      });
+    }
+  });
 
 export type CreateSessionInput = z.infer<typeof createSessionSchema>;
 export type AppendMessageInput = z.infer<typeof appendMessageSchema>;
