@@ -19,6 +19,11 @@ const inter = Inter({
 export const metadata: Metadata = {
   title: "ZEBRA · Prompt Studio",
   description: "Herramienta interna del equipo de paid media de Zebra.",
+  // Needed so the demo link's Open Graph image resolves to an absolute URL.
+  // Without it Next emits a relative path and WhatsApp, Slack and mail clients
+  // silently show no preview. AUTH_BASE_URL is the same override the OAuth
+  // redirect uses behind the EasyPanel proxy.
+  metadataBase: new URL(process.env.AUTH_BASE_URL || "http://localhost:3000"),
 };
 
 export default function RootLayout({
