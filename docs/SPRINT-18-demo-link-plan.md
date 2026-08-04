@@ -1,10 +1,12 @@
 # Sprint 18: Demo, el link de pruebas del cliente
 
-> Estado: código completo, pendiente de correr `023_demo_links.sql` y de
-> verificación end to end. Todo salió como estaba planeado salvo dos cosas
-> anotadas abajo: el header del Studio acabó siendo un componente propio en vez
-> de una regla CSS, y la ruta para revisar una nota cuelga de su conversación en
-> vez de llevar el `sessionId` por querystring.
+> Estado: código completo y `023_demo_links.sql` aplicada en prompt_studio el
+> 2026-08-04 (las 12 conversaciones y 14 notas que ya existían quedaron como
+> estaban, con `link_id` nulo y `source='admin'`, `status='approved'`). Pendiente
+> la verificación end to end contra la app corriendo. Todo salió como estaba
+> planeado salvo dos cosas anotadas abajo: el header del Studio acabó siendo un
+> componente propio en vez de una regla CSS, y la ruta para revisar una nota
+> cuelga de su conversación en vez de llevar el `sessionId` por querystring.
 
 ## Contexto
 

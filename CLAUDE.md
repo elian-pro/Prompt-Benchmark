@@ -83,7 +83,8 @@ Sprint 18, **Demo**: a fourth Lab mode where the one testing is the client. A
 shareable link, `/prueba/<token>`, gives them the Playground chat with no admin
 in it; they report what went wrong on the exact message, and nothing reaches the
 Editor until it is approved. Plan in `docs/SPRINT-18-demo-link-plan.md`. Code
-complete, pending `023_demo_links.sql` and end to end verification.
+complete and `023_demo_links.sql` already applied; pending end to end
+verification against the running app.
 
 This is the first public route in the project. Before touching anything under
 `/prueba` or `/api/prueba`, read the security model section in
