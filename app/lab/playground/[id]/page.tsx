@@ -17,11 +17,10 @@ import {
 } from "@tabler/icons-react";
 import type {
   DemoSessionDetail,
-  DemoMessageRole,
   DemoMessageRow,
 } from "@/lib/db/demo-sessions";
 import type { DemoNoteRow } from "@/lib/db/demo-notes";
-import { parseTurn, parseTurnBubbles } from "@/lib/adversarial-message";
+import { parseTurn } from "@/lib/adversarial-message";
 import { relativeTimeEs } from "@/lib/format";
 import type { VersionListItem } from "@/lib/db/versions";
 import { Button } from "@/components/ui/Button";
@@ -29,152 +28,7 @@ import { Modal } from "@/components/ui/Modal";
 import { SearchableChip } from "@/components/ui/SearchableChip";
 import { InfoHint } from "@/components/ui/InfoHint";
 import { DeleteDemoSessionModal } from "@/components/playground/DeleteDemoSessionModal";
-
-/** Any special state with no readable message names itself explicitly,
- *  e.g. "El bot pasó a estado «humano» y dejó de responder." — this is
- *  exactly what a live test needs to verify (Sprint 6, decision 2). */
-function emptyBotMessage(state: string | null): string {
-  return state ? `El bot pasó a estado «${state}» y dejó de responder.` : "El bot no envió mensaje.";
-}
-
-/** A persisted turn: clickable to tag it into the note being composed, and
- *  carries numbered pins for whichever notes already reference it. */
-function Turn({
-  id,
-  role,
-  content,
-  selected,
-  pins,
-  flashed,
-  onToggleSelect,
-  onJumpToNote,
-  registerRef,
-  onEditOpening,
-}: {
-  id: string;
-  role: DemoMessageRole;
-  content: string;
-  selected: boolean;
-  pins: number[];
-  flashed: boolean;
-  onToggleSelect: (id: string) => void;
-  onJumpToNote: (noteIndex: number) => void;
-  registerRef: (id: string, el: HTMLDivElement | null) => void;
-  /** When set, this turn is the editable opening message: shows a pencil that
-   *  opens the edit modal (Sprint 15). */
-  onEditOpening?: () => void;
-}) {
-  const side = role === "bot" ? "turn-bot" : "turn-lead";
-  const roleLabel = role === "bot" ? "Bot del cliente" : "Tú (lead)";
-  const { messages, state, malformed } = parseTurnBubbles(content);
-  // Malformed = the reply looked like JSON but couldn't be parsed (e.g. broken
-  // envelope). Never dump raw braces as bubbles: show one clean error bubble
-  // so a bad prompt output is obvious without garbage on screen.
-  const bubbles = malformed
-    ? ["No se pudo leer la respuesta del bot (formato inesperado)."]
-    : messages.length > 0
-      ? messages
-      : [emptyBotMessage(state)];
-  const isEmpty = malformed || messages.length === 0;
-
-  return (
-    <div
-      ref={(el) => registerRef(id, el)}
-      className={`chat-turn ${side}${selected ? " is-selected" : ""}${flashed ? " is-flashed" : ""}`}
-      onClick={() => onToggleSelect(id)}
-      role="button"
-      tabIndex={0}
-      onKeyDown={(e) => {
-        if (e.key === "Enter" || e.key === " ") {
-          e.preventDefault();
-          onToggleSelect(id);
-        }
-      }}
-    >
-      {pins.length > 0 && (
-        <div className="chat-pins">
-          {pins.map((p) => (
-            <button
-              key={p}
-              type="button"
-              className="chat-pin"
-              onClick={(e) => {
-                e.stopPropagation();
-                onJumpToNote(p - 1);
-              }}
-              aria-label={`Ir a la nota ${p}`}
-            >
-              {p}
-            </button>
-          ))}
-        </div>
-      )}
-      <span className="chat-turn-role">
-        {roleLabel}
-        {onEditOpening && (
-          <button
-            type="button"
-            className="icon-btn chat-turn-edit"
-            onClick={(e) => {
-              e.stopPropagation();
-              onEditOpening();
-            }}
-            aria-label="Editar mensaje de inicio"
-            title="Editar mensaje de inicio"
-          >
-            <IconPencil size={13} />
-          </button>
-        )}
-      </span>
-      {bubbles.map((b, i) => {
-        const isLast = i === bubbles.length - 1;
-        return (
-          <div key={i} className={`chat-msg${malformed ? " chat-msg-error" : ""}`}>
-            <div className={`chat-content${isEmpty ? " chat-empty" : ""}`}>{b}</div>
-            {/* The estado hangs off the last bubble, WhatsApp-style. */}
-            {state && isLast && !isEmpty && (
-              <div className="chat-state">
-                <span className="chat-state-label">Estado</span>
-                <span className="chat-state-value">{state}</span>
-              </div>
-            )}
-          </div>
-        );
-      })}
-    </div>
-  );
-}
-
-/** The optimistic bubble shown right after sending, before the reload —
- *  never persisted yet, so it has no id and can't be tagged. */
-function PendingTurn({ content }: { content: string }) {
-  return (
-    <div className="chat-turn turn-lead">
-      <span className="chat-turn-role">Tú (lead)</span>
-      <div className="chat-msg">
-        <div className="chat-content">{content}</div>
-      </div>
-    </div>
-  );
-}
-
-function TypingIndicator() {
-  return (
-    <div className="chat-turn turn-bot">
-      <span className="chat-turn-role">Bot del cliente</span>
-      <div className="chat-msg">
-        <div className="chat-content chat-typing">
-          Escribiendo
-          <span className="typing-dots" aria-hidden="true">
-            <span />
-            <span />
-            <span />
-          </span>
-        </div>
-      </div>
-    </div>
-  );
-}
+import { DemoTurn, PendingTurn, TypingIndicator } from "@/components/demo/DemoTurn";
 
 function NotesPanel({
   notes,
@@ -785,7 +639,7 @@ export default function PlaygroundSessionPage() {
               </p>
             )}
             {session.messages.map((m) => (
-              <Turn
+              <DemoTurn
                 key={m.id}
                 id={m.id}
                 role={m.role}

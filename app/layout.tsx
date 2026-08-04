@@ -1,15 +1,6 @@
 import type { Metadata } from "next";
 import { Inter } from "next/font/google";
-import {
-  IconLibrary,
-  IconPencil,
-  IconSparkles,
-  IconFlask,
-  IconSettings,
-  IconLogout,
-} from "@tabler/icons-react";
-import { ThemeToggle } from "@/components/ui/ThemeToggle";
-import { GenerationWatcher } from "@/components/sessions/GenerationWatcher";
+import { AppHeader } from "@/components/layout/AppHeader";
 import "./globals.css";
 
 // Runs synchronously before paint to apply the persisted theme, avoiding a
@@ -30,14 +21,6 @@ export const metadata: Metadata = {
   description: "Herramienta interna del equipo de paid media de Zebra.",
 };
 
-const NAV_ITEMS = [
-  { label: "Editor", href: "/editor", Icon: IconPencil },
-  { label: "Creator", href: "/creator", Icon: IconSparkles },
-  { label: "Lab", href: "/lab", Icon: IconFlask },
-  { label: "Biblioteca", href: "/library", Icon: IconLibrary },
-  { label: "Settings", href: "/settings", Icon: IconSettings },
-];
-
 export default function RootLayout({
   children,
 }: {
@@ -48,31 +31,7 @@ export default function RootLayout({
       <body data-theme="dark" suppressHydrationWarning>
         <script dangerouslySetInnerHTML={{ __html: NO_FLASH_THEME_SCRIPT }} />
         <div className="app-shell">
-          <header className="app-header">
-            <span className="pill-logo">Zebra · Prompt Studio</span>
-            <div className="header-right">
-              <nav className="app-nav">
-                {NAV_ITEMS.map(({ label, href, Icon }) => (
-                  <a key={href} href={href}>
-                    <Icon className="nav-icon" size={14} stroke={1.5} />
-                    {label}
-                  </a>
-                ))}
-              </nav>
-              <GenerationWatcher />
-              <ThemeToggle />
-              <form action="/api/auth/logout" method="post" className="logout-form">
-                <button
-                  type="submit"
-                  className="btn btn-ghost btn-sm logout-btn"
-                  title="Cerrar sesión"
-                  aria-label="Cerrar sesión"
-                >
-                  <IconLogout size={14} stroke={1.5} />
-                </button>
-              </form>
-            </div>
-          </header>
+          <AppHeader />
           <main>{children}</main>
         </div>
       </body>
