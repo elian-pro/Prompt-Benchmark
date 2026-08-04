@@ -4430,3 +4430,115 @@ body[data-theme="dark"] .history-filters input[type="date"]::-webkit-calendar-pi
   border-radius: 8px;
   padding: 6px 8px;
 }
+
+/* ===========================================================================
+   Demo link admin: the list of links and one link's conversations (S18, T5)
+   =========================================================================== */
+.demo-caps {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.demo-link-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.demo-link-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  border: 0.5px solid var(--border);
+  border-radius: 14px;
+  background: var(--surface);
+  padding: 16px 18px;
+  transition: border-color 0.15s ease;
+}
+.demo-link-row:hover {
+  border-color: var(--border2);
+}
+.demo-link-main {
+  flex: 1;
+  min-width: 220px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  color: inherit;
+  text-decoration: none;
+}
+.demo-link-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  font-size: 14px;
+}
+.demo-link-label {
+  font-size: 11px;
+  color: var(--muted);
+}
+.demo-link-meta {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  font-size: 11.5px;
+  color: var(--muted);
+}
+/* The only number worth interrupting for: reports nobody has looked at. */
+.demo-link-pending {
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #0a0a0a;
+  background: var(--accent);
+  border-radius: 100px;
+  padding: 2px 8px;
+}
+.demo-link-actions {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.demo-session-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.demo-session-row {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  text-align: left;
+  border: 0.5px solid var(--border2);
+  border-radius: 10px;
+  background: transparent;
+  padding: 12px;
+  cursor: pointer;
+  color: inherit;
+  transition: border-color 0.15s ease;
+}
+.demo-session-row:hover {
+  border-color: var(--muted);
+}
+.demo-session-row.is-selected {
+  border-color: var(--accent);
+}
+.demo-session-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 12.5px;
+}
+.demo-session-meta {
+  font-size: 11.5px;
+  color: var(--muted);
+}
+.demo-session-trace {
+  font-size: 10.5px;
+  color: var(--faint);
+}

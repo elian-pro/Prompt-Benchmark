@@ -1,11 +1,12 @@
 import Link from "next/link";
-import { IconMessage2, IconPlayerPlay, IconTarget } from "@tabler/icons-react";
+import { IconLink, IconMessage2, IconPlayerPlay, IconTarget } from "@tabler/icons-react";
 
 /**
- * Lab hub: three ways to put a client's prompt to the test, ordered by how
- * real the lead is. "IA vs IA" is the Adversarial run (lives at /adversarial),
- * "Playground" is you conversing with the prompt, and "Replay" works from
- * conversations that actually happened in production.
+ * Lab hub: four ways to put a client's prompt to the test, ordered by how real
+ * the lead is. "IA vs IA" is the Adversarial run (lives at /adversarial),
+ * "Playground" is you conversing with the prompt, "Demo" hands the same chat to
+ * the client behind a shareable link, and "Replay" works from conversations
+ * that actually happened in production.
  */
 export default function LabPage() {
   return (
@@ -36,6 +37,16 @@ export default function LabPage() {
           <p className="lab-card-desc">
             Conversa tú mismo con el prompt, como un lead real. Ideal para
             demos en vivo.
+          </p>
+        </Link>
+
+        <Link href="/lab/demo" className="lab-card">
+          <IconLink size={28} stroke={1.5} className="lab-card-icon" />
+          <span className="lab-card-title">Demo</span>
+          <p className="lab-card-desc">
+            El que prueba es el cliente. Le mandas un link, conversa con su
+            agente y reporta lo que no cuadra sobre el mensaje exacto. Tú
+            revisas y apruebas antes de que nada llegue al Editor.
           </p>
         </Link>
 
