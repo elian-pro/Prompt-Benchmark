@@ -1,10 +1,10 @@
 "use client";
 
-import { useState } from "react";
+import { useCallback, useState } from "react";
 import Link from "next/link";
 import { IconArrowLeft, IconPlus } from "@tabler/icons-react";
 import { Button } from "@/components/ui/Button";
-import { CaseList } from "@/components/library/CaseList";
+import { CaseList } from "@/components/replay/CaseList";
 import { NewCaseModal } from "@/components/replay/NewCaseModal";
 
 /**
@@ -15,6 +15,12 @@ import { NewCaseModal } from "@/components/replay/NewCaseModal";
  */
 export default function ReplayIndexPage() {
   const [picking, setPicking] = useState(false);
+  const [count, setCount] = useState<{ resolved: number; total: number } | null>(null);
+
+  const onCount = useCallback(
+    (resolved: number, total: number) => setCount({ resolved, total }),
+    [],
+  );
 
   return (
     <div>
@@ -25,8 +31,9 @@ export default function ReplayIndexPage() {
           </Link>
           <h1 className="library-title">Replay</h1>
           <p className="section-label library-subtitle">
-            Conversaciones reales que ya ocurrieron: encuentra la que falló,
-            márcala y comprueba si tu cambio la arregla
+            {count && count.total > 0
+              ? `${count.resolved} de ${count.total} ${count.total === 1 ? "caso resuelto" : "casos resueltos"}`
+              : "Conversaciones reales que ya ocurrieron: encuentra la que falló, márcala y comprueba si tu cambio la arregla"}
           </p>
         </div>
         <Button variant="primary" onClick={() => setPicking(true)}>
@@ -34,7 +41,7 @@ export default function ReplayIndexPage() {
         </Button>
       </div>
 
-      <CaseList embedded />
+      <CaseList onCount={onCount} />
 
       <NewCaseModal open={picking} onClose={() => setPicking(false)} />
     </div>
