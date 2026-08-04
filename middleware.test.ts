@@ -32,6 +32,13 @@ test("lets the login flow through", () => {
   }
 });
 
+test("lets the favicon through", () => {
+  // app/favicon.ico is a route in the App Router, so without this exclusion the
+  // client's demo page would ask an unauthenticated browser to log in just to
+  // draw the tab icon.
+  assert.equal(matches("/favicon.ico"), false);
+});
+
 test("lets the client demo link through", () => {
   for (const path of [
     "/prueba/abc123",
