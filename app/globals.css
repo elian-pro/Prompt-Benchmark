@@ -4568,3 +4568,24 @@ body[data-theme="dark"] .history-filters input[type="date"]::-webkit-calendar-pi
   gap: 12px;
   flex-wrap: wrap;
 }
+
+/* Header of the client's demo page: says what the page is, not just whose
+   assistant it is (Sprint 18). */
+.demo-header-id {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex-wrap: wrap;
+}
+.demo-header-id .section-label {
+  margin: 0 0 2px;
+}
+.demo-header-title {
+  font-size: 14px;
+  margin: 0;
+}
+.demo-reset {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}

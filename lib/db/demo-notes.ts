@@ -13,10 +13,12 @@ export type DemoNoteStatus = "pending" | "approved" | "rejected";
 export type DemoNoteRow = {
   id: string;
   session_id: string;
-  /** What is wrong. Written by whoever left the note. */
-  text: string;
-  /** What the bot should have answered instead. Optional, and the field that
-   *  saves the most guesswork when the prompt is edited afterwards (Sprint 18). */
+  /** What is wrong. Required in the Playground, which has this one field, and
+   *  optional on a client's report, where the tagged message usually says it
+   *  already (migration 024). */
+  text: string | null;
+  /** What the bot should have answered instead. This is the field that gets a
+   *  prompt edited, so on a client's report it is the required one. */
   expected: string | null;
   message_ids: string[];
   /** Who wrote it. A note from a client is a proposal, not an instruction. */
@@ -65,7 +67,7 @@ async function assertMessagesBelongToSession(
 export async function createNote(
   sessionId: string,
   input: {
-    text: string;
+    text?: string | null;
     messageIds: string[];
     expected?: string | null;
     source?: DemoNoteSource;
@@ -78,7 +80,7 @@ export async function createNote(
     .from("demo_notes")
     .insert({
       session_id: sessionId,
-      text: input.text,
+      text: input.text ?? null,
       expected: input.expected ?? null,
       message_ids: input.messageIds,
       // The column defaults cover the Playground, which never passes these.
@@ -95,7 +97,7 @@ export async function updateNote(
   id: string,
   sessionId: string,
   input: {
-    text?: string;
+    text?: string | null;
     expected?: string | null;
     messageIds?: string[];
     status?: DemoNoteStatus;

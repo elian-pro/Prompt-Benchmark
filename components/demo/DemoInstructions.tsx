@@ -46,7 +46,8 @@ export function DemoInstructions({
             <div>
               <strong>¿Algo salió mal? Toca el mensaje</strong> y déjanos una nota. No necesitas
               capturas de pantalla: al tocar el mensaje ya sabemos exactamente de cuál hablas.
-              Cuéntanos qué estuvo mal y, si lo sabes, qué debió responder.
+              Lo que más nos sirve es que nos digas <strong>qué debió responder</strong>. Si
+              quieres explicar qué estuvo mal, hay espacio para eso también.
             </div>
           </li>
           <li>

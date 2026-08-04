@@ -17,26 +17,27 @@ export const updateDemoLinkSchema = z.object({
 });
 
 /**
- * A note left by the client on a demo link. `text` is what is wrong, `expected`
- * is what the bot should have answered instead. The second one is optional
- * because a client who only knows something is off should still be able to say
- * so, and it is the field that saves the most guessing when the prompt is
- * edited afterwards.
+ * A note left by the client on a demo link.
+ *
+ * `expected` is the required one: what the bot should have answered is what
+ * actually gets the prompt edited, while "what went wrong" is usually legible
+ * from the message they tagged. This is the reverse of how it shipped first,
+ * and the reason `demo_notes.text` had to become nullable (migration 024).
  */
 export const createClientNoteSchema = z.object({
-  text: z
-    .string({ required_error: "Cuéntanos qué salió mal." })
+  expected: z
+    .string({ required_error: "Dinos qué debió responder." })
     .trim()
-    .min(1, "Cuéntanos qué salió mal.")
-    .max(4000, "La nota es demasiado larga."),
-  expected: z.string().trim().max(4000, "La respuesta esperada es demasiado larga.").optional(),
+    .min(1, "Dinos qué debió responder.")
+    .max(4000, "La respuesta es demasiado larga."),
+  text: z.string().trim().max(4000, "La nota es demasiado larga.").optional(),
   messageIds: z.array(z.string().uuid()).default([]),
 });
 
 export const updateClientNoteSchema = z
   .object({
-    text: z.string().trim().min(1, "Cuéntanos qué salió mal.").max(4000).optional(),
-    expected: z.string().trim().max(4000).nullable().optional(),
+    text: z.string().trim().max(4000).nullable().optional(),
+    expected: z.string().trim().min(1, "Dinos qué debió responder.").max(4000).optional(),
     messageIds: z.array(z.string().uuid()).optional(),
   })
   .refine(
@@ -50,7 +51,7 @@ export const updateClientNoteSchema = z
 export const reviewDemoNoteSchema = z
   .object({
     status: z.enum(["pending", "approved", "rejected"]).optional(),
-    text: z.string().trim().min(1, "La nota no puede quedar vacía.").max(4000).optional(),
+    text: z.string().trim().max(4000).nullable().optional(),
     expected: z.string().trim().max(4000).nullable().optional(),
   })
   .refine(

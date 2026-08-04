@@ -334,7 +334,7 @@ export default function PlaygroundSessionPage() {
 
   function startEditNote(note: DemoNoteRow) {
     setEditingNoteId(note.id);
-    setDraftText(note.text);
+    setDraftText(note.text ?? "");
     setSelectedIds(note.message_ids);
     setNoteError(null);
   }

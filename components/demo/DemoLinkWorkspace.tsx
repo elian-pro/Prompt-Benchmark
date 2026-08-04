@@ -60,7 +60,7 @@ export function DemoLinkWorkspace({
 
   async function review(
     note: DemoNoteRow,
-    patch: { status?: DemoNoteStatus; text?: string; expected?: string | null },
+    patch: { status?: DemoNoteStatus; text?: string | null; expected?: string | null },
   ) {
     setBusyNoteId(note.id);
     setError(null);
@@ -89,7 +89,7 @@ export function DemoLinkWorkspace({
 
   function startEdit(note: DemoNoteRow) {
     setEditingId(note.id);
-    setDraftText(note.text);
+    setDraftText(note.text ?? "");
     setDraftExpected(note.expected ?? "");
   }
 
@@ -217,19 +217,21 @@ export function DemoLinkWorkspace({
 
               {editingId === note.id ? (
                 <div className="note-review-edit">
+                  {/* Same order as the client sees: the fix leads, the
+                      complaint is context. */}
                   <textarea
                     className="textarea"
                     rows={3}
-                    value={draftText}
-                    onChange={(e) => setDraftText(e.target.value)}
-                    placeholder="Qué está mal"
+                    value={draftExpected}
+                    onChange={(e) => setDraftExpected(e.target.value)}
+                    placeholder="Qué debió responder"
                   />
                   <textarea
                     className="textarea"
                     rows={2}
-                    value={draftExpected}
-                    onChange={(e) => setDraftExpected(e.target.value)}
-                    placeholder="Qué debió responder (opcional)"
+                    value={draftText}
+                    onChange={(e) => setDraftText(e.target.value)}
+                    placeholder="Qué está mal"
                   />
                   <div className="note-composer-actions">
                     <Button variant="ghost" size="sm" onClick={() => setEditingId(null)}>
@@ -237,11 +239,13 @@ export function DemoLinkWorkspace({
                     </Button>
                     <Button
                       size="sm"
-                      disabled={!draftText.trim() || busyNoteId === note.id}
+                      disabled={
+                        !(draftExpected.trim() || draftText.trim()) || busyNoteId === note.id
+                      }
                       onClick={() =>
                         review(note, {
-                          text: draftText.trim(),
                           expected: draftExpected.trim() || null,
+                          text: draftText.trim() || null,
                         })
                       }
                     >
@@ -251,13 +255,13 @@ export function DemoLinkWorkspace({
                 </div>
               ) : (
                 <>
-                  <p className="note-text">{note.text}</p>
                   {note.expected && (
-                    <p className="note-expected">
+                    <p className="note-text">
                       <span className="section-label">Debió responder</span>
                       {note.expected}
                     </p>
                   )}
+                  {note.text && <p className="note-expected">{note.text}</p>}
                 </>
               )}
 

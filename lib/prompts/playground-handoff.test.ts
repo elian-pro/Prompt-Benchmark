@@ -96,3 +96,25 @@ test("a demo link handoff says where it came from", () => {
   assert.ok(out.includes("Reportes del cliente (Chapur)"));
   assert.ok(out.includes("versión 2.1"));
 });
+
+test("a report with only the fix leads with it instead of an empty line", () => {
+  const out = buildHandoffMessage(
+    "1.0",
+    [note({ text: null, expected: "Abre a las 8." })],
+    [],
+  );
+  assert.ok(out.includes('1. Debió responder: "Abre a las 8."'));
+  assert.ok(!out.includes("1. \n"), "no debe quedar una línea numerada vacía");
+});
+
+test("a report with both keeps the complaint first and the fix under it", () => {
+  const out = buildHandoffMessage(
+    "1.0",
+    [note({ text: "Dijo que abre a las 9.", expected: "Abre a las 8." })],
+    [],
+  );
+  const lines = out.split("\n");
+  const i = lines.findIndex((l) => l.startsWith("1. "));
+  assert.equal(lines[i], "1. Dijo que abre a las 9.");
+  assert.equal(lines[i + 1], '   Debió responder: "Abre a las 8."');
+});

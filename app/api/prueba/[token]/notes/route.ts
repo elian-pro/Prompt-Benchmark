@@ -33,8 +33,8 @@ export async function POST(req: NextRequest, { params }: Params) {
     // createNote checks that every tagged message belongs to this session, so
     // a note can never reference someone else's conversation.
     const note = await createNote(session.id, {
-      text: input.text,
-      expected: input.expected || null,
+      expected: input.expected,
+      text: input.text || null,
       messageIds: input.messageIds,
       source: "client",
       status: "pending",

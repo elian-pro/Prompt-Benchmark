@@ -5,6 +5,7 @@ import { IconNotes, IconRefresh, IconSend, IconTrash, IconX } from "@tabler/icon
 
 import { messagePreview } from "@/lib/adversarial-message";
 import { Button } from "@/components/ui/Button";
+import { InfoHint } from "@/components/ui/InfoHint";
 import { Modal } from "@/components/ui/Modal";
 import {
   CLIENT_LABELS,
@@ -178,8 +179,8 @@ export function DemoClient({
   }
 
   async function saveNote() {
-    const text = noteText.trim();
-    if (!text || savingNote) return;
+    const expected = noteExpected.trim();
+    if (!expected || savingNote) return;
     setSavingNote(true);
     setNoteError(null);
     try {
@@ -187,8 +188,8 @@ export function DemoClient({
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          text,
-          expected: noteExpected.trim() || undefined,
+          expected,
+          text: noteText.trim() || undefined,
           messageIds: selectedIds,
         }),
       });
@@ -283,20 +284,35 @@ export function DemoClient({
   return (
     <div className="public-demo">
       <header className="demo-header">
-        <span className="pill-logo">{clientName ?? "Asistente"}</span>
+        {/* Says what the page is once the instructions modal is gone. Without
+            it the screen is a chat with a client's name on it and no clue that
+            this is a testing round. */}
+        <div className="demo-header-id">
+          <span className="pill-logo">{clientName ?? "Asistente"}</span>
+          <div>
+            <p className="section-label">Pruebas y validación</p>
+            <p className="demo-header-title">
+              Prueba el asistente y repórtanos lo que no cuadre
+            </p>
+          </div>
+        </div>
+
         <div className="demo-header-right">
           <span className="demo-header-hint">
             Toca cualquier mensaje para reportar algo sobre él
           </span>
           {messages.length > 0 && (
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => setResetOpen(true)}
-              icon={<IconRefresh size={14} stroke={1.5} />}
-            >
-              Reiniciar
-            </Button>
+            <span className="demo-reset">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setResetOpen(true)}
+                icon={<IconRefresh size={14} stroke={1.5} />}
+              >
+                Reiniciar
+              </Button>
+              <InfoHint text="Empieza el chat de nuevo, desde cero, para probar otra conversación. Lo que ya reportaste no se borra." />
+            </span>
           )}
         </div>
       </header>
@@ -384,8 +400,8 @@ export function DemoClient({
               <div className="notes-empty">
                 <IconNotes size={22} stroke={1.5} />
                 <p>
-                  Cuando algo no te cuadre, toca el mensaje en el chat y descríbelo aquí. Así
-                  sabemos exactamente de qué respuesta hablas.
+                  Cuando algo no te cuadre, toca el mensaje en el chat y dinos qué debió
+                  responder. Así sabemos exactamente de qué respuesta hablas.
                 </p>
               </div>
             )}
@@ -425,13 +441,13 @@ export function DemoClient({
                     ))}
                   </div>
                 )}
-                <p className="note-text">{note.text}</p>
                 {note.expected && (
-                  <p className="note-expected">
+                  <p className="note-text">
                     <span className="section-label">Debió responder</span>
                     {note.expected}
                   </p>
                 )}
+                {note.text && <p className="note-expected">{note.text}</p>}
               </div>
             ))}
           </div>
@@ -474,23 +490,26 @@ export function DemoClient({
                 </div>
               </>
             )}
+            {/* The fix comes first and is the required one: it is what gets
+                the prompt corrected. The complaint is usually legible from the
+                message they tagged. */}
+            <textarea
+              className="textarea"
+              value={noteExpected}
+              onChange={(e) => setNoteExpected(e.target.value)}
+              placeholder="¿Qué debió responder? *"
+              rows={3}
+            />
             <textarea
               className="textarea"
               value={noteText}
               onChange={(e) => setNoteText(e.target.value)}
               placeholder="¿Qué estuvo mal?"
-              rows={3}
-            />
-            <textarea
-              className="textarea"
-              value={noteExpected}
-              onChange={(e) => setNoteExpected(e.target.value)}
-              placeholder="¿Qué debió responder? (opcional)"
               rows={2}
             />
             {noteError && <p className="form-error">{noteError}</p>}
             <div className="note-composer-actions">
-              <Button onClick={saveNote} disabled={!noteText.trim() || savingNote}>
+              <Button onClick={saveNote} disabled={!noteExpected.trim() || savingNote}>
                 {savingNote ? "Enviando…" : "Enviar reporte"}
               </Button>
             </div>

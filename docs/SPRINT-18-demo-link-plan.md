@@ -115,7 +115,21 @@ enseñárselo al cliente sin darle el Studio.
    de rondas anteriores que alguna nota todavía cita. El tope de mensajes cuenta
    todas las rondas, así que reiniciar no lo esquiva.
 
-3. **Token más corto**: 12 caracteres en vez de 32 (9 bytes, 72 bits). Sigue
+3. **El reporte lo encabeza el arreglo, no la queja.** "Qué debió responder" pasó
+   a ser el campo obligatorio y "qué estuvo mal" el opcional: lo primero es lo
+   que hace que el prompt se edite, y lo segundo casi siempre se lee solo en el
+   mensaje marcado. Eso obligó a `024_demo_note_text_optional.sql`, que quita el
+   `not null` de `demo_notes.text`. La regla de "al menos uno de los dos" vive en
+   el esquema de Zod y no en la base, porque cambia según quién escribe: el
+   Playground tiene un solo campo libre y ningún `expected`.
+
+4. **La página dice qué es.** Cerrado el modal de instrucciones solo quedaba un
+   chat con el nombre del cliente. Ahora el header lleva título.
+
+5. **El botón de reiniciar explica qué hace**, con un `InfoHint` que aclara lo
+   que más preocupa: que no borra los reportes ya enviados.
+
+6. **Token más corto**: 12 caracteres en vez de 32 (9 bytes, 72 bits). Sigue
    siendo inadivinable contra un endpoint que responde 404 y limita por IP.
    El prefijo `/prueba` **no** se acortó: el lookahead del matcher no está
    anclado a un segmento, así que excluir `/p` dejaría fuera del login cualquier

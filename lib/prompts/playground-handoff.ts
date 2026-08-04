@@ -44,8 +44,15 @@ export function buildHandoffMessage(
       .map((mid) => messagesById.get(mid))
       .filter((m): m is DemoMessageRow => Boolean(m))
       .map((m) => `   - ${quoteMessage(m)}`);
-    const lines = [`${i + 1}. ${note.text}`];
-    if (note.expected) {
+
+    // A client's report may carry only the fix, since "what went wrong" is
+    // optional for them (migration 024). When that happens the fix leads the
+    // block instead of leaving an empty numbered line.
+    const complaint = note.text?.trim();
+    const lines = complaint
+      ? [`${i + 1}. ${complaint}`]
+      : [`${i + 1}. Debió responder: "${note.expected}"`];
+    if (note.expected && complaint) {
       // The single most useful line when editing: the client already told us
       // what the right answer was.
       lines.push(`   Debió responder: "${note.expected}"`);
