@@ -31,7 +31,18 @@ import { retargetChatsTable } from "./n8n/chats-table";
 import { createChatsTable, isChatsAdminConfigured } from "./chats-admin";
 import { chatsTableName } from "./chats-table-name";
 
-export type StepResult = { ok: true; detail: string } | { ok: false; error: string };
+export type StepResult =
+  | { ok: true; detail: string }
+  | {
+      ok: false;
+      error: string;
+      /**
+       * The copy exists but we could not pick its node: the UI opens the
+       * binding modal on this workflow so the user chooses which agent gets
+       * the prompt, instead of hunting for the flow by hand.
+       */
+      pick?: { connectionId: string; workflowId: string };
+    };
 
 export type ProvisioningResult = {
   workflow: StepResult | null;
@@ -114,9 +125,19 @@ async function duplicateAndBind(
       agents.length === 0
         ? "no tiene ningún nodo AI Agent"
         : `tiene ${agents.length} nodos AI Agent y ninguno se llama «${PROMPT_AGENT_NAME}»`;
+  if (agents.length === 0) {
     return {
       ok: false,
-      error: `El flujo «${wanted}» ${adopted ? "ya existía y " : "se creó, pero "}${why}. Vincúlalo a mano desde la ficha.`,
+      error: `El flujo «${wanted}» ${adopted ? "ya existía y" : "se creó, pero"} no tiene ningún nodo AI Agent. Vincúlalo a mano desde la ficha.`,
+    };
+  }
+  if (agents.length > 1) {
+    // Only the user knows which agent holds the client prompt. `pick` carries
+    // the COPY (never the template) so the UI reopens the picker on it.
+    return {
+      ok: false,
+      error: `El flujo «${wanted}» ${adopted ? "ya existía y" : "se creó y"} tiene ${agents.length} nodos AI Agent. Elige cuál debe recibir el prompt.`,
+      pick: { connectionId: template.connectionId, workflowId },
     };
   }
 

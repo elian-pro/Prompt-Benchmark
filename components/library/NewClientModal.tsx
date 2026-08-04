@@ -10,7 +10,9 @@ import { N8nHostPicker } from "@/components/library/N8nHostPicker";
 import { ProvisionFields, type ProvisionChoice } from "@/components/library/ProvisionFields";
 import type { N8nHost } from "@/lib/db/clients";
 
-type StepResult = { ok: true; detail: string } | { ok: false; error: string };
+type StepResult =
+  | { ok: true; detail: string }
+  | { ok: false; error: string; pick?: { connectionId: string; workflowId: string } };
 type Provisioning = { workflow: StepResult | null; chats: StepResult | null };
 
 export function NewClientModal({ open, onClose }: { open: boolean; onClose: () => void }) {
@@ -37,6 +39,19 @@ export function NewClientModal({ open, onClose }: { open: boolean; onClose: () =
     router.push(`/library/${clientId}${bind ? "?bind=1" : ""}`);
   }
 
+  /** Opens the client's binding picker already on the duplicated workflow. */
+  function goPickNode(clientId: string, pick: { connectionId: string; workflowId: string }) {
+    router.push(
+      `/library/${clientId}?bind=1&conn=${encodeURIComponent(pick.connectionId)}&wf=${encodeURIComponent(pick.workflowId)}`,
+    );
+  }
+
+  // Provisioning duplicates a flow in OUR n8n and creates the history table
+  // OUR agents read: none of it exists for a client running its own n8n, so
+  // the options are hidden and ignored. Its binding is added later from the
+  // client's page, as a manual target.
+  const onZebra = n8nHost === "zebra";
+
   async function submit() {
     setSaving(true);
     setError(null);
@@ -57,9 +72,10 @@ export function NewClientModal({ open, onClose }: { open: boolean; onClose: () =
       }
       const { client } = await res.json();
 
-      const wantsProvisioning = provision.duplicateWorkflow || provision.createChatsTable;
+      const wantsProvisioning =
+        onZebra && (provision.duplicateWorkflow || provision.createChatsTable);
       if (!wantsProvisioning) {
-        goToClient(client.id, bindAfter);
+        goToClient(client.id, onZebra && bindAfter);
         return;
       }
 
@@ -116,6 +132,10 @@ export function NewClientModal({ open, onClose }: { open: boolean; onClose: () =
     }
   }
 
+  // Only the workflow step can leave a "choose the node" pending action.
+  const workflowStep = report?.provisioning.workflow;
+  const pendingPick = workflowStep && !workflowStep.ok ? workflowStep.pick : undefined;
+
   return (
     <Modal
       open={open}
@@ -123,9 +143,15 @@ export function NewClientModal({ open, onClose }: { open: boolean; onClose: () =
       title="Nuevo cliente"
       footer={
         report ? (
-          <Button variant="primary" onClick={() => goToClient(report.clientId, false)}>
-            Continuar
-          </Button>
+          pendingPick ? (
+            <Button variant="primary" onClick={() => goPickNode(report.clientId, pendingPick)}>
+              Elegir nodo
+            </Button>
+          ) : (
+            <Button variant="primary" onClick={() => goToClient(report.clientId, false)}>
+              Continuar
+            </Button>
+          )
         ) : (
           <>
             <Button variant="ghost" onClick={onClose} disabled={saving}>
@@ -143,7 +169,11 @@ export function NewClientModal({ open, onClose }: { open: boolean; onClose: () =
           <p className="form-ok">El cliente se creó.</p>
           <StepLine label="Flujo de n8n" result={report.provisioning.workflow} />
           <StepLine label="Tabla de historial" result={report.provisioning.chats} />
-          <p className="field-hint">Puedes reintentar lo que falló desde la ficha del cliente.</p>
+          <p className="field-hint">
+            {pendingPick
+              ? "Continúa para elegir el nodo del flujo que ya se creó."
+              : "Puedes reintentar lo que falló desde la ficha del cliente."}
+          </p>
         </>
       ) : (
         <>
@@ -164,14 +194,23 @@ export function NewClientModal({ open, onClose }: { open: boolean; onClose: () =
             />
           </div>
           <N8nHostPicker value={n8nHost} onChange={setN8nHost} />
-          <ProvisionFields
-            clientName={name}
-            value={provision}
-            onChange={setProvision}
-            disabled={saving}
-          />
-          {!provision.duplicateWorkflow && (
-            <BindOnCreateToggle checked={bindAfter} onChange={setBindAfter} />
+          {onZebra ? (
+            <>
+              <ProvisionFields
+                clientName={name}
+                value={provision}
+                onChange={setProvision}
+                disabled={saving}
+              />
+              {!provision.duplicateWorkflow && (
+                <BindOnCreateToggle checked={bindAfter} onChange={setBindAfter} />
+              )}
+            </>
+          ) : (
+            <p className="field-hint">
+              El agente vive fuera de Zebra, así que no hay flujo ni tabla que
+              crear aquí. Desde su ficha puedes registrar el destino de n8n.
+            </p>
           )}
           {error && <p className="form-error">{error}</p>}
         </>

@@ -279,3 +279,43 @@ sprint" de `CLAUDE.md`.
 - Checkboxes en Importar existente y en el finalize del Creator: esos clientes
   usan los botones de la ficha (T7).
 - Borrar el flujo o la tabla al archivar un cliente.
+
+## Ajuste posterior (28 jul 2026)
+
+La primera corrida real desmintió el supuesto del punto 3 de Verificación: la
+plantilla no tiene un solo nodo AI Agent, tiene tres (Router,
+dudas/conversacion, AI Agent de calendario). El cliente se creó bien y la tabla
+también, pero el paso de n8n terminó en "tiene 3 nodos AI Agent. Vincúlalo a
+mano desde la ficha", o sea que el caso que T5 trataba como excepción es el
+caso normal.
+
+Dos cambios, ya en `main` vía `sprint-16/node-pick-and-version-sync`:
+
+- **Elegir el nodo en vez de fallar.** Con más de un agente, el `StepResult`
+  fallido de `lib/provisioning.ts` lleva `pick` con la conexión y el id de la
+  copia. `NewClientModal` cambia "Continuar" por "Elegir nodo" y navega a
+  `/library/{id}?bind=1&conn=…&wf=…`; `N8nDeploymentCard` lee esos params y
+  abre `N8nBindingModal` con `preselect`, ya posado en el flujo duplicado. El
+  botón de reintento hace lo mismo sin pasar por la URL. Con cero agentes no
+  hay nada que elegir y sigue siendo error seco.
+  Se descartó guardar el nodo por defecto junto a la plantilla en Ajustes
+  (`template_node_name` en la conexión): ahorra un clic por cliente pero pide
+  migración y se rompe callado si la plantilla renombra el nodo. Si el clic
+  molesta, esa es la mejora.
+- **Sincronizar sin promover.** Un flujo recién vinculado no tenía forma de
+  recibir el prompt que el cliente ya tenía: el push colgaba de promover una
+  versión, y el link "Ver diff / sincronizar" de la tarjeta solo aparecía con
+  drift, nunca en `no_baseline`. `/api/clients/{id}/n8n-sync` ya aceptaba
+  cualquier `version_id`, así que solo faltaba el disparador: botón
+  "Sincronizar con n8n" en la vista de cualquier versión, y el link de la
+  tarjeta visible siempre que haya versión de producción.
+
+- **Nada de esto aplica al n8n del cliente.** Con "n8n propio del cliente" en
+  `N8nHostPicker`, ni el flujo ni la tabla ni el vínculo existen en nuestra
+  infraestructura, así que Nuevo cliente oculta los dos checkboxes y el toggle
+  de vincular (Importar oculta el suyo) y el submit los ignora aunque quedaran
+  marcados. El estado no se resetea, así que volver a "n8n de Zebra" recupera
+  los defaults. Su destino se registra después desde la ficha, como vínculo
+  manual.
+
+Queda pendiente el resto de la verificación end to end (puntos 4 a 7).

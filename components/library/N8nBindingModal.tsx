@@ -26,6 +26,12 @@ type Props = {
   onConfirm: (selection: BindingSelection) => Promise<void> | void;
   /** Called with a manual target's label. The parent persists it. */
   onConfirmManual: (label: string) => Promise<void> | void;
+  /**
+   * Opens straight on this connection and workflow, with its agents already
+   * loaded. Used after provisioning duplicates a flow with several AI Agents:
+   * the only thing left to decide is the node.
+   */
+  preselect?: { connectionId: string; workflowId: string } | null;
 };
 
 type Mode = "api" | "manual";
@@ -38,7 +44,13 @@ type Mode = "api" | "manual";
  * - Manual: a free-text label for a client's own n8n we cannot reach.
  * Self-contained (fetches connections, workflows and agents on demand).
  */
-export function N8nBindingModal({ open, onClose, onConfirm, onConfirmManual }: Props) {
+export function N8nBindingModal({
+  open,
+  onClose,
+  onConfirm,
+  onConfirmManual,
+  preselect,
+}: Props) {
   const [mode, setMode] = useState<Mode>("api");
 
   const [connections, setConnections] = useState<MaskedConnection[]>([]);
@@ -75,22 +87,6 @@ export function N8nBindingModal({ open, onClose, onConfirm, onConfirmManual }: P
     }
   }, []);
 
-  // Load connections once when opened, and auto-select the first one (usually
-  // the team's own "Zebra") so its workflows are ready without an extra click.
-  useEffect(() => {
-    if (!open) return;
-    fetch("/api/integrations/n8n")
-      .then((r) => r.json())
-      .then((rows: MaskedConnection[]) => {
-        setConnections(rows);
-        if (rows.length > 0) {
-          setConnectionId(rows[0].id);
-          loadWorkflows(rows[0].id);
-        }
-      })
-      .catch(() => setError("No se pudieron cargar las conexiones n8n."));
-  }, [open, loadWorkflows]);
-
   const loadAgents = useCallback(async (connId: string, wfId: string) => {
     setLoadingAgents(true);
     setError(null);
@@ -106,6 +102,30 @@ export function N8nBindingModal({ open, onClose, onConfirm, onConfirmManual }: P
       setLoadingAgents(false);
     }
   }, []);
+
+  // Load connections once when opened, and auto-select the first one (usually
+  // the team's own "Zebra") so its workflows are ready without an extra click.
+  // With `preselect` we go one step further and land on its workflow, leaving
+  // only the node to choose.
+  const preConnection = preselect?.connectionId;
+  const preWorkflow = preselect?.workflowId;
+  useEffect(() => {
+    if (!open) return;
+    fetch("/api/integrations/n8n")
+      .then((r) => r.json())
+      .then(async (rows: MaskedConnection[]) => {
+        setConnections(rows);
+        const initial = preConnection ?? rows[0]?.id;
+        if (!initial) return;
+        setConnectionId(initial);
+        await loadWorkflows(initial);
+        if (preWorkflow) {
+          setWorkflowId(preWorkflow);
+          loadAgents(initial, preWorkflow);
+        }
+      })
+      .catch(() => setError("No se pudieron cargar las conexiones n8n."));
+  }, [open, loadWorkflows, loadAgents, preConnection, preWorkflow]);
 
   function onPickConnection(connId: string) {
     setConnectionId(connId);

@@ -10,6 +10,7 @@ import {
   IconSparkles,
   IconTrash,
   IconPencil,
+  IconPlugConnected,
 } from "@tabler/icons-react";
 import type { ClientDetail } from "@/lib/db/clients";
 import type { VersionListItem } from "@/lib/db/versions";
@@ -797,6 +798,23 @@ export default function ClientDetailPage() {
                   disabled={busy}
                 >
                   Editar con IA
+                </Button>
+                {/* Push any version, not just production: a freshly bound flow
+                    needs its prompt pushed once without promoting again. */}
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  icon={<IconPlugConnected size={14} />}
+                  onClick={() =>
+                    setSyncTarget({
+                      versionId: viewingVersion.id,
+                      versionNumber: viewingVersion.version_number,
+                      versionContent: viewingVersion.content ?? "",
+                    })
+                  }
+                  disabled={busy || !viewingVersion.content?.trim()}
+                >
+                  Sincronizar con n8n
                 </Button>
                 {!viewingVersion.is_production && (
                   <Button

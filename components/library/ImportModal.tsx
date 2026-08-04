@@ -61,7 +61,7 @@ export function ImportModal({ open, onClose }: { open: boolean; onClose: () => v
         const data = await vRes.json().catch(() => ({}));
         throw new Error(data.error ?? "No se pudo importar la versión.");
       }
-      router.push(`/library/${client.id}${bindAfter ? "?bind=1" : ""}`);
+      router.push(`/library/${client.id}${bindAfter && n8nHost === "zebra" ? "?bind=1" : ""}`);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Error inesperado.");
       setSaving(false);
@@ -115,7 +115,11 @@ export function ImportModal({ open, onClose }: { open: boolean; onClose: () => v
         />
       </div>
       <N8nHostPicker value={n8nHost} onChange={setN8nHost} />
-      <BindOnCreateToggle checked={bindAfter} onChange={setBindAfter} />
+      {/* Binding on create picks a node in a connected n8n, which a client
+          running its own n8n does not have. Its target is added later. */}
+      {n8nHost === "zebra" && (
+        <BindOnCreateToggle checked={bindAfter} onChange={setBindAfter} />
+      )}
       {error && <p className="form-error">{error}</p>}
     </Modal>
   );
