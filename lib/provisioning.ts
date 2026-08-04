@@ -26,7 +26,7 @@ import { createApiBinding, listBindings } from "./db/n8n-bindings";
 import { listChatsTables } from "./db/chats-history";
 import { isChatsConfigured } from "./supabase";
 import { createWorkflow, getWorkflow, listWorkflows } from "./n8n/client";
-import { listAgentNodes, pickPromptAgent, PROMPT_AGENT_NAME } from "./n8n/agent-node";
+import { listAgentNodes, pickPromptAgent } from "./n8n/agent-node";
 import { retargetChatsTable } from "./n8n/chats-table";
 import { createChatsTable, isChatsAdminConfigured } from "./chats-admin";
 import { chatsTableName } from "./chats-table-name";
@@ -121,19 +121,15 @@ async function duplicateAndBind(
   const agents = listAgentNodes(await getWorkflow(creds, workflowId));
   const agent = pickPromptAgent(agents);
   if (!agent) {
-    const why =
-      agents.length === 0
-        ? "no tiene ningún nodo AI Agent"
-        : `tiene ${agents.length} nodos AI Agent y ninguno se llama «${PROMPT_AGENT_NAME}»`;
-  if (agents.length === 0) {
-    return {
-      ok: false,
-      error: `El flujo «${wanted}» ${adopted ? "ya existía y" : "se creó, pero"} no tiene ningún nodo AI Agent. Vincúlalo a mano desde la ficha.`,
-    };
-  }
-  if (agents.length > 1) {
-    // Only the user knows which agent holds the client prompt. `pick` carries
-    // the COPY (never the template) so the UI reopens the picker on it.
+    if (agents.length === 0) {
+      return {
+        ok: false,
+        error: `El flujo «${wanted}» ${adopted ? "ya existía y" : "se creó, pero"} no tiene ningún nodo AI Agent. Vincúlalo a mano desde la ficha.`,
+      };
+    }
+    // More than one agent and none of them is unambiguously the prompt one.
+    // Only the user knows which holds the client prompt, so `pick` carries the
+    // COPY (never the template) and the UI reopens the picker on it.
     return {
       ok: false,
       error: `El flujo «${wanted}» ${adopted ? "ya existía y" : "se creó y"} tiene ${agents.length} nodos AI Agent. Elige cuál debe recibir el prompt.`,
