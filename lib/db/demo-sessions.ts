@@ -27,6 +27,17 @@ export type DemoSession = {
    *  starts (creation, reset, version switch), so the chat can open with the
    *  bot having already "spoken" instead of always waiting on the human. */
   opening_message: string | null;
+  /** Set when the conversation came in through a client demo link (Sprint 18).
+   *  Null means the user started it here, in the Playground, which is what
+   *  every session was before demo links existed. */
+  link_id: string | null;
+  /** Anonymous device id from the signed `zebra_demo` cookie, plus the trail
+   *  that makes a disputed conversation arguable later. Null on Playground
+   *  sessions. */
+  visitor_id: string | null;
+  visitor_ip: string | null;
+  visitor_user_agent: string | null;
+  last_seen_at: string | null;
   created_at: string;
   updated_at: string;
 };
@@ -57,7 +68,8 @@ export type DemoSessionDetail = DemoSessionListItem & {
 
 const SESSION_COLS =
   "id, client_id, version_id, version_number_snapshot, prompt_snapshot, status, " +
-  "editor_session_id, current_round, opening_message, created_at, updated_at";
+  "editor_session_id, current_round, opening_message, link_id, visitor_id, " +
+  "visitor_ip, visitor_user_agent, last_seen_at, created_at, updated_at";
 const MESSAGE_COLS =
   "id, session_id, turn_number, round, role, content, version_number_snapshot, created_at";
 
@@ -135,13 +147,115 @@ export async function createSession(input: {
   return session;
 }
 
+/**
+ * Starts (or resumes) the conversation a visitor gets on a client demo link.
+ *
+ * The prompt is taken from the link's own snapshot, never re-read from the
+ * version: a link is a round of testing against a prompt the client was told
+ * they were testing, and editing that version mid round must not silently move
+ * the target under them.
+ *
+ * Resuming is what makes it safe to call on every page load. The unique index
+ * on (link_id, visitor_id) is the real guard: two tabs opening at once race,
+ * and the loser reads back the winner's row instead of creating a second
+ * conversation.
+ */
+export async function createLinkSession(input: {
+  linkId: string;
+  clientId: string;
+  versionId: string | null;
+  versionNumberSnapshot: string;
+  promptSnapshot: string;
+  openingMessage: string | null;
+  visitorId: string;
+  visitorIp: string | null;
+  visitorUserAgent: string | null;
+}): Promise<DemoSession> {
+  const sb = getSupabase();
+  const { data, error } = await sb
+    .from("demo_sessions")
+    .insert({
+      client_id: input.clientId,
+      version_id: input.versionId,
+      version_number_snapshot: input.versionNumberSnapshot,
+      prompt_snapshot: input.promptSnapshot,
+      status: "active",
+      opening_message: input.openingMessage,
+      link_id: input.linkId,
+      visitor_id: input.visitorId,
+      visitor_ip: input.visitorIp,
+      visitor_user_agent: input.visitorUserAgent,
+      last_seen_at: new Date().toISOString(),
+    })
+    .select(SESSION_COLS)
+    .single();
+
+  if (error) {
+    // 23505: the unique index fired, so someone else just created it.
+    if (error.code === "23505") {
+      const existing = await getVisitorSession(input.linkId, input.visitorId);
+      if (existing) return existing;
+    }
+    throw new Error(`No se pudo iniciar la conversación: ${error.message}`);
+  }
+
+  const session = data as unknown as DemoSession;
+  await seedOpeningMessage(
+    session.id,
+    session.current_round,
+    input.openingMessage,
+    input.versionNumberSnapshot,
+  );
+  return session;
+}
+
+/** The conversation a given device already has on a given link, if any. */
+export async function getVisitorSession(
+  linkId: string,
+  visitorId: string,
+): Promise<DemoSession | null> {
+  const sb = getSupabase();
+  const { data, error } = await sb
+    .from("demo_sessions")
+    .select(SESSION_COLS)
+    .eq("link_id", linkId)
+    .eq("visitor_id", visitorId)
+    .maybeSingle();
+  if (error) throw new Error(`No se pudo obtener la conversación: ${error.message}`);
+  return (data as unknown as DemoSession) ?? null;
+}
+
+/**
+ * Stamps the last time this device was seen, and refreshes the IP it came
+ * from. Both are part of the trail: a client testing from the office one day
+ * and from their phone the next should be visible as exactly that.
+ */
+export async function touchVisitorSession(
+  sessionId: string,
+  visitorIp: string | null,
+): Promise<void> {
+  const sb = getSupabase();
+  const patch: Record<string, unknown> = { last_seen_at: new Date().toISOString() };
+  if (visitorIp) patch.visitor_ip = visitorIp;
+  const { error } = await sb.from("demo_sessions").update(patch).eq("id", sessionId);
+  if (error) throw new Error(`No se pudo actualizar la conversación: ${error.message}`);
+}
+
+/**
+ * The Playground's own sessions. Conversations that came in through a client
+ * demo link are deliberately excluded: they belong to their link, they are
+ * evidence rather than scratch work, and mixing them in would put them one
+ * click away from "vaciar historial". They are listed by `listLinkSessions`
+ * in `demo-links.ts` instead.
+ */
 export async function listSessions({
   clientId,
 }: { clientId?: string } = {}): Promise<DemoSessionListItem[]> {
   const sb = getSupabase();
   let query = sb
     .from("demo_sessions")
-    .select(`${SESSION_COLS}, clients(name), demo_messages(id, round)`);
+    .select(`${SESSION_COLS}, clients(name), demo_messages(id, round)`)
+    .is("link_id", null);
   if (clientId) query = query.eq("client_id", clientId);
   query = query.order("created_at", { ascending: false });
 
@@ -326,19 +440,46 @@ export async function resetSession(sessionId: string): Promise<DemoSession> {
 
 /** Permanently deletes a Playground session. Its `demo_messages` and
  *  `demo_notes` are removed by the ON DELETE CASCADE FKs (migrations 008/009);
- *  there is no Storage tied to Playground, so nothing else to clean up. */
+ *  there is no Storage tied to Playground, so nothing else to clean up.
+ *
+ *  A conversation belonging to a demo link is refused: it is the record of
+ *  what a client actually typed and when, and deleting one by accident is the
+ *  one thing that cannot be undone. Those go away only with their whole link,
+ *  behind the two-step confirmation. */
 export async function deleteSession(sessionId: string): Promise<void> {
   const sb = getSupabase();
+  const { data: row, error: gErr } = await sb
+    .from("demo_sessions")
+    .select("link_id")
+    .eq("id", sessionId)
+    .maybeSingle();
+  if (gErr) throw new Error(`No se pudo obtener la conversación: ${gErr.message}`);
+  if (row?.link_id) {
+    throw new LinkSessionProtectedError(
+      "Esta conversación es de un link de cliente y no se borra por separado. Elimina el link completo si quieres deshacerte de ella.",
+    );
+  }
+
   const { error } = await sb.from("demo_sessions").delete().eq("id", sessionId);
   if (error) throw new Error(`No se pudo eliminar la conversación: ${error.message}`);
 }
 
+/** Custom error so the API can return 409 instead of a generic 500 when
+ *  something tries to delete a client's demo conversation. */
+export class LinkSessionProtectedError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "LinkSessionProtectedError";
+  }
+}
+
 /** Deletes every Playground session ("vaciar historial"). Same cascade as
- *  deleteSession. */
+ *  deleteSession, and the same exclusion: a client's demo conversations are
+ *  not part of the user's scratch history and this button must never reach
+ *  them. */
 export async function deleteAllSessions(): Promise<void> {
   const sb = getSupabase();
-  // A filter is required; `id is not null` matches every row.
-  const { error } = await sb.from("demo_sessions").delete().not("id", "is", null);
+  const { error } = await sb.from("demo_sessions").delete().is("link_id", null);
   if (error) throw new Error(`No se pudo vaciar el historial: ${error.message}`);
 }
 

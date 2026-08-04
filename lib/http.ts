@@ -6,7 +6,8 @@ import { RoleNotConfiguredError } from "./db/runs";
 import { ConnectionInUseError } from "./db/n8n-connections";
 import { N8nApiError } from "./n8n/client";
 import { ChatsAdminError } from "./chats-admin";
-import { VersionSwitchBlockedError } from "./db/demo-sessions";
+import { VersionSwitchBlockedError, LinkSessionProtectedError } from "./db/demo-sessions";
+import { DemoLinkError } from "./demo-link-guard";
 
 /** JSON error envelope. Messages are in Spanish (user-facing). */
 export function jsonError(message: string, status: number) {
@@ -44,6 +45,19 @@ export function handleError(err: unknown) {
   }
   if (err instanceof VersionSwitchBlockedError) {
     return jsonError(err.message, 409);
+  }
+  if (err instanceof LinkSessionProtectedError) {
+    return jsonError(err.message, 409);
+  }
+  if (err instanceof DemoLinkError) {
+    // The guard on the public demo routes already decided the status: 404 for
+    // an unknown token, 409 for a closed link or an exhausted cap, 429 when
+    // the caller is going too fast.
+    const res = jsonError(err.message, err.status);
+    if (err.retryAfterSeconds) {
+      res.headers.set("Retry-After", String(err.retryAfterSeconds));
+    }
+    return res;
   }
   if (err instanceof N8nApiError) {
     // 502: the failure is upstream in n8n, not in our request handling.
