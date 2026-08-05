@@ -3869,6 +3869,14 @@ body[data-theme="light"] .dot-grid::after {
   line-height: 1.55;
   margin: 0 0 10px;
 }
+/* The case's conversation, inside a row of a list. Capped and scrollable so a
+   long conversation does not push the replay and its verdict off screen. */
+.case-item .chat-messages {
+  max-height: 420px;
+  overflow-y: auto;
+  margin-top: 8px;
+  padding-right: 4px;
+}
 .replay-compare {
   display: grid;
   gap: 10px;

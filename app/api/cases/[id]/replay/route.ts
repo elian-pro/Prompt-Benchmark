@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest } from "next/server";
 import { getCase } from "@/lib/db/conversation-cases";
 import { getVersion, listVersions } from "@/lib/db/versions";
 import { getRoleDefault } from "@/lib/db/role-defaults";
@@ -6,7 +6,7 @@ import { RoleNotConfiguredError } from "@/lib/db/runs";
 import { transcriptOf } from "@/lib/conversation-turns";
 import { buildReplayPlan, isReplayable } from "@/lib/replay";
 import { replayCaseSchema } from "@/lib/schemas/cases";
-import { chat, type ChatMessage } from "@/lib/providers";
+import { streamChat, type ChatMessage } from "@/lib/providers";
 import { handleError, jsonError } from "@/lib/http";
 
 export const dynamic = "force-dynamic";
@@ -17,6 +17,16 @@ type Params = { params: Promise<{ id: string }> };
 /**
  * Re-runs the turn that failed against a candidate version, and returns both
  * replies so they can be compared.
+ *
+ * The reply streams as NDJSON, same event shapes as an Editor turn: one `meta`
+ * event with the version and the original reply, then `text` deltas, then
+ * `done` or `error`. Watching it answer is the point of pressing the button;
+ * waiting on a spinner for a whole reply is not. Errors raised BEFORE the
+ * stream opens (no version, unreplayable case) stay plain JSON, so the client
+ * checks `res.ok` first and only then reads the stream.
+ *
+ * The stream is not a job: nothing survives navigating away mid replay, unlike
+ * an Editor turn. A replay is one short answer and re-running it is free.
  *
  * Scope, stated here because it is easy to expect more: this answers ONE turn.
  * A whole conversation cannot be replayed, because as soon as the bot says
@@ -70,22 +80,52 @@ export async function POST(req: NextRequest, { params }: Params) {
       );
     }
 
-    const reply = await chat({
-      providerId: role.provider_id,
-      modelName: role.model_name,
-      systemPrompt: version.content,
-      messages: plan.messages as ChatMessage[],
-      temperature: role.temperature ?? undefined,
-      topP: role.top_p ?? undefined,
-      maxTokens: role.max_tokens ?? undefined,
+    const encoder = new TextEncoder();
+    const stream = new ReadableStream<Uint8Array>({
+      async start(controller) {
+        const send = (evt: Record<string, unknown>) => {
+          controller.enqueue(encoder.encode(JSON.stringify(evt) + "\n"));
+        };
+        send({
+          type: "meta",
+          versionId: version.id,
+          versionNumber: version.version_number,
+          isProduction: version.is_production,
+          original: plan.original,
+        });
+        try {
+          for await (const chunk of streamChat({
+            providerId: role.provider_id,
+            modelName: role.model_name,
+            systemPrompt: version.content,
+            messages: plan.messages as ChatMessage[],
+            temperature: role.temperature ?? undefined,
+            topP: role.top_p ?? undefined,
+            maxTokens: role.max_tokens ?? undefined,
+          })) {
+            if (chunk.type === "text") send({ type: "text", text: chunk.text });
+          }
+          send({ type: "done" });
+        } catch (err) {
+          // The status code is already spent on a 200 by the time the model
+          // fails, so the failure travels as an event and the UI shows it
+          // where the reply would have been.
+          send({
+            type: "error",
+            message: err instanceof Error ? err.message : "Falló el replay.",
+          });
+        }
+        controller.close();
+      },
     });
 
-    return NextResponse.json({
-      versionId: version.id,
-      versionNumber: version.version_number,
-      isProduction: version.is_production,
-      original: plan.original,
-      replayed: reply.content,
+    return new Response(stream, {
+      headers: {
+        "Content-Type": "application/x-ndjson; charset=utf-8",
+        "Cache-Control": "no-store",
+        // Disable proxy buffering so the deltas arrive as they are produced.
+        "X-Accel-Buffering": "no",
+      },
     });
   } catch (err) {
     return handleError(err);

@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/Button";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { SkeletonRows } from "@/components/ui/Skeleton";
 import { parseTurnBubbles } from "@/lib/adversarial-message";
+import { Turn } from "@/components/conversation/Turn";
 import { relativeTimeEs } from "@/lib/format";
 import type { ConversationTurn } from "@/lib/conversation-turns";
 
@@ -23,12 +24,21 @@ type CaseRow = {
   created_at: string;
 };
 
-type ReplayResult = {
+/** The `meta` event: everything about the replay except the reply itself,
+ *  which arrives as deltas after it. */
+type ReplayMeta = {
   versionId: string;
   versionNumber: string;
   isProduction: boolean;
   original: ConversationTurn[];
-  replayed: string;
+};
+
+/** The conversation the case was filed against, fetched when the row opens. */
+type CaseDetail = {
+  turns: ConversationTurn[];
+  source: "turnos" | "historial";
+  turnos_marcados: number[];
+  turno_index: number | null;
 };
 
 function formatDate(iso: string): string {
@@ -72,8 +82,10 @@ function Reply({ bubbles, estado }: { bubbles: string[]; estado: string | null }
  */
 function CaseItem({ kase }: { kase: CaseRow }) {
   const [open, setOpen] = useState(false);
+  const [detail, setDetail] = useState<CaseDetail | null>(null);
   const [running, setRunning] = useState(false);
-  const [result, setResult] = useState<ReplayResult | null>(null);
+  const [meta, setMeta] = useState<ReplayMeta | null>(null);
+  const [reply, setReply] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [resolved, setResolved] = useState<{ version_id: string | null; at: string | null }>({
     version_id: kase.resolved_version_id,
@@ -102,18 +114,63 @@ function CaseItem({ kase }: { kase: CaseRow }) {
     }
   }
 
+  /** The conversation is only fetched once the row is opened: the list shows
+   *  every case of every client, and each snapshot is a whole conversation. */
+  const loadDetail = useCallback(async () => {
+    try {
+      const res = await fetch(`/api/cases/${kase.id}`);
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error ?? "No se pudo cargar la conversación.");
+      setDetail(data);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Error al cargar la conversación.");
+    }
+  }, [kase.id]);
+
+  useEffect(() => {
+    if (open && !detail) void loadDetail();
+  }, [open, detail, loadDetail]);
+
+  /** Reads the replay's NDJSON stream, so the reply appears as it is written
+   *  instead of after it is finished. Same event shapes as an Editor turn. */
   async function runReplay() {
     setRunning(true);
     setError(null);
+    setMeta(null);
+    setReply("");
     try {
       const res = await fetch(`/api/cases/${kase.id}/replay`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: "{}",
       });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(data.error ?? "No se pudo correr el replay.");
-      setResult(data);
+      // Everything that fails before the model runs is still plain JSON.
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.error ?? "No se pudo correr el replay.");
+      }
+
+      const reader = res.body!.getReader();
+      const decoder = new TextDecoder();
+      let acc = "";
+      let buffer = "";
+      for (;;) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split("\n");
+        // The tail is whatever came after the last newline: half an event.
+        buffer = lines.pop() ?? "";
+        for (const line of lines) {
+          if (!line.trim()) continue;
+          const evt = JSON.parse(line);
+          if (evt.type === "meta") setMeta(evt);
+          else if (evt.type === "text") {
+            acc += evt.text;
+            setReply(acc);
+          } else if (evt.type === "error") setError(evt.message);
+        }
+      }
     } catch (e) {
       setError(e instanceof Error ? e.message : "Error al correr el replay.");
     } finally {
@@ -121,7 +178,9 @@ function CaseItem({ kase }: { kase: CaseRow }) {
     }
   }
 
-  const replayed = result ? parseTurnBubbles(result.replayed) : null;
+  // While the reply streams it is a partial envelope, so it is shown as raw
+  // text; the bubbles appear once it is complete and parses.
+  const replayed = running ? null : parseTurnBubbles(reply);
   const turnLabel =
     kase.turno_index == null ? "Sin turno marcado" : `Turno ${kase.turno_index + 1}`;
 
@@ -167,21 +226,58 @@ function CaseItem({ kase }: { kase: CaseRow }) {
 
           {error && <p className="form-error">{error}</p>}
 
-          {result && replayed && (
+          {/* The whole conversation, not only the turn that failed: reading
+              what led to it is why a case is worth opening. The pin marks what
+              the note points at. */}
+          {detail === null ? (
+            <p className="empty-hint">Cargando conversación…</p>
+          ) : detail.turns.length === 0 ? (
+            <p className="muted" style={{ fontSize: 13 }}>
+              No se pudo leer ningún mensaje de esta conversación.
+            </p>
+          ) : (
+            <>
+              {detail.source === "historial" && (
+                <span className="muted" style={{ fontSize: 11 }}>
+                  Reconstruido del texto plano: puede tener errores.
+                </span>
+              )}
+              <div className="chat-messages">
+                {detail.turns.map((turn, i) => (
+                  <Turn
+                    key={i}
+                    turn={turn}
+                    pins={detail.turnos_marcados.includes(i) ? [1] : []}
+                  />
+                ))}
+              </div>
+            </>
+          )}
+
+          {meta && (
             <div className="replay-compare">
               <div>
                 <span className="chat-turn-role">Lo que contestó en producción</span>
                 <Reply
-                  bubbles={result.original.map((t) => t.texto)}
-                  estado={result.original.find((t) => t.estado)?.estado ?? null}
+                  bubbles={meta.original.map((t) => t.texto)}
+                  estado={meta.original.find((t) => t.estado)?.estado ?? null}
                 />
               </div>
               <div>
                 <span className="chat-turn-role">
-                  Con {result.versionNumber}
-                  {result.isProduction ? " (producción)" : ""}
+                  Con {meta.versionNumber}
+                  {meta.isProduction ? " (producción)" : ""}
                 </span>
-                {replayed.malformed ? (
+                {replayed === null ? (
+                  // Mid stream the text is a half-written envelope, so it is
+                  // shown raw. It becomes bubbles the moment it parses.
+                  <div className="chat-msg">
+                    <div className="chat-content">
+                      {reply}
+                      <span className="chat-caret" />
+                    </div>
+                  </div>
+                ) : replayed.malformed ? (
                   <div className="chat-msg chat-msg-error">
                     <div className="chat-content chat-empty">
                       La respuesta no vino en el formato esperado.
@@ -192,24 +288,33 @@ function CaseItem({ kase }: { kase: CaseRow }) {
                 )}
               </div>
 
-              <div className="row-between" style={{ gridColumn: "1 / -1" }}>
-                <span className="muted" style={{ fontSize: 11 }}>
-                  ¿La nueva respuesta resuelve el problema?
-                </span>
-                <span style={{ display: "flex", gap: 6 }}>
-                  <Button size="sm" variant="ghost" onClick={() => resolve(null)} disabled={saving}>
-                    Sigue fallando
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="primary"
-                    onClick={() => resolve(result.versionId)}
-                    disabled={saving}
-                  >
-                    Ya pasa
-                  </Button>
-                </span>
-              </div>
+              {/* The verdict is a call about the finished reply, so it waits
+                  for the stream to end. */}
+              {!running && replayed && (
+                <div className="row-between" style={{ gridColumn: "1 / -1" }}>
+                  <span className="muted" style={{ fontSize: 11 }}>
+                    ¿La nueva respuesta resuelve el problema?
+                  </span>
+                  <span style={{ display: "flex", gap: 6 }}>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => resolve(null)}
+                      disabled={saving}
+                    >
+                      Sigue fallando
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="primary"
+                      onClick={() => resolve(meta.versionId)}
+                      disabled={saving}
+                    >
+                      Ya pasa
+                    </Button>
+                  </span>
+                </div>
+              )}
             </div>
           )}
 

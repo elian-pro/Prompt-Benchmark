@@ -1,11 +1,12 @@
 "use client";
 
-import { useCallback, useEffect, useState, type KeyboardEvent } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { IconCheck, IconNotes, IconPencil, IconSend, IconTrash, IconX } from "@tabler/icons-react";
 import type { ConversationRow } from "@/lib/db/chats-history";
-import { transcriptOf, type ConversationTurn } from "@/lib/conversation-turns";
+import { transcriptOf } from "@/lib/conversation-turns";
 import { Button } from "@/components/ui/Button";
+import { Turn } from "@/components/conversation/Turn";
 
 /** A saved note, which is a case with no Editor session yet. */
 type Note = {
@@ -15,88 +16,9 @@ type Note = {
   editor_session_id: string | null;
 };
 
-const ROLE_LABEL: Record<ConversationTurn["rol"], string> = {
-  lead: "Lead",
-  bot: "Bot del cliente",
-  sistema: "Sistema",
-};
-
 function preview(text: string): string {
   const clean = text.trim() || "(sin mensaje)";
   return clean.length > 60 ? `${clean.slice(0, 60)}…` : clean;
-}
-
-/** One turn, with the numbered pins of every note that points at it. Same
- *  gesture and same look as the Playground: click to tag, click again to
- *  untag. */
-function Turn({
-  turn,
-  selected,
-  selectable,
-  pins,
-  onToggle,
-}: {
-  turn: ConversationTurn;
-  selected: boolean;
-  selectable: boolean;
-  pins: number[];
-  onToggle: () => void;
-}) {
-  if (turn.rol === "sistema") {
-    return (
-      <div className="chat-turn turn-bot is-static">
-        <span className="chat-turn-role">{ROLE_LABEL.sistema}</span>
-        <div className="chat-msg">
-          <div className="chat-content chat-empty">
-            El bot pasó a estado «{turn.estado}».
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  const side = turn.rol === "lead" ? "turn-lead" : "turn-bot";
-  return (
-    <div
-      className={`chat-turn ${side}${selected ? " is-selected" : ""}${
-        selectable ? "" : " is-static"
-      }`}
-      {...(selectable
-        ? {
-            onClick: onToggle,
-            role: "button" as const,
-            tabIndex: 0,
-            "aria-pressed": selected,
-            onKeyDown: (e: KeyboardEvent) => {
-              if (e.key === "Enter" || e.key === " ") {
-                e.preventDefault();
-                onToggle();
-              }
-            },
-          }
-        : {})}
-    >
-      {pins.length > 0 && (
-        <div className="chat-pins">
-          {pins.map((p) => (
-            <span key={p} className="chat-pin">
-              {p}
-            </span>
-          ))}
-        </div>
-      )}
-      <span className="chat-turn-role">{ROLE_LABEL[turn.rol]}</span>
-      <div className="chat-msg">
-        <div className="chat-content">{turn.texto}</div>
-        {turn.estado && (
-          <div className="chat-state">
-            <span className="chat-state-label">Estado</span>
-            <span className="chat-state-value">{turn.estado}</span>
-          </div>
-        )}
-      </div>
-    </div>
-  );
 }
 
 /**
@@ -271,9 +193,8 @@ export function ReplayWorkspace({
                 key={i}
                 turn={turn}
                 selected={selected.includes(i)}
-                selectable={turn.rol !== "sistema"}
                 pins={pinsByTurn.get(i) ?? []}
-                onToggle={() => toggle(i)}
+                onToggle={turn.rol === "sistema" ? undefined : () => toggle(i)}
               />
             ))}
           </div>

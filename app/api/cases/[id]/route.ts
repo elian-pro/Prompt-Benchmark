@@ -16,6 +16,36 @@ export const dynamic = "force-dynamic";
 type Params = { params: Promise<{ id: string }> };
 
 /**
+ * One case with the conversation it was filed against, as turns.
+ *
+ * The list endpoint deliberately leaves the snapshots out (they are whole
+ * conversations, and the list shows dozens), so opening a case fetches them
+ * here. The parsing happens server side because `transcriptOf` is the only
+ * thing that knows how to read a legacy `historial` blob, and its result is
+ * what every screen renders.
+ */
+export async function GET(_req: NextRequest, { params }: Params) {
+  try {
+    const { id } = await params;
+    const kase = await getCase(id);
+    if (!kase) return jsonError("Caso no encontrado.", 404);
+
+    const { turns, source } = transcriptOf({
+      turnos: kase.turnos_snapshot,
+      historial: kase.historial_snapshot,
+    });
+    return NextResponse.json({
+      turns,
+      source,
+      turnos_marcados: kase.turnos_marcados,
+      turno_index: kase.turno_index,
+    });
+  } catch (err) {
+    return handleError(err);
+  }
+}
+
+/**
  * The verdict on a case, set by a person after reading the replay's two
  * replies. `resolvedVersionId: null` reopens it, which is what a later version
  * breaking the case again looks like.

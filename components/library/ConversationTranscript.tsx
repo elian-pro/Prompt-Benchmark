@@ -2,46 +2,8 @@
 
 import { useState } from "react";
 import type { ConversationRow } from "@/lib/db/chats-history";
-import { transcriptOf, type ConversationTurn } from "@/lib/conversation-turns";
-
-const ROLE_LABEL: Record<ConversationTurn["rol"], string> = {
-  lead: "Lead",
-  bot: "Bot del cliente",
-  sistema: "Sistema",
-};
-
-/** Reuses the Playground's chat classes so a real conversation and a simulated
- *  one read the same way. */
-function Turn({ turn }: { turn: ConversationTurn }) {
-  if (turn.rol === "sistema") {
-    return (
-      <div className="chat-turn turn-bot is-static">
-        <span className="chat-turn-role">{ROLE_LABEL.sistema}</span>
-        <div className="chat-msg">
-          <div className="chat-content chat-empty">
-            El bot pasó a estado «{turn.estado}».
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  const side = turn.rol === "lead" ? "turn-lead" : "turn-bot";
-  return (
-    <div className={`chat-turn ${side} is-static`}>
-      <span className="chat-turn-role">{ROLE_LABEL[turn.rol]}</span>
-      <div className="chat-msg">
-        <div className="chat-content">{turn.texto}</div>
-        {turn.estado && (
-          <div className="chat-state">
-            <span className="chat-state-label">Estado</span>
-            <span className="chat-state-value">{turn.estado}</span>
-          </div>
-        )}
-      </div>
-    </div>
-  );
-}
+import { transcriptOf } from "@/lib/conversation-turns";
+import { Turn } from "@/components/conversation/Turn";
 
 /**
  * A real conversation, read only. Marking messages and filing a case is
