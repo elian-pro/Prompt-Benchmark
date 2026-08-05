@@ -14,6 +14,11 @@ import { CollapsibleCard } from "@/components/ui/CollapsibleCard";
  *
  * `savedContent` is the persisted override (or null when none exists); the
  * card seeds its editor from it, falling back to `defaultText`.
+ *
+ * `appended` is what the app concatenates after the persona at runtime and
+ * nobody can edit, precisely so that saving an override cannot delete it. It is
+ * shown read only because a persona that refers to those rules ("ver la prueba
+ * de conflicto más abajo") reads as broken next to a box where they are not.
  */
 export function SystemPromptCard({
   role,
@@ -21,6 +26,7 @@ export function SystemPromptCard({
   description,
   defaultText,
   savedContent,
+  appended,
   onToast,
 }: {
   role: PromptRole;
@@ -28,6 +34,7 @@ export function SystemPromptCard({
   description: string;
   defaultText: string;
   savedContent: string | null;
+  appended?: { title: string; text: string }[];
   onToast: (message: string) => void;
 }) {
   // The value the app is currently using for this role.
@@ -105,6 +112,22 @@ export function SystemPromptCard({
         spellCheck={false}
         disabled={busy}
       />
+
+      {appended && appended.length > 0 && (
+        <div className="prompt-appended">
+          <span className="prompt-card-note">
+            Además de lo de arriba, la app siempre manda esto. No es editable, así que
+            guardar tu versión de la persona no lo quita.
+          </span>
+          {appended.map((block) => (
+            <details key={block.title}>
+              <summary>{block.title}</summary>
+              <pre>{block.text}</pre>
+            </details>
+          ))}
+        </div>
+      )}
+
       <div className="prompt-card-actions">
         <span className="prompt-card-disclaimer">
           {isOverridden

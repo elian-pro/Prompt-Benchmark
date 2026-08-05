@@ -20,8 +20,19 @@ import { N8nConnectionRow } from "@/components/settings/N8nConnectionRow";
 import { N8nConnectionFormModal } from "@/components/settings/N8nConnectionFormModal";
 import { ComposerSettingsCard } from "@/components/settings/ComposerSettingsCard";
 import { EDITOR_PERSONA } from "@/lib/prompts/editor-persona";
+import { OPTIONS_CONTRACT } from "@/lib/prompts/options-block";
+import { ANTI_OVERFIT_CONTRACT } from "@/lib/prompts/anti-overfit";
 import { CREATOR_PERSONA } from "@/lib/prompts/creator-persona";
 import { buildJudgeSystemPrompt } from "@/lib/prompts/judge";
+
+/** What buildEditorSystemPrompt and buildCreatorSystemPrompt append after the
+ *  persona, shown here read only so the card matches what is actually sent.
+ *  Both builders concatenate these two in this order; if that changes, this
+ *  list changes with it. */
+const APPENDED_CONTRACTS = [
+  { title: "Bloque de opciones seleccionables", text: OPTIONS_CONTRACT },
+  { title: "Reglas que no sobreajustan", text: ANTI_OVERFIT_CONTRACT },
+];
 
 export default function SettingsPage() {
   const [providers, setProviders] = useState<MaskedProvider[]>([]);
@@ -257,6 +268,7 @@ export default function SettingsPage() {
             description="Persona del chat del Editor. En tiempo real, la app le anexa al final el prompt del cliente que se está editando."
             defaultText={EDITOR_PERSONA}
             savedContent={overrides.editor ?? null}
+            appended={APPENDED_CONTRACTS}
             onToast={showToast}
           />
           <SystemPromptCard
@@ -265,6 +277,7 @@ export default function SettingsPage() {
             description="Persona del chat del Creator. En tiempo real, la app le anexa al final el prompt base elegido como referencia de arquitectura."
             defaultText={CREATOR_PERSONA}
             savedContent={overrides.creator ?? null}
+            appended={APPENDED_CONTRACTS}
             onToast={showToast}
           />
           <SystemPromptCard
