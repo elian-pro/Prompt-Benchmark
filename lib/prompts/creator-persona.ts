@@ -26,6 +26,7 @@
  * Written in Spanish: it builds the team's Spanish prompts.
  */
 import { OPTIONS_CONTRACT } from "./options-block";
+import { ANTI_OVERFIT_CONTRACT } from "./anti-overfit";
 
 /** The persona's standing instructions, independent of any specific brief.
  *  Exported so Settings can display it (read-only workspace; the runtime
@@ -88,12 +89,14 @@ export function buildCreatorSystemPrompt(
   const reference =
     referencePrompt.trim().length > 0 ? referencePrompt : "(No se proporcionó prompt base.)";
   const persona = personaOverride?.trim() ? personaOverride : CREATOR_PERSONA;
-  // OPTIONS_CONTRACT is appended after the persona (default or override) so the
-  // selectable-options capability survives a saved persona override, exactly as
-  // in buildEditorSystemPrompt.
+  // OPTIONS_CONTRACT and ANTI_OVERFIT_CONTRACT are appended after the persona
+  // (default or override) so both capabilities survive a saved persona
+  // override, exactly as in buildEditorSystemPrompt.
   return `${persona}
 
 ${OPTIONS_CONTRACT}
+
+${ANTI_OVERFIT_CONTRACT}
 
 ---
 

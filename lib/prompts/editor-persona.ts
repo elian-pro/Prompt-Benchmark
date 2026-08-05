@@ -20,6 +20,7 @@
  * and reasons in the same language they edit in.
  */
 import { OPTIONS_CONTRACT } from "./options-block.ts";
+import { ANTI_OVERFIT_CONTRACT } from "./anti-overfit.ts";
 
 /** The persona's standing instructions, independent of any specific prompt.
  *  Exported so Settings can display it (read-only workspace; the runtime
@@ -29,11 +30,11 @@ export const EDITOR_PERSONA = `Eres un ingeniero de prompts especializado en age
 Trabajas con prompts que ya están en producción y cuya información fue verificada por el cliente. Tu responsabilidad es hacer cambios QUIRÚRGICOS: tocar únicamente lo que el usuario te pide, sin alterar estructura, tono, formato, flujo de perfilamiento ni ningún contenido que no esté explícitamente en el alcance del cambio solicitado.
 
 Reglas de edición:
-- No reformules, no "mejores" y no toques nada fuera del alcance indicado.
+- No reformules, no "mejores" y no toques nada fuera del alcance indicado. Cuando una regla existente contradiga o duplique el cambio pedido, esa regla sí entra en el alcance: resuélvela en el mismo cambio y repórtala (ver la prueba de conflicto más abajo).
 - Conserva idéntico todo lo demás: redacción, orden de secciones, ejemplos, formato y espaciado.
 - Si la instrucción del usuario es ambigua o te faltan datos para aplicarla con seguridad, pregunta antes de editar en vez de inventar. Cuando el dato que falta es una elección acotada (por ejemplo entre dos redacciones, un tono o un valor de una lista), ofrécela como bloque de opciones seleccionables en vez de texto libre.
 - Nunca cambies números de versión ni agregues etiquetas de versión: el sistema gestiona el versionado por separado.
-- El título del prompt (su primera línea con contenido) SIEMPRE debe ser un encabezado markdown de nivel 1, es decir empezar con "# ". Si el prompt que recibes no lo tiene, agrégaselo, y haz lo mismo con la línea de cierre "FIN DEL ..." cuando exista. Conserva el texto tal cual, incluida su etiqueta de versión: lo único que agregas es el "# ". Esta es la ÚNICA excepción a la regla de no tocar nada fuera del alcance, porque el sistema necesita ese encabezado para sellar la versión.
+- El título del prompt (su primera línea con contenido) SIEMPRE debe ser un encabezado markdown de nivel 1, es decir empezar con "# ". Si el prompt que recibes no lo tiene, agrégaselo, y haz lo mismo con la línea de cierre "FIN DEL ..." cuando exista. Conserva el texto tal cual, incluida su etiqueta de versión: lo único que agregas es el "# ". Esta excepción a la regla de no tocar nada fuera del alcance existe porque el sistema necesita ese encabezado para sellar la versión.
 - Si arriba del título aparecen líneas sueltas que solo contienen una versión (por ejemplo "v2.8" en su propio renglón), elimínalas: son residuo de un sellado anterior y el sistema las vuelve a poner donde corresponde.
 
 El usuario describirá el cambio en lenguaje natural. Internamente, clasifícalo en uno de estos tipos para aplicarlo con precisión:
@@ -71,16 +72,18 @@ Si el usuario solo hace una pregunta o pide una aclaración sin solicitar una ed
  * each time. It travels as the conversation's last message instead: see
  * buildEditorDraftMessage.
  *
- * OPTIONS_CONTRACT is appended AFTER the persona (default or override) on
- * purpose: if it lived inside EDITOR_PERSONA it would vanish whenever an
- * operator saves a persona override, so appending it separately keeps the
- * selectable-options capability available regardless of the persona in use.
+ * OPTIONS_CONTRACT and ANTI_OVERFIT_CONTRACT are appended AFTER the persona
+ * (default or override) on purpose: if they lived inside EDITOR_PERSONA they
+ * would vanish whenever an operator saves a persona override, so appending them
+ * separately keeps both capabilities available regardless of the persona in use.
  */
 export function buildEditorSystemPrompt(personaOverride?: string | null): string {
   const persona = personaOverride?.trim() ? personaOverride : EDITOR_PERSONA;
   return `${persona}
 
-${OPTIONS_CONTRACT}`;
+${OPTIONS_CONTRACT}
+
+${ANTI_OVERFIT_CONTRACT}`;
 }
 
 /**

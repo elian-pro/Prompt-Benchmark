@@ -156,9 +156,13 @@ test("draft message carries the draft, and says so when it is empty", () => {
   assert.ok(buildEditorDraftMessage("   ").includes("El prompt está vacío"));
 });
 
-test("a persona override replaces the persona, keeping the options contract", () => {
+// Both contracts live outside the persona precisely so an override can't drop
+// them: an operator saving their own persona in Settings must not silently turn
+// off selectable options or the anti-overfitting checklist.
+test("a persona override replaces the persona, keeping both contracts", () => {
   const system = buildEditorSystemPrompt("Eres otra persona.");
   assert.ok(system.includes("Eres otra persona."));
   assert.ok(!system.includes("ingeniero de prompts"));
   assert.ok(system.includes("OPCIONES"));
+  assert.ok(system.includes("NO SOBREAJUSTE"));
 });
