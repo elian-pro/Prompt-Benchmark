@@ -264,7 +264,18 @@ export async function listSessions({
   return (data ?? []).map(flattenListItem);
 }
 
-export async function getSession(id: string): Promise<DemoSessionDetail | null> {
+export async function getSession(
+  id: string,
+  opts?: {
+    /** Every round, oldest first, instead of only the active one. For the
+     *  admin reading a demo link: when a client restarts, the conversation
+     *  that made them restart is usually the interesting one, and hiding it
+     *  left the reports about it quoting turns that were nowhere on screen.
+     *  The client's own view keeps the default, since a restart is precisely
+     *  their way of starting clean. */
+    allRounds?: boolean;
+  },
+): Promise<DemoSessionDetail | null> {
   const sb = getSupabase();
   const { data: session, error } = await sb
     .from("demo_sessions")
@@ -277,11 +288,12 @@ export async function getSession(id: string): Promise<DemoSessionDetail | null> 
   // Only the active round is shown in the chat; older rounds remain in the
   // table so note previews keep resolving (see rounds model in the plan).
   const currentRound = (session as any).current_round ?? 1;
-  const { data: messages, error: mErr } = await sb
-    .from("demo_messages")
-    .select(MESSAGE_COLS)
-    .eq("session_id", id)
-    .eq("round", currentRound)
+  let query = sb.from("demo_messages").select(MESSAGE_COLS).eq("session_id", id);
+  if (!opts?.allRounds) query = query.eq("round", currentRound);
+  // turn_number restarts at 1 on every round, so it only orders a transcript
+  // once the round leads. Without this the rounds interleave.
+  const { data: messages, error: mErr } = await query
+    .order("round", { ascending: true, nullsFirst: true })
     .order("turn_number", { ascending: true });
   if (mErr) throw new Error(`No se pudieron obtener los mensajes: ${mErr.message}`);
 
@@ -306,6 +318,10 @@ export async function getSession(id: string): Promise<DemoSessionDetail | null> 
 
   return {
     ...flattenListItem({ ...session, demo_messages: messages ?? [] }),
+    // What was actually read, which is the active round or all of them.
+    // flattenListItem always counts the active one, and it is the list's
+    // preview number, not this transcript's.
+    message_count: (messages ?? []).length,
     messages: (messages ?? []) as unknown as DemoMessageRow[],
     notes,
     note_messages: noteMessages,

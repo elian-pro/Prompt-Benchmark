@@ -2613,6 +2613,26 @@ a.lab-card:hover {
   padding: 0;
   flex: none;
 }
+/* Marks where a client started over inside a transcript that shows every
+   round (demo link, admin side). */
+.round-divider {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 6px 0;
+  color: var(--faint);
+  font-size: 10.5px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+.round-divider::before,
+.round-divider::after {
+  content: "";
+  flex: 1;
+  height: 0.5px;
+  background: var(--border2);
+}
+
 .notes-panel {
   display: flex;
   flex-direction: column;

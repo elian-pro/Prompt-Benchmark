@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { Fragment, useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { IconArrowRight, IconCheck, IconNotes, IconPencil, IconX } from "@tabler/icons-react";
 
@@ -142,15 +142,28 @@ export function DemoLinkWorkspace({
           {session.messages.length === 0 && (
             <p className="empty-hint">Esta persona abrió el link pero no escribió nada.</p>
           )}
-          {session.messages.map((m) => (
-            <DemoTurn
-              key={m.id}
-              id={m.id}
-              role={m.role}
-              content={m.content}
-              pins={pinsByMessage.get(m.id) ?? []}
-            />
-          ))}
+          {session.messages.map((m, i) => {
+            // The transcript carries every round. A restart is a real event in
+            // the test, so it is drawn rather than smoothed over: without the
+            // line, two conversations read as one that changed its mind.
+            const previous = session.messages[i - 1];
+            const restarted = previous && (m.round ?? 1) !== (previous.round ?? 1);
+            return (
+              <Fragment key={m.id}>
+                {restarted && (
+                  <div className="round-divider">
+                    <span>Reinició la conversación</span>
+                  </div>
+                )}
+                <DemoTurn
+                  id={m.id}
+                  role={m.role}
+                  content={m.content}
+                  pins={pinsByMessage.get(m.id) ?? []}
+                />
+              </Fragment>
+            );
+          })}
         </div>
       </div>
 

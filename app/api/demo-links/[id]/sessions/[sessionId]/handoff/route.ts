@@ -31,7 +31,9 @@ export async function POST(_req: NextRequest, { params }: Params) {
     const link = await getLink(id);
     if (!link) return jsonError("Link no encontrado.", 404);
 
-    const session = await getSession(sessionId);
+    // Every round: a report about a turn the client later restarted past is
+    // still approved, and it must reach the Editor with its quote attached.
+    const session = await getSession(sessionId, { allRounds: true });
     if (!session || session.link_id !== id) {
       return jsonError("Conversación no encontrada.", 404);
     }

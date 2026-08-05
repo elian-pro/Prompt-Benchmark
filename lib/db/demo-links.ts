@@ -164,7 +164,10 @@ export type LinkSessionListItem = {
   last_seen_at: string | null;
   visitor_ip: string | null;
   visitor_user_agent: string | null;
+  /** Across every round, matching the transcript the admin opens. */
   message_count: number;
+  /** How many times this visitor started over. 1 means they never did. */
+  round_count: number;
   note_count: number;
   pending_notes: number;
 };
@@ -185,14 +188,14 @@ export async function listLinkSessions(linkId: string): Promise<LinkSessionListI
   return (data ?? []).map((row: any) => {
     const messages: any[] = Array.isArray(row.demo_messages) ? row.demo_messages : [];
     const notes: any[] = Array.isArray(row.demo_notes) ? row.demo_notes : [];
-    const round = row.current_round ?? 1;
     return {
       id: row.id,
       created_at: row.created_at,
       last_seen_at: row.last_seen_at,
       visitor_ip: row.visitor_ip,
       visitor_user_agent: row.visitor_user_agent,
-      message_count: messages.filter((m) => (m.round ?? 1) === round).length,
+      message_count: messages.length,
+      round_count: row.current_round ?? 1,
       note_count: notes.length,
       pending_notes: notes.filter((n) => n.status === "pending").length,
     };

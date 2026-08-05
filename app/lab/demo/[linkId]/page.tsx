@@ -147,6 +147,7 @@ export default function DemoLinkDetailPage() {
                     </div>
                     <div className="demo-session-meta">
                       {s.message_count} mensaje{s.message_count === 1 ? "" : "s"}
+                      {s.round_count > 1 && ` · ${s.round_count} conversaciones`}
                       {s.note_count > 0 && ` · ${s.note_count} reporte${s.note_count === 1 ? "" : "s"}`}
                     </div>
                     {/* The evidence trail, visible without opening the row: this
