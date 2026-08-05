@@ -11,8 +11,7 @@ import {
 } from "@tabler/icons-react";
 
 import { ThemeToggle } from "@/components/ui/ThemeToggle";
-import { GenerationWatcher } from "@/components/sessions/GenerationWatcher";
-import { PendingNotesWatcher } from "@/components/demo/PendingNotesWatcher";
+import { NotificationsBell } from "@/components/layout/NotificationsBell";
 
 /**
  * The Studio chrome. Split out of the root layout so it can be absent, not just
@@ -52,8 +51,7 @@ export function AppHeader() {
             </a>
           ))}
         </nav>
-        <PendingNotesWatcher />
-        <GenerationWatcher />
+        <NotificationsBell />
         <ThemeToggle />
         <form action="/api/auth/logout" method="post" className="logout-form">
           <button
