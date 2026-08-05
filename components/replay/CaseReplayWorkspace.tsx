@@ -253,8 +253,8 @@ export function CaseReplayWorkspace({
           {!started && (
             <p className="empty-hint">
               {replayable
-                ? "Corre el replay y la versión elegida contesta ese mismo mensaje del lead. Desde ahí puedes seguir la conversación tú."
-                : "Este caso no tiene marcada una respuesta del bot, así que no hay nada que volver a contestar. Márcala en la conversación y vuelve."}
+                ? "Corre el replay y la versión elegida contesta desde el mensaje marcado. Desde ahí puedes seguir la conversación tú, escribiendo como el lead."
+                : "Esta nota no marca ningún mensaje, así que no hay un punto donde volver a contestar. Marca uno en la conversación y vuelve."}
             </p>
           )}
           {thread.map((turn, i) =>

@@ -37,7 +37,15 @@ export async function GET(_req: NextRequest, { params }: Params) {
     // The snapshots themselves stay on the server: `turns` is the readable
     // form of exactly the same thing, and the raw blobs are large.
     const { historial_snapshot, turnos_snapshot, ...rest } = kase;
-    return NextResponse.json({ ...rest, turns, source });
+    return NextResponse.json({
+      ...rest,
+      // Recomputed when the stored cut is null: cases filed before a
+      // lead-marked note counted as replayable have it, and deriving it here
+      // fixes them without a backfill.
+      turno_index: kase.turno_index ?? replayCutFor(kase.turnos_marcados, turns),
+      turns,
+      source,
+    });
   } catch (err) {
     return handleError(err);
   }

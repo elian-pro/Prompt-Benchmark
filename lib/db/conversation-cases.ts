@@ -6,7 +6,7 @@
  * supabase/migrations/020_conversation_cases.sql for why the snapshots are
  * frozen rather than read back from the source on demand.
  */
-import { getSupabase } from "../supabase";
+import { getSupabase } from "../supabase.ts";
 
 export type ConversationCase = {
   id: string;
@@ -18,8 +18,8 @@ export type ConversationCase = {
   historial_snapshot: string | null;
   turnos_snapshot: unknown;
   version_id: string | null;
-  /** Where the replay cuts the history: the first bot turn among the marked
-   *  ones. A replay can only answer one turn. */
+  /** Where the replay cuts the history: see replayCutFor. Null only for a note
+   *  that marks nothing. */
   turno_index: number | null;
   /** Every turn the note points at, for the pins in the transcript. */
   turnos_marcados: number[];
@@ -55,18 +55,26 @@ export type NewCase = {
 };
 
 /**
- * The turn a replay cuts at, out of everything the note marked: the first bot
- * turn among them. A note can point at several messages, but a replay can only
- * answer one, and the earliest bot turn is where the conversation first went
- * wrong. Null when the note marks nothing or only lead messages, which leaves
- * the case unreplayable and says so in the UI.
+ * The turn a replay cuts at, out of everything the note marked: the earliest
+ * bot turn among them. A note can point at several messages, but a replay can
+ * only answer one, and the earliest bot turn is where the conversation first
+ * went wrong.
+ *
+ * Marking only lead messages is the other way people write a case: "after this
+ * message the bot got it wrong", pointing at what the bot should have answered
+ * rather than at its answer. So the earliest marked turn is the cut, and
+ * buildReplayPlan already knows to start the reply right after a lead turn.
+ *
+ * Null only when the note marks nothing at all, which is a general note and
+ * leaves the case unreplayable.
  */
 export function replayCutFor(
   marked: number[],
   turns: { rol: string }[],
 ): number | null {
-  const bots = marked.filter((i) => turns[i]?.rol === "bot").sort((a, b) => a - b);
-  return bots[0] ?? null;
+  const inOrder = [...marked].sort((a, b) => a - b);
+  const bot = inOrder.find((i) => turns[i]?.rol === "bot");
+  return bot ?? inOrder[0] ?? null;
 }
 
 export async function createCase(input: NewCase): Promise<ConversationCase> {

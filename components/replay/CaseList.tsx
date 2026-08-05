@@ -15,11 +15,23 @@ type CaseRow = {
   id_de_kommo: string | null;
   conversation_at: string | null;
   turno_index: number | null;
+  turnos_marcados: number[];
   nota: string;
   resolved_version_id: string | null;
   resolved_at: string | null;
   created_at: string;
 };
+
+/** Where the replay starts. The stored cut is null on cases filed before a
+ *  lead-marked note counted as replayable; for those the earliest marked turn
+ *  IS the cut (see replayCutFor), so the row says the same thing the case page
+ *  does instead of "sin turno marcado". */
+function turnLabel(kase: CaseRow): string {
+  const cut = kase.turno_index ?? (kase.turnos_marcados.length > 0
+    ? Math.min(...kase.turnos_marcados)
+    : null);
+  return cut == null ? "Sin turno marcado" : `Turno ${cut + 1}`;
+}
 
 /**
  * Every client's cases: who, what failed, how long ago.
@@ -80,8 +92,7 @@ export function CaseList({
               {kase.id_de_kommo && <span className="muted"> · Lead {kase.id_de_kommo}</span>}
             </span>
             <span className="session-title">
-              {kase.turno_index == null ? "Sin turno marcado" : `Turno ${kase.turno_index + 1}`} ·{" "}
-              {kase.nota}
+              {turnLabel(kase)} · {kase.nota}
             </span>
           </span>
           <span className="session-meta">

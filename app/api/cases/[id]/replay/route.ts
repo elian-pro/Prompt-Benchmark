@@ -1,5 +1,5 @@
 import { NextRequest } from "next/server";
-import { getCase } from "@/lib/db/conversation-cases";
+import { getCase, replayCutFor } from "@/lib/db/conversation-cases";
 import { getVersion, listVersions } from "@/lib/db/versions";
 import { getRoleDefault } from "@/lib/db/role-defaults";
 import { RoleNotConfiguredError } from "@/lib/db/runs";
@@ -28,23 +28,18 @@ type Params = { params: Promise<{ id: string }> };
  * The stream is not a job: nothing survives navigating away mid replay, unlike
  * an Editor turn. A replay is one short answer and re-running it is free.
  *
- * Scope, stated here because it is easy to expect more: this answers ONE turn.
- * A whole conversation cannot be replayed, because as soon as the bot says
- * something different the real lead's next message no longer follows from it.
- * It also runs with prompt and history only, so a difference caused by a tool,
- * a CRM field or RAG will not reproduce.
+ * Scope, stated here because it is easy to expect more: the real conversation
+ * is only history up to the marked point. From there the replay continues with
+ * what the user types playing the lead, never with what the real lead said
+ * next: once the bot answers differently, the rest of the real conversation no
+ * longer follows from it. It also runs with prompt and history only, so a
+ * difference caused by a tool, a CRM field or RAG will not reproduce.
  */
 export async function POST(req: NextRequest, { params }: Params) {
   try {
     const { id } = await params;
     const kase = await getCase(id);
     if (!kase) return jsonError("Caso no encontrado.", 404);
-    if (kase.turno_index == null) {
-      return jsonError(
-        "Este caso no tiene marcado el turno que falló, así que no hay qué volver a correr.",
-        409,
-      );
-    }
 
     const body = await req.json().catch(() => ({}));
     const input = replayCaseSchema.parse(body);
@@ -65,7 +60,17 @@ export async function POST(req: NextRequest, { params }: Params) {
       turnos: kase.turnos_snapshot,
       historial: kase.historial_snapshot,
     });
-    const plan = buildReplayPlan(turns, kase.turno_index);
+    // Same fallback as the case endpoint, so a case filed before a lead-marked
+    // note counted as replayable still runs.
+    const cut = kase.turno_index ?? replayCutFor(kase.turnos_marcados, turns);
+    if (cut == null) {
+      return jsonError(
+        "Este caso no marca ningún mensaje, así que no hay un punto donde volver a contestar.",
+        409,
+      );
+    }
+
+    const plan = buildReplayPlan(turns, cut);
     if (!isReplayable(plan)) {
       return jsonError(
         "El turno marcado no tiene un mensaje del lead antes, así que no hay nada que responder.",
