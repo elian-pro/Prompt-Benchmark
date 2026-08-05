@@ -23,9 +23,24 @@ export const handoffSchema = z.object({
 });
 
 /** Re-running a case. Omitting the version means "the one in production now",
- *  which is the usual question: did what I just promoted fix this? */
+ *  which is the usual question: did what I just promoted fix this?
+ *
+ *  `continuation` is the replay's own conversation after that first answer:
+ *  what the candidate version replied (verbatim, envelope and all, because the
+ *  model follows the format of its own previous turns) and what the user typed
+ *  playing the lead. It travels on every turn because a replay is not stored
+ *  anywhere: the browser holds it, the server only answers. */
 export const replayCaseSchema = z.object({
   versionId: z.string().uuid().optional(),
+  continuation: z
+    .array(
+      z.object({
+        role: z.enum(["user", "assistant"]),
+        content: z.string().min(1).max(8000),
+      }),
+    )
+    .max(60)
+    .default([]),
 });
 
 /** The verdict. Null reopens the case: passing belongs to a version, and a

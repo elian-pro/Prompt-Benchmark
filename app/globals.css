@@ -3849,25 +3849,51 @@ body[data-theme="light"] .dot-grid::after {
   }
 }
 
-/* Replay: one filed case, and the two replies it compares. The row reuses the
-   Playground session list; the body hangs off it, sharing its border. */
-.case-entry {
-  display: flex;
-  flex-direction: column;
-}
-.case-entry.open .session-item {
-  border-radius: 12px 12px 0 0;
-}
-.case-item {
-  padding: 12px 16px 14px;
-  border: 0.5px solid var(--border);
-  border-top: 0;
-  border-radius: 0 0 12px 12px;
-}
+/* Replay: one filed case on its own page. Two columns of equal weight, the
+   real conversation and the replay, each scrolling on its own so the pair
+   stays side by side instead of one pushing the other down the page. */
 .case-note {
   font-size: 13px;
   line-height: 1.55;
-  margin: 0 0 10px;
+  margin: 0 0 14px;
+}
+.case-replay-layout {
+  display: grid;
+  gap: 20px;
+  align-items: start;
+}
+@media (min-width: 1200px) {
+  .case-replay-layout {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+.case-replay-column {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 0;
+  border: 0.5px solid var(--border);
+  border-radius: 14px;
+  padding: 14px 16px 16px;
+}
+.case-replay-head {
+  gap: 12px;
+}
+.case-replay-scroll {
+  /* Tall enough to read a conversation, capped so the composer and the verdict
+     stay on screen. */
+  height: 62vh;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+.case-replay-composer {
+  display: flex;
+  align-items: flex-end;
+  gap: 8px;
+}
+.case-replay-composer .textarea {
+  flex: 1;
+  min-width: 0;
 }
 /* Read-only contracts the app appends after a persona (Settings). Collapsed by
    default: they are reference, not the thing being edited. */

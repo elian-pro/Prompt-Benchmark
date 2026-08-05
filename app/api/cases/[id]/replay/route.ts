@@ -73,6 +73,13 @@ export async function POST(req: NextRequest, { params }: Params) {
       );
     }
 
+    // The real conversation up to the failing reply, then whatever the replay
+    // itself has said since.
+    const messages = [...plan.messages, ...input.continuation];
+    if (messages.at(-1)?.role !== "user") {
+      return jsonError("Escribe un mensaje del lead para que el bot pueda contestar.", 409);
+    }
+
     const role = await getRoleDefault("test_bot");
     if (!role) {
       throw new RoleNotConfiguredError(
@@ -98,7 +105,7 @@ export async function POST(req: NextRequest, { params }: Params) {
             providerId: role.provider_id,
             modelName: role.model_name,
             systemPrompt: version.content,
-            messages: plan.messages as ChatMessage[],
+            messages: messages as ChatMessage[],
             temperature: role.temperature ?? undefined,
             topP: role.top_p ?? undefined,
             maxTokens: role.max_tokens ?? undefined,

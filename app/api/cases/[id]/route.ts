@@ -34,12 +34,10 @@ export async function GET(_req: NextRequest, { params }: Params) {
       turnos: kase.turnos_snapshot,
       historial: kase.historial_snapshot,
     });
-    return NextResponse.json({
-      turns,
-      source,
-      turnos_marcados: kase.turnos_marcados,
-      turno_index: kase.turno_index,
-    });
+    // The snapshots themselves stay on the server: `turns` is the readable
+    // form of exactly the same thing, and the raw blobs are large.
+    const { historial_snapshot, turnos_snapshot, ...rest } = kase;
+    return NextResponse.json({ ...rest, turns, source });
   } catch (err) {
     return handleError(err);
   }
