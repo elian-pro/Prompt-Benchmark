@@ -211,6 +211,7 @@ export function DemoLinkWorkspace({
 
               {note.message_ids.length > 0 && (
                 <div className="note-refs">
+                  <span className="section-label">Mensajes que marcó</span>
                   {note.message_ids.map((mid) => {
                     const m = messagesById.get(mid);
                     return (
@@ -269,12 +270,17 @@ export function DemoLinkWorkspace({
               ) : (
                 <>
                   {note.expected && (
-                    <p className="note-text">
+                    <p className="note-field">
                       <span className="section-label">Debió responder</span>
                       {note.expected}
                     </p>
                   )}
-                  {note.text && <p className="note-expected">{note.text}</p>}
+                  {note.text && (
+                    <p className="note-field">
+                      <span className="section-label">Qué está mal</span>
+                      {note.text}
+                    </p>
+                  )}
                 </>
               )}
 

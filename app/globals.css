@@ -44,6 +44,19 @@ body {
   height: 100%;
 }
 
+/* Scrollbars. The macOS overlay bar lands as a wide light slab across a dark
+   panel, and it is the first thing the eye goes to on a screen that is
+   otherwise all grays. Both properties are inherited, so the whole app follows
+   from this one rule: no scrollbar component, no library.
+
+   A neutral gray rather than a token: the theme variables are declared on
+   `body`, and the viewport's scrollbar is styled from `html`, which is their
+   parent. This one reads correctly against both themes. */
+html {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(128, 128, 128, 0.45) transparent;
+}
+
 body {
   background: var(--bg);
   color: var(--fg);
@@ -2734,6 +2747,21 @@ a.lab-card:hover {
   color: var(--fg);
 }
 .note-text {
+  font-size: 12.5px;
+  line-height: 1.55;
+  color: var(--fg);
+  white-space: pre-wrap;
+}
+
+/* One labelled field of a report ("Debió responder", "Qué está mal"). The
+   label used to sit inline and ran straight into its own text; a report is
+   read by someone deciding whether to approve it, so each part says what it
+   is. */
+.note-field {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin: 8px 0 0;
   font-size: 12.5px;
   line-height: 1.55;
   color: var(--fg);
