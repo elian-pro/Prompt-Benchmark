@@ -14,6 +14,7 @@ import {
   TypingIndicator,
 } from "@/components/demo/DemoTurn";
 import { DemoInstructions } from "@/components/demo/DemoInstructions";
+import { gateStateFor } from "@/lib/demo-visit";
 
 /**
  * The client's whole experience of a demo link: read the instructions, talk to
@@ -65,10 +66,15 @@ export function DemoClient({
   token: string;
   clientName: string | null;
 }) {
-  // The instructions gate. Remembered per link so a client who comes back to
-  // keep testing is not lectured twice, but a different link explains itself
-  // again because it may be a different round with different goals.
+  // The instructions gate. What is remembered per link is WHEN the client was
+  // last active, not merely that they were: coming back to keep testing right
+  // away skips the instructions, coming back tomorrow does not. A different
+  // link always explains itself again, since it may be a different round with
+  // different goals.
   const [started, setStarted] = useState(false);
+  /** First visit ever to this link: the instructions arrive one step at a
+   *  time. A return visit gets the whole card and one button. */
+  const [firstTime, setFirstTime] = useState(true);
   const [session, setSession] = useState<PublicSession | null>(null);
   const [loading, setLoading] = useState(false);
   const [fatal, setFatal] = useState<string | null>(null);
@@ -91,21 +97,30 @@ export function DemoClient({
 
   useEffect(() => {
     try {
-      if (window.localStorage.getItem(`demo-seen:${token}`) === "1") setStarted(true);
+      const gate = gateStateFor(window.localStorage.getItem(`demo-seen:${token}`), Date.now());
+      setFirstTime(gate.stepped);
+      if (gate.started) setStarted(true);
     } catch {
       // Private mode with storage disabled: showing the instructions again is
       // the harmless outcome, so there is nothing to handle.
     }
   }, [token]);
 
-  const start = useCallback(() => {
+  /** Marks the visit as alive. Called when the gate is passed and on every
+   *  message, so half an hour of silence is what ends it, not half an hour of
+   *  clock. */
+  const touch = useCallback(() => {
     try {
-      window.localStorage.setItem(`demo-seen:${token}`, "1");
+      window.localStorage.setItem(`demo-seen:${token}`, String(Date.now()));
     } catch {
       /* see above */
     }
-    setStarted(true);
   }, [token]);
+
+  const start = useCallback(() => {
+    touch();
+    setStarted(true);
+  }, [touch]);
 
   // Opening the conversation is a POST: it creates the session on first visit
   // and resumes it after that. A GET would be wrong here, and is what link
@@ -151,6 +166,7 @@ export function DemoClient({
   async function send() {
     const content = input.trim();
     if (!content || sending) return;
+    touch();
     setSending(true);
     setError(null);
     setInput("");
@@ -241,7 +257,7 @@ export function DemoClient({
   if (!started) {
     return (
       <div className="public-demo">
-        <DemoInstructions clientName={clientName} onStart={start} />
+        <DemoInstructions clientName={clientName} stepped={firstTime} onStart={start} />
       </div>
     );
   }
@@ -514,7 +530,7 @@ export function DemoClient({
             />
             {noteError && <p className="form-error">{noteError}</p>}
             <div className="note-composer-actions">
-              <Button onClick={saveNote} disabled={!noteExpected.trim() || savingNote}>
+              <Button variant="primary" onClick={saveNote} disabled={!noteExpected.trim() || savingNote}>
                 {savingNote ? "Enviando…" : "Enviar reporte"}
               </Button>
             </div>

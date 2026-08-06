@@ -4682,6 +4682,23 @@ body[data-theme="dark"] .history-filters input[type="date"]::-webkit-calendar-pi
   font-weight: 500;
   color: var(--fg);
 }
+/* A step that has not been reached yet: legible as a shape, unreadable as
+   text. The card arrives one point at a time instead of as a wall that gets
+   closed on reflex. */
+.demo-gate-steps li.is-locked {
+  filter: blur(5px);
+  opacity: 0.55;
+  user-select: none;
+  pointer-events: none;
+}
+.demo-gate-steps li {
+  transition: filter 0.35s ease, opacity 0.35s ease;
+}
+@media (prefers-reduced-motion: reduce) {
+  .demo-gate-steps li {
+    transition: none;
+  }
+}
 .demo-gate-card .btn {
   align-self: flex-start;
 }
@@ -4894,12 +4911,15 @@ body[data-theme="dark"] .history-filters input[type="date"]::-webkit-calendar-pi
    black, the same tokens as their chat bubble (.turn-lead .chat-msg). The
    accent yellow is Studio chrome and means nothing to someone who only ever
    sees this page. Scoped to .public-demo so the Studio's own buttons are
-   untouched. */
+   untouched, and applied to every main action on the page (start testing,
+   send a report, restart) so they read as one voice. */
+.public-demo .btn-primary,
 .public-demo .note-composer-actions .btn {
   background: var(--fg);
   color: var(--bg);
   border-color: var(--fg);
 }
+.public-demo .btn-primary:disabled,
 .public-demo .note-composer-actions .btn:disabled {
   opacity: 0.35;
 }
