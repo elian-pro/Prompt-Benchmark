@@ -176,8 +176,15 @@
   border-color: var(--accent);
 }
 
-/* Focus: a thin ring, animated. Never a hard 2px outline (ZR-18). */
-.zebra-ds :focus-visible {
+/* Focus: a thin ring, animated. Never a hard 2px outline (ZR-18).
+   Only on things you press. A text field matches :focus-visible the moment it
+   is clicked, not just on keyboard focus, so the ring drew a box around the
+   composer every time someone went to type. Fields already say they are
+   focused by their own border turning to the accent, just below. */
+.zebra-ds button:focus-visible,
+.zebra-ds a:focus-visible,
+.zebra-ds [role="button"]:focus-visible,
+.zebra-ds summary:focus-visible {
   outline: none;
   box-shadow: 0 0 0 1px var(--accent);
   transition: box-shadow 0.18s cubic-bezier(0.16, 1, 0.3, 1);
