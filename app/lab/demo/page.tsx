@@ -15,6 +15,7 @@ import type { DemoLinkListItem } from "@/lib/db/demo-links";
 import { Button } from "@/components/ui/Button";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { SkeletonRows } from "@/components/ui/Skeleton";
+import { formatDeadlineShortEs, isExpired } from "@/lib/business-days";
 import { NewDemoLinkModal } from "@/components/demo/NewDemoLinkModal";
 
 /**
@@ -127,6 +128,10 @@ export default function DemoLinksPage() {
                 {link.client_name ?? "Cliente eliminado"}
                 {link.label && <span className="demo-link-label">{link.label}</span>}
                 {link.status === "closed" && <span className="note-status">Cerrado</span>}
+                {/* Expired is not closed: nobody decided it, the date did. */}
+                {link.status === "active" && isExpired(link.expires_on) && (
+                  <span className="note-status">Vencido</span>
+                )}
               </div>
               <div className="demo-link-meta">
                 <span>v{link.version_number_snapshot}</span>
@@ -136,6 +141,15 @@ export default function DemoLinksPage() {
                 </span>
                 <span>·</span>
                 <span>{formatDate(link.created_at)}</span>
+                {link.expires_on && (
+                  <>
+                    <span>·</span>
+                    <span>
+                      {isExpired(link.expires_on) ? "venció" : "hasta"} el{" "}
+                      {formatDeadlineShortEs(link.expires_on)}
+                    </span>
+                  </>
+                )}
                 {link.pending_notes > 0 && (
                   <span className="demo-link-pending">
                     {link.pending_notes} sin revisar

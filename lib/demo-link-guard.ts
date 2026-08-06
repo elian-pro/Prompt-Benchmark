@@ -22,6 +22,7 @@ import type { NextRequest } from "next/server";
 import type { NextResponse } from "next/server";
 
 import { getLinkByToken, type DemoLink } from "./db/demo-links";
+import { formatDeadlineEs, isExpired } from "./business-days.ts";
 import { randomToken, signPayload, verifyPayload } from "./auth/signed-token.ts";
 import { createRateLimiter, DEMO_MESSAGE_RULE } from "./rate-limit.ts";
 
@@ -102,6 +103,16 @@ export async function openDemoContext(
   if (link.status !== "active") {
     throw new DemoLinkError(
       "Esta ronda de pruebas ya se cerró. Escríbenos si necesitas seguir probando.",
+      409,
+    );
+  }
+  // The deadline is checked here rather than flipped into `status` by a
+  // scheduler this project does not have. One comparison, and it can never be
+  // stale: the moment the date passes, every public route stops. Saying which
+  // day it closed separates "the time ran out" from "we closed it".
+  if (isExpired(link.expires_on)) {
+    throw new DemoLinkError(
+      `El plazo para dejar reportes terminó el ${formatDeadlineEs(link.expires_on!)}. Escríbenos si necesitas seguir probando.`,
       409,
     );
   }

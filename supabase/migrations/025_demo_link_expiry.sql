@@ -1,0 +1,27 @@
+-- ============================================================
+-- Demo: a link that closes on its own (Sprint 18).
+-- Run once in the Supabase SQL Editor of the prompt_studio project.
+--
+-- A round of testing had no end date. It stayed open until someone remembered
+-- to close it by hand, and the client was never told they had a deadline,
+-- because there was none to tell.
+--
+-- `date`, not `timestamptz`, on purpose. The admin picks a day and the client
+-- is told a day; an instant would only add a conversion that renders the wrong
+-- one, since `new Date("2026-08-14")` is UTC midnight, which in Mexico is the
+-- evening of the 13th.
+--
+-- The deadline is INCLUSIVE and read in Mexico City time: a link expiring on
+-- the 14th takes reports all through the 14th and stops at midnight. Expiry is
+-- compared at read time in lib/demo-link-guard.ts rather than flipped into
+-- `status`, because a flip would need a scheduler this project does not have,
+-- and would leave a window where a link is past its date but not marked yet.
+--
+-- `status` stays what it always was: the decision a person made. `closed_at`
+-- is when they made it. This column is when the link stops on its own.
+--
+-- Existing links get null, which means no deadline, so nothing already handed
+-- to a client changes behavior.
+-- ============================================================
+
+alter table demo_links add column if not exists expires_on date;

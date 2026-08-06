@@ -1,5 +1,9 @@
 import { z } from "zod";
 
+/** A day, never an instant: the admin picks a day and the client is told a
+ *  day. See lib/business-days.ts for why that distinction is load bearing. */
+const isoDate = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Fecha inválida.");
+
 /** Creating a demo link freezes a client's version, the same way a Playground
  *  session does. The caps have defaults in the database; they are here so the
  *  user can tighten them per link without a migration. */
@@ -10,11 +14,21 @@ export const createDemoLinkSchema = z.object({
   label: z.string().trim().max(120, "El nombre del link es demasiado largo.").optional(),
   maxSessions: z.number().int().min(1).max(500).optional(),
   maxMessages: z.number().int().min(1).max(500).optional(),
+  /** Last day the client can leave reports, inclusive. Null: no deadline. */
+  expiresOn: isoDate.nullable().optional(),
 });
 
-export const updateDemoLinkSchema = z.object({
-  status: z.enum(["active", "closed"]),
-});
+/** Both fields are optional and independent: closing a link by hand and moving
+ *  its deadline are different decisions, and the PATCH carries whichever one
+ *  the user just made. */
+export const updateDemoLinkSchema = z
+  .object({
+    status: z.enum(["active", "closed"]).optional(),
+    expiresOn: isoDate.nullable().optional(),
+  })
+  .refine((val) => val.status !== undefined || val.expiresOn !== undefined, {
+    message: "No hay cambios que guardar.",
+  });
 
 /**
  * A note left by the client on a demo link.

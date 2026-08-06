@@ -6,6 +6,7 @@ import {
   getLink,
   listLinkSessions,
   reopenLink,
+  setLinkExpiry,
 } from "@/lib/db/demo-links";
 import { getClient } from "@/lib/db/clients";
 import { updateDemoLinkSchema } from "@/lib/schemas/demo-links";
@@ -37,12 +38,21 @@ export async function GET(_req: NextRequest, { params }: Params) {
   }
 }
 
-/** Closing revokes the URL without touching what was said through it. */
+/** Closing revokes the URL without touching what was said through it; moving
+ *  the deadline changes when it revokes itself. A request carries whichever of
+ *  the two the user just decided, and both are applied when it carries both. */
 export async function PATCH(req: NextRequest, { params }: Params) {
   try {
     const { id } = await params;
-    const { status } = updateDemoLinkSchema.parse(await req.json());
-    return NextResponse.json(status === "closed" ? await closeLink(id) : await reopenLink(id));
+    const { status, expiresOn } = updateDemoLinkSchema.parse(await req.json());
+
+    let link = await getLink(id);
+    if (!link) return jsonError("Link no encontrado.", 404);
+
+    if (expiresOn !== undefined) link = await setLinkExpiry(id, expiresOn);
+    if (status !== undefined) link = status === "closed" ? await closeLink(id) : await reopenLink(id);
+
+    return NextResponse.json(link);
   } catch (err) {
     return handleError(err);
   }

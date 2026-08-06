@@ -8,6 +8,13 @@ import type { VersionListItem } from "@/lib/db/versions";
 import { Modal } from "@/components/ui/Modal";
 import { Button } from "@/components/ui/Button";
 import { SearchableChip } from "@/components/ui/SearchableChip";
+import {
+  businessDaysFrom,
+  formatDeadlineEs,
+  todayInMexico,
+  THREE_WORKING_WEEKS,
+  WORKING_WEEK,
+} from "@/lib/business-days";
 
 /**
  * Cuts a new demo link: a client, the version it freezes, and how the chat
@@ -29,6 +36,11 @@ export function NewDemoLinkModal({
   const [versionId, setVersionId] = useState("");
   const [label, setLabel] = useState("");
   const [openingMessage, setOpeningMessage] = useState("");
+  /** A round is born with a deadline: leaving it open forever is the decision
+   *  that has to be made on purpose, not the one that happens by default. */
+  const [expiresOn, setExpiresOn] = useState(() =>
+    businessDaysFrom(todayInMexico(), WORKING_WEEK),
+  );
   const [maxSessions, setMaxSessions] = useState("25");
   const [maxMessages, setMaxMessages] = useState("60");
   const [loading, setLoading] = useState(true);
@@ -82,6 +94,7 @@ export function NewDemoLinkModal({
           openingMessage: openingMessage.trim() || undefined,
           maxSessions: Number(maxSessions) || undefined,
           maxMessages: Number(maxMessages) || undefined,
+          expiresOn: expiresOn || null,
         }),
       });
       if (!res.ok) throw new Error((await res.json()).error ?? "No se pudo crear el link.");
@@ -153,6 +166,43 @@ export function NewDemoLinkModal({
           </p>
         </div>
       )}
+
+      <div className="field">
+        <label className="field-label">¿Hasta cuándo puede dejar reportes?</label>
+        <div className="deadline-row">
+          <input
+            type="date"
+            className="input"
+            min={todayInMexico()}
+            value={expiresOn}
+            onChange={(e) => setExpiresOn(e.target.value)}
+          />
+          <button
+            type="button"
+            className="version-changes-link"
+            onClick={() => setExpiresOn(businessDaysFrom(todayInMexico(), WORKING_WEEK))}
+          >
+            Una semana hábil
+          </button>
+          <button
+            type="button"
+            className="version-changes-link"
+            onClick={() => setExpiresOn(businessDaysFrom(todayInMexico(), THREE_WORKING_WEEKS))}
+          >
+            15 días hábiles
+          </button>
+          <button type="button" className="version-changes-link" onClick={() => setExpiresOn("")}>
+            Sin fecha
+          </button>
+        </div>
+        {/* The hint is the client's own sentence, so what you pick and what
+            they read are visibly the same thing. */}
+        <p className="field-hint">
+          {expiresOn
+            ? `El cliente verá: "tienes hasta el ${formatDeadlineEs(expiresOn)} para dejar tus reportes".`
+            : "Sin fecha, el link queda abierto hasta que lo cierres a mano."}
+        </p>
+      </div>
 
       <div className="field">
         <label className="field-label">Nombre de la ronda (opcional)</label>

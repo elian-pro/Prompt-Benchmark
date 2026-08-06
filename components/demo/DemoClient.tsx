@@ -63,9 +63,12 @@ const STATUS_LABEL: Record<PublicNote["status"], string> = {
 export function DemoClient({
   token,
   clientName,
+  deadline,
 }: {
   token: string;
   clientName: string | null;
+  /** Last day they can leave reports, YYYY-MM-DD. Null: no deadline. */
+  deadline: string | null;
 }) {
   // The instructions gate. What is remembered per link is WHEN the client was
   // last active, not merely that they were: coming back to keep testing right
@@ -271,7 +274,12 @@ export function DemoClient({
   if (!started) {
     return (
       <div className="public-demo">
-        <DemoInstructions clientName={clientName} stepped={firstTime} onStart={start} />
+        <DemoInstructions
+          clientName={clientName}
+          stepped={firstTime}
+          deadline={deadline}
+          onStart={start}
+        />
       </div>
     );
   }

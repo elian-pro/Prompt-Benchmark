@@ -4027,6 +4027,29 @@ body[data-theme="light"] .dot-grid::after {
   flex: 1;
   min-width: 0;
 }
+/* The deadline: a native date input with the presets that fill it, and the
+   same control in the link's header. No calendar component. */
+.deadline-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.deadline-row .input {
+  width: auto;
+  flex: none;
+}
+.deadline-control {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+.deadline-control .input {
+  width: auto;
+  padding: 6px 10px;
+  font-size: 12px;
+}
+
 /* Read-only contracts the app appends after a persona (Settings). Collapsed by
    default: they are reference, not the thing being edited. */
 .prompt-appended {

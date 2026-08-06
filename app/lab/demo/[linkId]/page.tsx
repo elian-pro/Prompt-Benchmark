@@ -8,6 +8,7 @@ import { IconArrowLeft, IconList, IconMessages, IconTrash } from "@tabler/icons-
 import type { DemoLink, LinkSessionListItem } from "@/lib/db/demo-links";
 import { Button } from "@/components/ui/Button";
 import { EmptyState } from "@/components/ui/EmptyState";
+import { formatDeadlineEs, isExpired, todayInMexico } from "@/lib/business-days";
 import { DangerConfirmModal } from "@/components/ui/DangerConfirmModal";
 import { DemoLinkWorkspace } from "@/components/demo/DemoLinkWorkspace";
 
@@ -74,6 +75,21 @@ export default function DemoLinkDetailPage() {
     setListOpen(false);
   }
 
+  /** One field, one request: the deadline is a single decision and does not
+   *  need a form around it. */
+  async function saveExpiry(value: string) {
+    const res = await fetch(`/api/demo-links/${linkId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ expiresOn: value || null }),
+    });
+    if (!res.ok) {
+      setError((await res.json()).error ?? "No se pudo cambiar la fecha.");
+      return;
+    }
+    await load();
+  }
+
   async function removeLink() {
     const res = await fetch(`/api/demo-links/${linkId}`, { method: "DELETE" });
     if (!res.ok) throw new Error((await res.json()).error ?? "No se pudo eliminar el link.");
@@ -94,11 +110,39 @@ export default function DemoLinkDetailPage() {
             {detail
               ? `v${detail.version_number_snapshot} · ${detail.sessions.length} conversación${
                   detail.sessions.length === 1 ? "" : "es"
-                }${detail.label ? ` · ${detail.label}` : ""}`
+                }${detail.label ? ` · ${detail.label}` : ""}${
+                  detail.expires_on
+                    ? ` · ${isExpired(detail.expires_on) ? "venció" : "hasta"} el ${formatDeadlineEs(detail.expires_on)}`
+                    : ""
+                }`
               : "Cargando…"}
           </p>
         </div>
         <div className="detail-actions">
+          {detail && (
+            <span className="deadline-control">
+              <label className="section-label" htmlFor="link-deadline">
+                {detail.expires_on && isExpired(detail.expires_on) ? "Venció el" : "Cierra el"}
+              </label>
+              <input
+                id="link-deadline"
+                type="date"
+                className="input"
+                min={todayInMexico()}
+                value={detail.expires_on ?? ""}
+                onChange={(e) => void saveExpiry(e.target.value)}
+              />
+              {detail.expires_on && (
+                <button
+                  type="button"
+                  className="version-changes-link"
+                  onClick={() => void saveExpiry("")}
+                >
+                  Quitar fecha
+                </button>
+              )}
+            </span>
+          )}
           <Button
             variant="danger"
             size="sm"

@@ -33,6 +33,9 @@ export type DemoLink = {
   max_messages: number;
   created_at: string;
   closed_at: string | null;
+  /** The last day the client can leave reports, inclusive, read in Mexico City
+   *  time. Null means no deadline. See lib/business-days.ts. */
+  expires_on: string | null;
 };
 
 export type DemoLinkListItem = DemoLink & {
@@ -43,7 +46,8 @@ export type DemoLinkListItem = DemoLink & {
 
 const LINK_COLS =
   "id, token, client_id, version_id, version_number_snapshot, prompt_snapshot, " +
-  "opening_message, label, status, max_sessions, max_messages, created_at, closed_at";
+  "opening_message, label, status, max_sessions, max_messages, created_at, closed_at, " +
+  "expires_on";
 
 export async function createLink(input: {
   clientId: string;
@@ -52,6 +56,8 @@ export async function createLink(input: {
   label?: string;
   maxSessions?: number;
   maxMessages?: number;
+  /** YYYY-MM-DD, or null for a link that stays open until someone closes it. */
+  expiresOn?: string | null;
 }): Promise<DemoLink> {
   const version = await getVersion(input.versionId);
   if (!version) throw new Error("La versión a probar no existe.");
@@ -79,6 +85,7 @@ export async function createLink(input: {
       opening_message: input.openingMessage?.trim() || null,
       label: input.label?.trim() || null,
       status: "active",
+      expires_on: input.expiresOn ?? null,
       ...(input.maxSessions ? { max_sessions: input.maxSessions } : {}),
       ...(input.maxMessages ? { max_messages: input.maxMessages } : {}),
     })
@@ -225,6 +232,21 @@ export async function closeLink(id: string): Promise<DemoLink> {
     .select(LINK_COLS)
     .single();
   if (error) throw new Error(`No se pudo cerrar el link: ${error.message}`);
+  return data as unknown as DemoLink;
+}
+
+/** The deadline, set or cleared. Separate from close/reopen because they mean
+ *  different things: this is when the link stops on its own, that is a person
+ *  deciding it stops now. */
+export async function setLinkExpiry(id: string, expiresOn: string | null): Promise<DemoLink> {
+  const sb = getSupabase();
+  const { data, error } = await sb
+    .from("demo_links")
+    .update({ expires_on: expiresOn })
+    .eq("id", id)
+    .select(LINK_COLS)
+    .single();
+  if (error) throw new Error(`No se pudo cambiar la fecha de cierre: ${error.message}`);
   return data as unknown as DemoLink;
 }
 

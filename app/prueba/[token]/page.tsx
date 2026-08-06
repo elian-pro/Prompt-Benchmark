@@ -72,5 +72,11 @@ export default async function DemoLinkPage({ params }: Params) {
   const resolved = await resolve(token);
   if (!resolved) notFound();
 
-  return <DemoClient token={token} clientName={resolved.clientName} />;
+  return (
+    <DemoClient
+      token={token}
+      clientName={resolved.clientName}
+      deadline={resolved.link.expires_on}
+    />
+  );
 }

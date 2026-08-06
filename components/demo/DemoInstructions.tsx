@@ -5,6 +5,7 @@ import { IconMessage2, IconNotes, IconShieldLock } from "@tabler/icons-react";
 
 import { Button } from "@/components/ui/Button";
 import { ZebraWordmark } from "@/components/ui/ZebraWordmark";
+import { formatDeadlineEs } from "@/lib/business-days";
 
 /**
  * What the client reads before typing anything: the instructions that used to
@@ -35,9 +36,12 @@ const STEP_DELAY_MS = 1500;
 export function DemoInstructions({
   clientName,
   stepped = true,
+  deadline,
   onStart,
 }: {
   clientName: string | null;
+  /** The last day they can report, when the round has one. */
+  deadline?: string | null;
   /** False when the instructions are being shown again to someone who already
    *  read them: no blur, no steps. */
   stepped?: boolean;
@@ -109,6 +113,16 @@ export function DemoInstructions({
                   <strong>Todo queda guardado.</strong> La conversación, la fecha y el
                   dispositivo desde el que escribes se registran, para que después podamos
                   revisar juntos qué se pidió y cuándo. No pedimos tu nombre ni tu correo.
+                  {/* The deadline rides on the last step instead of becoming a
+                      fourth one: the reveal counts steps, and this is
+                      logistics, which is what that step already is. */}
+                  {deadline && (
+                    <>
+                      {" "}
+                      Tienes hasta el <strong>{formatDeadlineEs(deadline)}</strong> para dejar
+                      tus reportes.
+                    </>
+                  )}
                 </>
               ),
             },
