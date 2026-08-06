@@ -186,6 +186,84 @@ del login. Ver la sección de modelo de seguridad en `docs/ARCHITECTURE.md`.
 un mensaje concreto, Carlos recibe el aviso, lo revisa en contexto, lo aprueba y
 aterriza en el Editor con el turno marcado y la respuesta esperada.
 
+## Sprint 19 — El design system de Zebra en toda la app ⏳
+
+La página del cliente (`/prueba`) ya corre con el design system de Zebra
+(Virtual Stripes 26), aislada: `app/prueba/layout.tsx` la envuelve en
+`.zebra-ds` y `app/prueba/zebra-ds.css` asigna los valores del sistema a los
+MISMOS nombres de variable que ya usa la app, así que cada regla existente se
+re-viste sola. Ese es el mecanismo que se repite fase por fase: una sección
+entra al sistema sin tocar a las demás y sin un "big bang" que haya que
+revisar de golpe.
+
+Fuente de verdad: la skill `zebra-design-system` (tokens, reglas ZR-##,
+flujos). Cuando el código y la regla se contradigan, gana el código y la regla
+se corrige.
+
+### Fase 0 — Decisiones y cimientos
+
+Nada visual todavía. Tres decisiones que definen todo lo demás, y hasta que no
+estén tomadas no arranca la fase 1:
+
+1. **El amarillo.** El DS es monocromático: acento negro en light, blanco en
+   dark, y el `#ffce00` solo como contenido de demos de video, nunca como
+   chrome (ZR-05). Hoy `--accent: #ffd602` pinta iconos de nav, botones
+   primarios, pines y bordes activos en toda la herramienta. O el Studio se
+   queda monocromático como la marca, o se documenta la desviación.
+2. **Los temas.** La app tiene light y dark con toggle. El DS trae los dos
+   juegos completos, así que se conservan; hay que confirmar que el mirror es
+   correcto (ZR-25) en cada sección, no solo en la que se está tocando.
+3. **La píldora.** Los botones del DS son de 10px, ya no píldora. En `/prueba`
+   se aceptó la desviación para los chips (el nombre del cliente sigue en
+   píldora) pero no para los botones. Definir si adentro se hace lo mismo.
+
+Trabajo de esta fase: mover los tokens del DS a un archivo propio, cargar
+JetBrains Mono a nivel de app (ZR-09) y dejar la clase `.zebra-ds` lista para
+colgarla de un layout por sección. Sin aplicar todavía.
+
+### Fase 1 — Settings
+
+La pestaña de menor tráfico y la que más formularios tiene: es donde se prueban
+los patrones de input, select, foco y validación sin arriesgar el trabajo
+diario. Incluye las tarjetas de proveedor, la asignación de roles y las de
+system prompts.
+
+### Fase 2 — Biblioteca
+
+Listas, tarjetas de cliente, filas de versión y badges. Aquí se resuelve la
+escala de superficies (ZR-08: la tarjeta nunca del color de su sección) y qué
+pasa con los badges de estado, que hoy usan color y el DS quiere monocromo con
+rojo reservado a error.
+
+### Fase 3 — Lab
+
+Las cuatro modalidades: IA vs IA, Playground, Demo (lado admin) y Replay. Es la
+superficie más grande, pero la mitad del trabajo ya está hecho: los patrones de
+chat, burbuja, pin y panel de notas se decidieron en `/prueba`. Aquí se
+convierte esa hoja aislada en el patrón compartido en vez de duplicarla.
+
+### Fase 4 — Editor y Creator
+
+Lo último por ser lo que más se usa a diario y donde un cambio a media
+conversación se siente peor. Chat con streaming, bloque de opciones
+seleccionables, tarjeta de prompt y el drawer del borrador.
+
+### Fase 5 — Chrome y limpieza
+
+Header, nav, login, toasts y la campana de notificaciones. Al final: retirar la
+capa de compatibilidad, dejar los tokens del DS como los únicos y borrar
+`app/prueba/zebra-ds.css`, que para entonces será redundante.
+
+**Cómo se revisa cada fase**: una fase, un commit, y una pasada visual con la
+sección en pantalla antes de seguir a la siguiente. Cada fase es reversible por
+sí sola porque nada fuera de su alcance cambia. La lista de verificación es
+`referencias/REGLAS.md` de la skill, citando reglas por ID.
+
+**Definition of done**: las cinco pestañas usan los tokens, la tipografía, los
+radios, los hairlines y el foco del design system; las desviaciones que
+sobrevivan están escritas donde viven, con su porqué; y una pieza nueva se
+construye leyendo la skill, no copiando estilos de una pantalla vecina.
+
 ---
 
 ## Future (not in current scope)
