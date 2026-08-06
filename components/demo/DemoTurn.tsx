@@ -1,6 +1,6 @@
 "use client";
 
-import { IconPencil } from "@tabler/icons-react";
+import { IconCheck, IconPencil } from "@tabler/icons-react";
 
 import type { DemoMessageRole } from "@/lib/db/demo-sessions";
 import { parseTurnBubbles } from "@/lib/adversarial-message";
@@ -120,6 +120,14 @@ export function DemoTurn({
           : undefined
       }
     >
+      {/* Selected for a report. The border alone says it on a wide screen; on a
+          phone, where several messages are picked one after another, the mark
+          is what makes the state unmistakable. */}
+      {selected && selectable && (
+        <span className="chat-check" aria-hidden="true">
+          <IconCheck size={12} stroke={2.5} />
+        </span>
+      )}
       {pins.length > 0 && (
         <div className="chat-pins">
           {pins.map((p) => (

@@ -326,6 +326,33 @@
     display: none;
   }
 
+  /* The selection bar: what is picked, and the way forward. It sits on the
+     composer, which has nothing to do while messages are being chosen. */
+  .zebra-ds .demo-selection-bar {
+    position: fixed;
+    left: 12px;
+    right: 12px;
+    bottom: calc(env(safe-area-inset-bottom, 0px) + 12px);
+    z-index: 49;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 10px 8px 8px;
+    border-radius: 100px;
+    border: 1px solid var(--border2);
+    background: var(--surface);
+    box-shadow: var(--shadow-lg);
+  }
+  .zebra-ds .demo-selection-count {
+    flex: 1;
+    font-size: 13px;
+    color: var(--fg);
+  }
+  .zebra-ds .demo-selection-bar .btn {
+    padding: 8px 16px;
+    font-size: 13px;
+  }
+
   /* The reports: a sheet that rises from the bottom, not a column below the
      chat. It opens when a message is tagged, which is when there is something
      to report. */

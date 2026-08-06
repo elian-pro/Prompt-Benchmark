@@ -160,15 +160,9 @@ export function DemoClient({
   }, [session?.messages.length, sending]);
 
   function toggleSelect(messageId: string) {
-    setSelectedIds((prev) => {
-      const next = prev.includes(messageId)
-        ? prev.filter((x) => x !== messageId)
-        : [...prev, messageId];
-      // Tagging is the start of writing a report, so the sheet comes with it.
-      // Untagging the last one is not, so it does not.
-      if (next.length > 0) setSheetOpen(true);
-      return next;
-    });
+    setSelectedIds((prev) =>
+      prev.includes(messageId) ? prev.filter((x) => x !== messageId) : [...prev, messageId],
+    );
   }
 
   function onInputChange(e: React.ChangeEvent<HTMLTextAreaElement>) {
@@ -439,6 +433,31 @@ export function DemoClient({
             </div>
           </div>
         </div>
+
+        {/* Phone: picking messages is its own moment, the way it is in
+            WhatsApp. Tapping one no longer opens the report form, because the
+            form covered the chat and the next message could not be reached.
+            The bar counts what is picked and moves on when you say so. */}
+        {selectedIds.length > 0 && !sheetOpen && (
+          <div className="demo-selection-bar">
+            <button
+              type="button"
+              className="icon-btn"
+              onClick={() => setSelectedIds([])}
+              aria-label="Quitar la selección"
+            >
+              <IconX size={16} stroke={1.5} />
+            </button>
+            <span className="demo-selection-count">
+              {selectedIds.length === 1
+                ? "1 mensaje seleccionado"
+                : `${selectedIds.length} mensajes seleccionados`}
+            </span>
+            <Button variant="primary" size="sm" onClick={() => setSheetOpen(true)}>
+              Reportar
+            </Button>
+          </div>
+        )}
 
         {sheetOpen && (
           <div
