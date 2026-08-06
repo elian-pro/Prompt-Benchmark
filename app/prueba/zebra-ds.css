@@ -1,0 +1,222 @@
+/* ===========================================================================
+   Zebra Design System (Virtual Stripes 26) for the client's page, and only for
+   the client's page.
+   ===========================================================================
+
+   Everything here hangs off `.zebra-ds`, the wrapper that app/prueba/layout.tsx
+   puts around this route. Nothing leaks into the Studio: the rest of the app
+   keeps its own tokens, its yellow accent and its pill buttons until we roll
+   the system out section by section.
+
+   How the isolation works: the DS values are assigned to the SAME variable
+   names the app already uses (--bg, --fg, --surface, ...), inside this scope.
+   Every rule written for the demo in globals.css re-skins itself, and the ones
+   below only cover what tokens alone cannot express: typography, radii, border
+   widths, focus.
+
+   Theme: dark, decided up front (ZR-21). Values are the DS's own dark set, not
+   approximations. No motif: the page is a working tool for the client and the
+   background stays out of the way.
+   =========================================================================== */
+
+.zebra-ds {
+  /* --- DS dark tokens, under the app's names ---------------------------- */
+  --bg: #0a0a0a;
+  --surface: #161616;
+  --surface2: #1c1c1c;
+  --border: rgba(255, 255, 255, 0.1);
+  --border2: rgba(255, 255, 255, 0.14);
+  --fg: #ffffff;
+  --muted: #a3a3a3; /* ink-500 */
+  --faint: #737373; /* ink-400: metadata only, never body text (ZR-07) */
+  /* Monochrome (ZR-05): the accent is white here. The Studio's yellow is
+     chrome for us and means nothing to someone who only sees this page. */
+  --accent: #ffffff;
+
+  /* --- DS radii, "muy sutil" scale -------------------------------------- */
+  --r-chip: 6px;
+  --r-control: 8px;
+  --r-input: 10px;
+  --r-btn: 10px;
+  --r-card: 12px;
+
+  /* --- Elevation: dark cards carry no drop shadow, closer = lighter ------ */
+  --shadow-lg: 0 0 0 1px rgba(255, 255, 255, 0.06), 0 6px 16px -4px rgba(0, 0, 0, 0.55);
+
+  font-size: 15px; /* DS body */
+}
+
+/* ---------------------------------------------------------------------------
+   Typography (ZR-09, ZR-10). Inter is already loaded by the root layout;
+   JetBrains Mono arrives as --font-mono from this route's layout, so it is
+   downloaded on this page and nowhere else.
+   --------------------------------------------------------------------------- */
+
+/* The eyebrow: the DS's canonical label. Every `section-label` on this page is
+   one, so the class is redefined here rather than sprinkled into the markup. */
+.zebra-ds .section-label {
+  font-family: var(--font-mono), ui-monospace, monospace;
+  font-size: 11px;
+  font-weight: 500;
+  line-height: 1;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.zebra-ds h1,
+.zebra-ds h2,
+.zebra-ds h3 {
+  font-weight: 600;
+  text-wrap: balance;
+}
+.zebra-ds p {
+  text-wrap: pretty;
+}
+.zebra-ds strong,
+.zebra-ds b {
+  font-weight: 600;
+}
+
+/* Reading sizes from the DS scale: body 15, body small 14, caption 12. */
+.zebra-ds .demo-gate-lead,
+.zebra-ds .chat-content,
+.zebra-ds .textarea {
+  font-size: 15px;
+}
+.zebra-ds .demo-gate-steps li,
+.zebra-ds .note-field {
+  font-size: 14px;
+}
+.zebra-ds .note-ref,
+.zebra-ds .demo-header-title {
+  font-size: 12px;
+}
+.zebra-ds .demo-header-title {
+  font-size: 14px;
+}
+
+/* The client's name. Inter, not mono: the mono face is for eyebrows, labels
+   and technical data (ZR-09), and this is a name.
+   Deviation from the DS, decided deliberately: the radius stays the Studio's
+   pill (100px) instead of the 6px chip. Zebra's own chips were drawn as pills
+   before this page existed and the shape is part of how the tool reads; the
+   rule that reserves round-full for circles yields to that here. */
+.zebra-ds .pill-logo {
+  letter-spacing: 0.18em;
+  font-size: 11px;
+  /* Semibold is what "bold" means in this system: 700 and up is reserved for
+     figures and stats (ZR-10). */
+  font-weight: 600;
+}
+
+/* ---------------------------------------------------------------------------
+   Hairlines (ZR-14). One pixel in every state, always. Depth comes from the
+   surface, and an active border changes color, never width.
+   --------------------------------------------------------------------------- */
+.zebra-ds .demo-gate-card,
+.zebra-ds .notes-card,
+.zebra-ds .note-card,
+.zebra-ds .note-ref,
+.zebra-ds .chat-msg,
+.zebra-ds .modal,
+.zebra-ds .btn {
+  border-width: 1px;
+}
+
+/* ---------------------------------------------------------------------------
+   Radii: cards 12, buttons 10, inputs 10.
+   --------------------------------------------------------------------------- */
+.zebra-ds .demo-gate-card,
+.zebra-ds .notes-card,
+.zebra-ds .modal {
+  border-radius: var(--r-card);
+}
+.zebra-ds .note-card,
+.zebra-ds .chat-msg {
+  border-radius: var(--r-card);
+}
+
+/* ---------------------------------------------------------------------------
+   Buttons. The DS retired the pill: 10px, sentence case, semibold 14px, and a
+   lift on hover that snaps back on press.
+   --------------------------------------------------------------------------- */
+.zebra-ds .btn {
+  border-radius: var(--r-btn);
+  padding: 12px 24px;
+  font-size: 14px;
+  font-weight: 600;
+  letter-spacing: 0;
+  text-transform: none;
+  transition: background 0.18s cubic-bezier(0.16, 1, 0.3, 1),
+    border-color 0.18s cubic-bezier(0.16, 1, 0.3, 1),
+    transform 0.18s cubic-bezier(0.16, 1, 0.3, 1),
+    box-shadow 0.18s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.zebra-ds .btn:not(:disabled):hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-lg);
+}
+.zebra-ds .btn:not(:disabled):active {
+  transform: translateY(0);
+}
+.zebra-ds .btn-ghost:not(:disabled):hover {
+  border-color: var(--accent);
+}
+
+/* Inputs: the composer and the report fields. */
+.zebra-ds .textarea {
+  border-bottom-width: 1px;
+  transition: border-color 0.18s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.zebra-ds .textarea:hover {
+  border-color: var(--muted);
+}
+.zebra-ds .textarea:focus {
+  border-color: var(--accent);
+}
+
+/* Focus: a thin ring, animated. Never a hard 2px outline (ZR-18). */
+.zebra-ds :focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 1px var(--accent);
+  transition: box-shadow 0.18s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* Icons: lucide-style monoline, 1.5 (ZR-19). A CSS rule beats the presentation
+   attribute the icon set writes inline, so this normalizes every icon on the
+   page at once. */
+.zebra-ds svg {
+  stroke-width: 1.5;
+}
+
+/* The wordmark never stretches and never recolors (ZR-11, ZR-12). */
+.zebra-ds svg[role="img"] {
+  flex: none;
+  color: var(--fg);
+}
+/* Only where it sits in a flex COLUMN does it need pinning: there the default
+   `align-items: stretch` would pull it to the card's width and squash the
+   letters. In the header row it must stay centered against the chip, which is
+   what a blanket flex-start broke. */
+.zebra-ds .demo-gate-card > svg[role="img"] {
+  align-self: flex-start;
+}
+
+/* Selection of a message keeps the hairline and changes its color, the same
+   rule cards follow (ZR-14). */
+.zebra-ds .chat-turn.is-selected .chat-msg {
+  border-color: var(--accent);
+  box-shadow: var(--shadow-lg);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .zebra-ds .btn,
+  .zebra-ds .textarea,
+  .zebra-ds :focus-visible {
+    transition: none;
+  }
+  .zebra-ds .btn:not(:disabled):hover {
+    transform: none;
+  }
+}

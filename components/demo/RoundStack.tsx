@@ -19,7 +19,7 @@ export type RoundSummary = {
 function time(iso: string | null): string {
   return iso
     ? new Date(iso).toLocaleTimeString("es-MX", { hour: "2-digit", minute: "2-digit" })
-    : "—";
+    : "sin hora";
 }
 
 function day(iso: string | null): string {

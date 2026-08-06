@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { IconMessage2, IconNotes, IconShieldLock } from "@tabler/icons-react";
 
 import { Button } from "@/components/ui/Button";
+import { ZebraWordmark } from "@/components/ui/ZebraWordmark";
 
 /**
  * What the client reads before typing anything: the instructions that used to
@@ -57,6 +58,9 @@ export function DemoInstructions({
   return (
     <div className="demo-gate">
       <div className="demo-gate-card">
+        {/* First thing they see is who made this (ZR-13 in spirit: a Zebra
+            piece carries the wordmark, not the word). */}
+        <ZebraWordmark height={16} />
         <p className="section-label">Pruebas y validación</p>
         <h1 className="demo-gate-title">
           Prueba el agente{clientName ? ` de ${clientName}` : ""}
