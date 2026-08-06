@@ -281,6 +281,38 @@
     padding: 8px;
   }
 
+  /* The composer: one line. "Enter para enviar" is a keyboard instruction on a
+     device with no keyboard, and the row it lived in stole a bubble's worth of
+     conversation every screen. The send button sits beside the field instead
+     of under it. */
+  .zebra-ds .chat-composer-zone .idle-composer {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 10px 8px 14px;
+  }
+  .zebra-ds .idle-composer-hint {
+    display: none;
+  }
+  .zebra-ds .idle-composer-footrow {
+    flex: none;
+  }
+
+  /* The report fields opened three lines tall, which on a phone is most of
+     what is left above the keyboard. They start at one line and grow as they
+     are dragged. */
+  .zebra-ds .notes-panel .textarea {
+    min-height: 0;
+    height: 42px;
+  }
+
+  /* The hint next to "Reiniciar" opens a bubble wider than the phone, clipped
+     at the edge. What it explains is already in the instructions card, so on a
+     phone the icon goes rather than the text being unreadable. */
+  .zebra-ds .demo-header .info-hint {
+    display: none;
+  }
+
   /* The reports: a sheet that rises from the bottom, not a column below the
      chat. It opens when a message is tagged, which is when there is something
      to report. */
