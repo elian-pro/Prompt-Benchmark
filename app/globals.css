@@ -579,7 +579,10 @@ button {
 .modal-overlay {
   position: fixed;
   inset: 0;
-  background: rgba(0, 0, 0, 0.6);
+  /* Blurred rather than only dimmed: what is behind stays recognizable as the
+     screen you came from, without competing for reading. */
+  background: rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(6px);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -2626,24 +2629,107 @@ a.lab-card:hover {
   padding: 0;
   flex: none;
 }
-/* Marks where a client started over inside a transcript that shows every
-   round (demo link, admin side). */
-.round-divider {
+/* A visitor's conversations (demo link, admin side): one on screen, the rest
+   behind a stack of squares that grows with how many there are, the way a Mac
+   folder shows a sliver of paper when it holds something. */
+.chat-toolbar {
   display: flex;
   align-items: center;
-  gap: 10px;
-  margin: 6px 0;
-  color: var(--faint);
-  font-size: 10.5px;
+  margin-bottom: 10px;
+}
+.round-stack-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 12px 5px 9px;
+  border-radius: 100px;
+  border: 0.5px solid var(--border2);
+  background: transparent;
+  color: var(--muted);
+  font-family: inherit;
+  font-size: 11px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: color 0.15s ease, border-color 0.15s ease;
+}
+.round-stack-btn:hover {
+  color: var(--fg);
+  border-color: var(--fg);
+}
+.round-stack-btn:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+/* The squares: the front one reads as the conversation you are in, the ones
+   behind fade back so the pile is depth rather than three separate things. */
+.stack-layer {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.6;
+}
+.stack-layer-front {
+  opacity: 1;
+}
+.stack-layer-mid {
+  opacity: 0.55;
+}
+.stack-layer-back {
+  opacity: 0.28;
+}
+
+.round-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.round-row {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  width: 100%;
+  text-align: left;
+  padding: 10px 12px;
+  border: 0.5px solid var(--border);
+  border-radius: 10px;
+  background: transparent;
+  font-family: inherit;
+  cursor: pointer;
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+.round-row:hover {
+  background: var(--surface2);
+  border-color: var(--border2);
+}
+.round-row.is-selected {
+  border-color: var(--accent);
+}
+.round-row-top {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.round-row-title {
+  font-size: 13px;
+  color: var(--fg);
+}
+.round-row-tag {
+  font-size: 9.5px;
   letter-spacing: 0.14em;
   text-transform: uppercase;
+  color: var(--accent);
 }
-.round-divider::before,
-.round-divider::after {
-  content: "";
-  flex: 1;
-  height: 0.5px;
-  background: var(--border2);
+.round-row-meta {
+  font-size: 11px;
+  color: var(--muted);
+}
+.round-row-preview {
+  font-size: 11.5px;
+  font-style: italic;
+  color: var(--faint);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .notes-panel {

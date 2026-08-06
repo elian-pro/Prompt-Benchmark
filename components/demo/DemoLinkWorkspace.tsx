@@ -1,6 +1,6 @@
 "use client";
 
-import { Fragment, useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { IconArrowRight, IconCheck, IconNotes, IconPencil, IconX } from "@tabler/icons-react";
 
@@ -8,6 +8,7 @@ import type { DemoSessionDetail } from "@/lib/db/demo-sessions";
 import type { DemoNoteRow, DemoNoteStatus } from "@/lib/db/demo-notes";
 import { messagePreview } from "@/lib/adversarial-message";
 import { DemoTurn } from "@/components/demo/DemoTurn";
+import { RoundStack, type RoundSummary } from "@/components/demo/RoundStack";
 import { Button } from "@/components/ui/Button";
 import { EmptyState } from "@/components/ui/EmptyState";
 
@@ -39,10 +40,14 @@ export function DemoLinkWorkspace({
   const [draftText, setDraftText] = useState("");
   const [draftExpected, setDraftExpected] = useState("");
   const [handingOff, setHandingOff] = useState(false);
+  /** Which of the visitor's conversations is on screen. Null means the last
+   *  one, which is what they were doing when they stopped. */
+  const [round, setRound] = useState<number | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
     setError(null);
+    setRound(null);
     try {
       const res = await fetch(`/api/demo-links/${linkId}/sessions/${sessionId}`);
       if (!res.ok) throw new Error((await res.json()).error ?? "No se pudo cargar.");
@@ -125,7 +130,31 @@ export function DemoLinkWorkspace({
   const messagesById = new Map(
     [...session.messages, ...session.note_messages].map((m) => [m.id, m]),
   );
-  const currentIds = new Set(session.messages.map((m) => m.id));
+  // A restart starts a new conversation, not a new chapter of the same one.
+  // They are grouped and shown one at a time; the rest live behind the stack.
+  const byRound = new Map<number, typeof session.messages>();
+  for (const m of session.messages) {
+    const r = m.round ?? 1;
+    byRound.set(r, [...(byRound.get(r) ?? []), m]);
+  }
+  const roundNumbers = [...byRound.keys()].sort((a, b) => a - b);
+  const activeRound = round ?? roundNumbers.at(-1) ?? 1;
+  const visible = byRound.get(activeRound) ?? [];
+  const rounds: RoundSummary[] = roundNumbers.map((r) => {
+    const msgs = byRound.get(r) ?? [];
+    const lead = msgs.find((m) => m.role === "human");
+    return {
+      round: r,
+      messageCount: msgs.length,
+      startedAt: msgs[0]?.created_at ?? null,
+      endedAt: msgs.at(-1)?.created_at ?? null,
+      firstLead: lead ? messagePreview(lead.content) : null,
+    };
+  });
+
+  // Only what is on screen counts as current: a report about another
+  // conversation still quotes its message, tagged as belonging elsewhere.
+  const currentIds = new Set(visible.map((m) => m.id));
   // A note's number in this column is the pin drawn on the turns it tags, the
   // same convention the Playground uses.
   const pinsByMessage = new Map<string, number[]>();
@@ -138,32 +167,22 @@ export function DemoLinkWorkspace({
   return (
     <div className="playground-layout">
       <div className="playground-chat">
+        <div className="chat-toolbar">
+          <RoundStack rounds={rounds} selected={activeRound} onSelect={setRound} />
+        </div>
         <div className="chat-messages">
-          {session.messages.length === 0 && (
+          {visible.length === 0 && (
             <p className="empty-hint">Esta persona abrió el link pero no escribió nada.</p>
           )}
-          {session.messages.map((m, i) => {
-            // The transcript carries every round. A restart is a real event in
-            // the test, so it is drawn rather than smoothed over: without the
-            // line, two conversations read as one that changed its mind.
-            const previous = session.messages[i - 1];
-            const restarted = previous && (m.round ?? 1) !== (previous.round ?? 1);
-            return (
-              <Fragment key={m.id}>
-                {restarted && (
-                  <div className="round-divider">
-                    <span>Reinició la conversación</span>
-                  </div>
-                )}
-                <DemoTurn
-                  id={m.id}
-                  role={m.role}
-                  content={m.content}
-                  pins={pinsByMessage.get(m.id) ?? []}
-                />
-              </Fragment>
-            );
-          })}
+          {visible.map((m) => (
+            <DemoTurn
+              key={m.id}
+              id={m.id}
+              role={m.role}
+              content={m.content}
+              pins={pinsByMessage.get(m.id) ?? []}
+            />
+          ))}
         </div>
       </div>
 
