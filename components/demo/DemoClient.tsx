@@ -76,6 +76,10 @@ export function DemoClient({
   /** First visit ever to this link: the instructions arrive one step at a
    *  time. A return visit gets the whole card and one button. */
   const [firstTime, setFirstTime] = useState(true);
+  /** Whether localStorage has been read yet. Nothing renders before it: the
+   *  instructions look different for a first visit than for a return one, and
+   *  guessing means showing the wrong card and then swapping it. */
+  const [checked, setChecked] = useState(false);
   const [session, setSession] = useState<PublicSession | null>(null);
   const [loading, setLoading] = useState(false);
   const [fatal, setFatal] = useState<string | null>(null);
@@ -104,6 +108,8 @@ export function DemoClient({
     } catch {
       // Private mode with storage disabled: showing the instructions again is
       // the harmless outcome, so there is nothing to handle.
+    } finally {
+      setChecked(true);
     }
   }, [token]);
 
@@ -254,6 +260,9 @@ export function DemoClient({
       setNoteError(e instanceof Error ? e.message : "Error al eliminar la nota.");
     }
   }
+
+  // One frame of nothing while the visit is read, instead of the wrong card.
+  if (!checked) return null;
 
   if (!started) {
     return (

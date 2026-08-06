@@ -47,7 +47,15 @@ export function DemoInstructions({
   const [ready, setReady] = useState(!stepped);
 
   useEffect(() => {
-    if (!stepped) return;
+    // `stepped` can arrive late: the page renders before it knows whether this
+    // browser has been here. Returning early on false left the state seeded
+    // from the first value, blurred and with a dead button, so it syncs
+    // instead.
+    if (!stepped) {
+      setRevealed(STEP_COUNT);
+      setReady(true);
+      return;
+    }
     setReady(false);
     const timer = setTimeout(() => setReady(true), STEP_DELAY_MS);
     return () => clearTimeout(timer);
