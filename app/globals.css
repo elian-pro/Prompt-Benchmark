@@ -4890,9 +4890,24 @@ body[data-theme="dark"] .history-filters input[type="date"]::-webkit-calendar-pi
    assistant it is (Sprint 18). */
 .demo-header-id {
   display: flex;
+  /* Not `stretch`: that would widen the wordmark's svg (ZR-11). */
   align-items: center;
   gap: 14px;
   flex-wrap: wrap;
+}
+/* The wordmark takes the page's text color rather than a fill of its own, so
+   it is never recolored, only inherited (ZR-12). */
+.demo-header-id svg[role="img"] {
+  color: var(--fg);
+  flex: none;
+}
+/* Hairline between who made this and whose agent it is. 1px always: depth
+   comes from surface, never from a thicker line. */
+.demo-header-sep {
+  width: 1px;
+  height: 20px;
+  background: var(--border2);
+  flex: none;
 }
 .demo-header-id .section-label {
   margin: 0 0 2px;

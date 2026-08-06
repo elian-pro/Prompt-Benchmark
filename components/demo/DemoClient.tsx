@@ -15,6 +15,7 @@ import {
 } from "@/components/demo/DemoTurn";
 import { DemoInstructions } from "@/components/demo/DemoInstructions";
 import { gateStateFor } from "@/lib/demo-visit";
+import { ZebraWordmark } from "@/components/ui/ZebraWordmark";
 
 /**
  * The client's whole experience of a demo link: read the instructions, talk to
@@ -304,6 +305,10 @@ export function DemoClient({
             it the screen is a chat with a client's name on it and no clue that
             this is a testing round. */}
         <div className="demo-header-id">
+          {/* Ours first, then whose agent is being tested. The client is on a
+              page with no other sign of who built it. */}
+          <ZebraWordmark height={17} />
+          <span className="demo-header-sep" aria-hidden="true" />
           <span className="pill-logo">{clientName ?? "Agente"}</span>
           <div>
             <p className="section-label">Pruebas y validación</p>
