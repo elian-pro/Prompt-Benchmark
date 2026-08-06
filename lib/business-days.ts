@@ -18,7 +18,7 @@
 
 /** Monday to Friday. A working week, told to someone on Monday, ends Friday. */
 export const WORKING_WEEK = 5;
-export const THREE_WORKING_WEEKS = 15;
+export const TWO_WORKING_WEEKS = 10;
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
@@ -95,4 +95,64 @@ export function formatDeadlineShortEs(iso: string): string {
     day: "numeric",
     month: "short",
   }).format(new Date(atNoon(iso)));
+}
+
+
+/* ---------------------------------------------------------------------------
+   The month grid behind the picker. Calendar drawing is date arithmetic, so it
+   lives here with the rest of it and is checked the same way.
+   --------------------------------------------------------------------------- */
+
+export type CalendarDay = {
+  iso: string;
+  day: number;
+  /** False for the days of the neighbouring months that fill the first and
+   *  last rows. They are drawn faint and still selectable. */
+  inMonth: boolean;
+};
+
+/** "YYYY-MM" for the month a date belongs to. */
+export function monthOf(iso: string): string {
+  return iso.slice(0, 7);
+}
+
+export function shiftMonth(month: string, delta: number): string {
+  const [year, m] = month.split("-").map(Number);
+  const total = year * 12 + (m - 1) + delta;
+  const y = Math.floor(total / 12);
+  const mm = (total % 12) + 1;
+  return `${y}-${String(mm).padStart(2, "0")}`;
+}
+
+/**
+ * Six weeks of seven days, Monday first, covering `month` and the edges of its
+ * neighbours. Always 42 cells so the popover does not change height as the
+ * months go by, which is what makes the arrows feel like paging rather than
+ * redrawing.
+ */
+export function monthMatrix(month: string): CalendarDay[] {
+  const [year, m] = month.split("-").map(Number);
+  const first = Date.UTC(year, m - 1, 1);
+  // getUTCDay is Sunday-based; the week here starts on Monday.
+  const lead = (new Date(first).getUTCDay() + 6) % 7;
+  const start = first - lead * DAY_MS;
+
+  return Array.from({ length: 42 }, (_, i) => {
+    const date = new Date(start + i * DAY_MS);
+    return {
+      iso: date.toISOString().slice(0, 10),
+      day: date.getUTCDate(),
+      inMonth: date.getUTCMonth() === m - 1,
+    };
+  });
+}
+
+/** "Agosto 2026", for the popover's header. Month and year are formatted apart
+ *  because Spanish ICU joins them with "de", which reads as prose in a header
+ *  that is a label. */
+export function formatMonthEs(month: string): string {
+  const name = new Intl.DateTimeFormat("es-MX", { timeZone: "UTC", month: "long" }).format(
+    new Date(atNoon(`${month}-01`)),
+  );
+  return `${name.charAt(0).toUpperCase()}${name.slice(1)} ${month.slice(0, 4)}`;
 }

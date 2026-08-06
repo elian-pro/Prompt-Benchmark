@@ -8,7 +8,8 @@ import { IconArrowLeft, IconList, IconMessages, IconTrash } from "@tabler/icons-
 import type { DemoLink, LinkSessionListItem } from "@/lib/db/demo-links";
 import { Button } from "@/components/ui/Button";
 import { EmptyState } from "@/components/ui/EmptyState";
-import { formatDeadlineEs, isExpired, todayInMexico } from "@/lib/business-days";
+import { formatDeadlineEs, isExpired } from "@/lib/business-days";
+import { DeadlinePicker } from "@/components/ui/DeadlinePicker";
 import { DangerConfirmModal } from "@/components/ui/DangerConfirmModal";
 import { DemoLinkWorkspace } from "@/components/demo/DemoLinkWorkspace";
 
@@ -77,11 +78,11 @@ export default function DemoLinkDetailPage() {
 
   /** One field, one request: the deadline is a single decision and does not
    *  need a form around it. */
-  async function saveExpiry(value: string) {
+  async function saveExpiry(value: string | null) {
     const res = await fetch(`/api/demo-links/${linkId}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ expiresOn: value || null }),
+      body: JSON.stringify({ expiresOn: value }),
     });
     if (!res.ok) {
       setError((await res.json()).error ?? "No se pudo cambiar la fecha.");
@@ -120,28 +121,10 @@ export default function DemoLinkDetailPage() {
         </div>
         <div className="detail-actions">
           {detail && (
-            <span className="deadline-control">
-              <label className="section-label" htmlFor="link-deadline">
-                {detail.expires_on && isExpired(detail.expires_on) ? "Venció el" : "Cierra el"}
-              </label>
-              <input
-                id="link-deadline"
-                type="date"
-                className="input"
-                min={todayInMexico()}
-                value={detail.expires_on ?? ""}
-                onChange={(e) => void saveExpiry(e.target.value)}
-              />
-              {detail.expires_on && (
-                <button
-                  type="button"
-                  className="version-changes-link"
-                  onClick={() => void saveExpiry("")}
-                >
-                  Quitar fecha
-                </button>
-              )}
-            </span>
+            <DeadlinePicker
+              value={detail.expires_on}
+              onChange={(next) => void saveExpiry(next)}
+            />
           )}
           <Button
             variant="danger"

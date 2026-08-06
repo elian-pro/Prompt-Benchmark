@@ -12,7 +12,10 @@ import {
   formatDeadlineEs,
   isExpired,
   todayInMexico,
-  THREE_WORKING_WEEKS,
+  formatMonthEs,
+  monthMatrix,
+  shiftMonth,
+  TWO_WORKING_WEEKS,
   WORKING_WEEK,
 } from "./business-days.ts";
 
@@ -30,8 +33,8 @@ test("a weekend start rolls to Monday and gets the whole week", () => {
   assert.equal(businessDaysFrom("2026-08-16", WORKING_WEEK), "2026-08-21"); // domingo
 });
 
-test("fifteen business days is three calendar weeks", () => {
-  assert.equal(businessDaysFrom("2026-08-10", THREE_WORKING_WEEKS), "2026-08-28");
+test("ten business days is two calendar weeks", () => {
+  assert.equal(businessDaysFrom("2026-08-10", TWO_WORKING_WEEKS), "2026-08-21");
 });
 
 // The deadline is inclusive. This is the assertion that fails if anyone
@@ -57,4 +60,33 @@ test("the label names the weekday, the day and the month", () => {
   assert.match(label, /viernes/);
   assert.match(label, /14/);
   assert.match(label, /agosto/);
+});
+
+/* The month grid the picker draws. */
+
+test("the grid is always six weeks, Monday first", () => {
+  const grid = monthMatrix("2026-08");
+  assert.equal(grid.length, 42);
+  // August 2026 starts on a Saturday, so the first row leads with July.
+  assert.equal(grid[0].iso, "2026-07-27");
+  assert.equal(grid[0].inMonth, false);
+  assert.equal(grid[5].iso, "2026-08-01");
+  assert.equal(grid[5].inMonth, true);
+  assert.equal(grid.at(-1)!.iso, "2026-09-06");
+});
+
+test("a month that starts on Monday has no leading days", () => {
+  const grid = monthMatrix("2026-06");
+  assert.equal(grid[0].iso, "2026-06-01");
+  assert.equal(grid[0].inMonth, true);
+});
+
+test("paging crosses the year in both directions", () => {
+  assert.equal(shiftMonth("2026-12", 1), "2027-01");
+  assert.equal(shiftMonth("2026-01", -1), "2025-12");
+  assert.equal(shiftMonth("2026-08", 0), "2026-08");
+});
+
+test("the month header is capitalized", () => {
+  assert.match(formatMonthEs("2026-08"), /^Agosto 2026$/);
 });

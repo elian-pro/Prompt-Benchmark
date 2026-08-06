@@ -4027,27 +4027,154 @@ body[data-theme="light"] .dot-grid::after {
   flex: 1;
   min-width: 0;
 }
-/* The deadline: a native date input with the presets that fill it, and the
-   same control in the link's header. No calendar component. */
-.deadline-row {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  flex-wrap: wrap;
+/* The deadline picker: a gear, two presets and a month drawn by the app.
+   The browser's own date control looked like the browser's, and had nowhere to
+   put "five business days from today", which is how the decision is made. */
+.deadline-picker {
+  position: relative;
+  display: inline-flex;
 }
-.deadline-row .input {
-  width: auto;
-  flex: none;
-}
-.deadline-control {
+.deadline-trigger {
   display: inline-flex;
   align-items: center;
   gap: 8px;
+  padding: 7px 14px;
+  border-radius: 100px;
+  border: 0.5px solid var(--border2);
+  background: transparent;
+  color: var(--muted);
+  font-family: inherit;
+  font-size: 11px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: color 0.15s ease, border-color 0.15s ease;
 }
-.deadline-control .input {
-  width: auto;
-  padding: 6px 10px;
+.deadline-trigger:hover:not(:disabled) {
+  color: var(--fg);
+  border-color: var(--fg);
+}
+.deadline-trigger:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.deadline-panel {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  z-index: 41;
+  width: 290px;
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  background: var(--surface);
+  border: 0.5px solid var(--border2);
+  border-radius: 14px;
+  box-shadow: 0 16px 36px rgba(0, 0, 0, 0.38);
+}
+.deadline-presets {
+  display: flex;
+  gap: 8px;
+}
+.deadline-presets button {
+  flex: 1;
+  padding: 8px 10px;
+  border-radius: 9px;
+  border: 0.5px solid var(--border);
+  background: transparent;
+  color: var(--fg);
+  font-family: inherit;
   font-size: 12px;
+  cursor: pointer;
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+.deadline-presets button:hover {
+  background: var(--surface2);
+  border-color: var(--border2);
+}
+
+.deadline-month {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.deadline-month span {
+  font-size: 11px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.deadline-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 2px;
+}
+.deadline-weekday {
+  text-align: center;
+  font-size: 10px;
+  color: var(--faint);
+  padding-bottom: 4px;
+}
+.deadline-day {
+  aspect-ratio: 1;
+  border: none;
+  border-radius: 100px;
+  background: transparent;
+  color: var(--fg);
+  font-family: inherit;
+  font-size: 12.5px;
+  cursor: pointer;
+  transition: background 0.12s ease;
+}
+.deadline-day:hover {
+  background: var(--surface2);
+}
+/* The days of the neighbouring months stay reachable: a deadline three days
+   into next month is a normal thing to pick from this one. */
+.deadline-day.is-outside {
+  color: var(--faint);
+}
+/* Today is marked by a dot, so the selected day keeps the only filled shape
+   on the grid and the two never compete. */
+.deadline-day.is-today {
+  position: relative;
+}
+.deadline-day.is-today::after {
+  content: "";
+  position: absolute;
+  bottom: 4px;
+  left: 50%;
+  width: 3px;
+  height: 3px;
+  margin-left: -1.5px;
+  border-radius: 100px;
+  background: var(--muted);
+}
+.deadline-day.is-selected {
+  background: var(--fg);
+  color: var(--bg);
+}
+.deadline-day.is-selected::after {
+  background: var(--bg);
+}
+
+.deadline-clear {
+  border: none;
+  background: transparent;
+  color: var(--muted);
+  font-family: inherit;
+  font-size: 11.5px;
+  text-align: left;
+  padding: 2px;
+  cursor: pointer;
+}
+.deadline-clear:hover {
+  color: var(--fg);
 }
 
 /* Read-only contracts the app appends after a persona (Settings). Collapsed by
