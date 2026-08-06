@@ -13,6 +13,7 @@ export function CollapsibleCard({
   hint,
   actions,
   defaultOpen = false,
+  onOpen,
   children,
 }: {
   title: string;
@@ -21,6 +22,9 @@ export function CollapsibleCard({
   /** Header buttons that act without toggling (e.g. "Agregar proveedor"). */
   actions?: ReactNode;
   defaultOpen?: boolean;
+  /** Fired the first time the card expands. For a body whose content costs
+   *  something to fetch, so a page full of cards does not pay for all of it. */
+  onOpen?: () => void;
   children: ReactNode;
 }) {
   const [open, setOpen] = useState(defaultOpen);
@@ -34,7 +38,12 @@ export function CollapsibleCard({
           className="collapse-toggle"
           aria-expanded={open}
           aria-controls={bodyId}
-          onClick={() => setOpen((o) => !o)}
+          onClick={() => {
+            setOpen((o) => {
+              if (!o) onOpen?.();
+              return !o;
+            });
+          }}
         >
           <IconChevronDown size={16} className="collapse-chevron" />
           <span className="collapse-title">{title}</span>

@@ -6,6 +6,7 @@ import { RoleNotConfiguredError } from "./db/runs";
 import { ConnectionInUseError } from "./db/n8n-connections";
 import { N8nApiError } from "./n8n/client";
 import { ChatsAdminError } from "./chats-admin";
+import { GoogleChatError } from "./google-chat/auth.ts";
 import { VersionSwitchBlockedError, LinkSessionProtectedError } from "./db/demo-sessions";
 import { DemoLinkError } from "./demo-link-guard";
 
@@ -65,6 +66,11 @@ export function handleError(err: unknown) {
   }
   if (err instanceof ChatsAdminError) {
     // 502 for the same reason: upstream is the Supabase Management API.
+    return jsonError(err.message, 502);
+  }
+  if (err instanceof GoogleChatError) {
+    // Same: the failure is Google's, and only the Settings card ever sees it.
+    // The notification path swallows its own errors and never reaches here.
     return jsonError(err.message, 502);
   }
   if (err instanceof SyntaxError) {

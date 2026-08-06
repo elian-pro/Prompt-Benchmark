@@ -160,6 +160,15 @@ export async function listClients({
   return rows;
 }
 
+/** Just the name. `getClient` loads every version with its full prompt, which
+ *  is a lot of rows to pull to render one word in a notification. */
+export async function getClientName(id: string): Promise<string | null> {
+  const sb = getSupabase();
+  const { data, error } = await sb.from("clients").select("name").eq("id", id).maybeSingle();
+  if (error) throw new Error(`No se pudo obtener el cliente: ${error.message}`);
+  return (data as { name: string } | null)?.name ?? null;
+}
+
 export async function getClient(id: string): Promise<ClientDetail | null> {
   const sb = getSupabase();
   const { data: client, error } = await sb

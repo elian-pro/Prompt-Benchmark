@@ -19,6 +19,7 @@ import { SystemPromptCard } from "@/components/settings/SystemPromptCard";
 import { N8nConnectionRow } from "@/components/settings/N8nConnectionRow";
 import { N8nConnectionFormModal } from "@/components/settings/N8nConnectionFormModal";
 import { ComposerSettingsCard } from "@/components/settings/ComposerSettingsCard";
+import { GoogleChatCard, type GoogleChatConfig } from "@/components/settings/GoogleChatCard";
 import { EDITOR_PERSONA } from "@/lib/prompts/editor-persona";
 import { OPTIONS_CONTRACT } from "@/lib/prompts/options-block";
 import { ANTI_OVERFIT_CONTRACT } from "@/lib/prompts/anti-overfit";
@@ -40,6 +41,7 @@ export default function SettingsPage() {
   const [overrides, setOverrides] = useState<Record<string, string>>({});
   const [connections, setConnections] = useState<MaskedConnection[]>([]);
   const [composerSettings, setComposerSettings] = useState<ComposerSettings | null>(null);
+  const [chatConfig, setChatConfig] = useState<GoogleChatConfig | null>(null);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
 
@@ -63,12 +65,13 @@ export default function SettingsPage() {
     setLoading(true);
     setLoadError(null);
     try {
-      const [pRes, rRes, oRes, cRes, csRes] = await Promise.all([
+      const [pRes, rRes, oRes, cRes, csRes, gcRes] = await Promise.all([
         fetch("/api/providers"),
         fetch("/api/role-defaults"),
         fetch("/api/prompt-overrides"),
         fetch("/api/integrations/n8n"),
         fetch("/api/composer-settings"),
+        fetch("/api/integrations/google-chat"),
       ]);
       if (!pRes.ok) throw new Error((await pRes.json()).error ?? "Error al cargar proveedores.");
       if (!rRes.ok) throw new Error((await rRes.json()).error ?? "Error al cargar roles.");
@@ -85,6 +88,9 @@ export default function SettingsPage() {
       );
       setConnections(await cRes.json());
       setComposerSettings(await csRes.json());
+      // A failure here must not blank the whole page: the notifications are a
+      // convenience and the rest of Settings is not.
+      setChatConfig(gcRes.ok ? await gcRes.json() : null);
     } catch (e) {
       setLoadError(e instanceof Error ? e.message : "Error al cargar los datos.");
     } finally {
@@ -248,6 +254,10 @@ export default function SettingsPage() {
           />
         )}
       </CollapsibleCard>
+
+      {!loading && !loadError && chatConfig && (
+        <GoogleChatCard config={chatConfig} onSaved={setChatConfig} onToast={showToast} />
+      )}
 
       {!loading && !loadError && composerSettings && (
         <ComposerSettingsCard

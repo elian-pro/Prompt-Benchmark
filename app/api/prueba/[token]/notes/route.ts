@@ -1,10 +1,12 @@
-import { NextRequest, NextResponse } from "next/server";
+import { after, NextRequest, NextResponse } from "next/server";
 
 import { getVisitorSession } from "@/lib/db/demo-sessions";
 import { createNote, listNotes } from "@/lib/db/demo-notes";
 import { createClientNoteSchema } from "@/lib/schemas/demo-links";
 import { DemoLinkError, openDemoContext, withVisitorCookie } from "@/lib/demo-link-guard";
 import { handleError } from "@/lib/http";
+import { baseUrlFromHeaders } from "@/lib/base-url";
+import { notifyNoteCreated } from "@/lib/google-chat/notify";
 
 export const dynamic = "force-dynamic";
 
@@ -39,6 +41,18 @@ export async function POST(req: NextRequest, { params }: Params) {
       source: "client",
       status: "pending",
     });
+
+    // Off the response path on purpose: `after` runs once the client already
+    // has their confirmation, and notifyNoteCreated swallows its own failures,
+    // so Google Chat being down can never turn into a failed report.
+    after(() =>
+      notifyNoteCreated({
+        link: context.link,
+        expected: note.expected ?? input.expected,
+        complaint: note.text,
+        baseUrl: baseUrlFromHeaders(req.headers),
+      }),
+    );
 
     const response = NextResponse.json({
       id: note.id,
