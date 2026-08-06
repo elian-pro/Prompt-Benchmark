@@ -217,7 +217,126 @@
   box-shadow: var(--shadow-lg);
 }
 
+/* ===========================================================================
+   Phone. Not a narrower desktop: a chat.
+   =========================================================================== */
+@media (max-width: 900px) {
+  /* iOS zooms into any field under 16px, which is what made writing a message
+     jump the whole page. The DS reading scale stays 15px; only what you type
+     into goes up. */
+  .zebra-ds .textarea,
+  .zebra-ds .idle-composer-input,
+  .zebra-ds input {
+    font-size: 16px;
+  }
+
+  /* The screen is the conversation: header, chat, composer, and the chat is
+     the only thing that scrolls. Before this the page itself scrolled, so a
+     reply from the agent carried the viewport past the composer and left the
+     reports filling the screen.
+     Fixed to the viewport rather than sized in dvh: the Studio's shell adds its
+     own padding around this route, and any height measured against the screen
+     would end up that much taller than what fits. The wrapper still scrolls,
+     for the instructions card on a short phone. */
+  .zebra-ds {
+    position: fixed;
+    inset: 0;
+    overflow-y: auto;
+    padding: 14px 16px 0;
+  }
+  .zebra-ds .public-demo {
+    min-height: 100%;
+    gap: 0;
+  }
+  .zebra-ds .demo-body {
+    flex: 1;
+    min-height: 0;
+  }
+  .zebra-ds .playground-chat {
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+  }
+  .zebra-ds .chat-messages {
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+    padding-bottom: 8px;
+  }
+
+  /* Header: who made this and whose agent it is. The eyebrow and the line
+     about what to do were read once, at the gate, and then took a fifth of a
+     phone screen forever. */
+  .zebra-ds .demo-header {
+    padding-bottom: 10px;
+  }
+  .zebra-ds .demo-header-id > div {
+    display: none;
+  }
+  .zebra-ds .demo-header .btn-label {
+    display: none;
+  }
+  .zebra-ds .demo-header .btn {
+    padding: 8px;
+  }
+
+  /* The reports: a sheet that rises from the bottom, not a column below the
+     chat. It opens when a message is tagged, which is when there is something
+     to report. */
+  .zebra-ds .demo-sheet {
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 51;
+    max-height: 82dvh;
+    overflow-y: auto;
+    border-radius: var(--r-card) var(--r-card) 0 0;
+    border-bottom: none;
+    transform: translateY(101%);
+    transition: transform 0.24s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+  .zebra-ds .demo-sheet.is-open {
+    transform: none;
+  }
+  .zebra-ds .demo-sheet-backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: 50;
+    background: var(--overlay, rgba(0, 0, 0, 0.6));
+    backdrop-filter: blur(6px);
+  }
+}
+
+/* The handle back to the sheet, and its close button: both are phone-only, so
+   the wide layout keeps the panel it already has. */
+.zebra-ds .demo-sheet-open,
+.zebra-ds .demo-sheet-close {
+  display: none;
+}
+@media (max-width: 900px) {
+  .zebra-ds .demo-sheet-open {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 7px 10px;
+    border-radius: 100px;
+    border: 1px solid var(--border2);
+    background: transparent;
+    color: var(--muted);
+    cursor: pointer;
+  }
+  .zebra-ds .demo-sheet-close {
+    display: inline-flex;
+    margin-left: auto;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
+  .zebra-ds .demo-sheet {
+    transition: none;
+  }
   .zebra-ds .btn,
   .zebra-ds .textarea,
   .zebra-ds :focus-visible {

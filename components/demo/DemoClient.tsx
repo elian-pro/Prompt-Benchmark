@@ -95,6 +95,10 @@ export function DemoClient({
   const [savingNote, setSavingNote] = useState(false);
   const [noteError, setNoteError] = useState<string | null>(null);
   const [resetOpen, setResetOpen] = useState(false);
+  /** On a phone the reports do not fit beside the chat, so they live in a
+   *  sheet that rises from the bottom: opened by tagging a message, which is
+   *  when you have something to report, or by the counter in the header. */
+  const [sheetOpen, setSheetOpen] = useState(false);
   const [resetting, setResetting] = useState(false);
 
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
@@ -156,9 +160,15 @@ export function DemoClient({
   }, [session?.messages.length, sending]);
 
   function toggleSelect(messageId: string) {
-    setSelectedIds((prev) =>
-      prev.includes(messageId) ? prev.filter((x) => x !== messageId) : [...prev, messageId],
-    );
+    setSelectedIds((prev) => {
+      const next = prev.includes(messageId)
+        ? prev.filter((x) => x !== messageId)
+        : [...prev, messageId];
+      // Tagging is the start of writing a report, so the sheet comes with it.
+      // Untagging the last one is not, so it does not.
+      if (next.length > 0) setSheetOpen(true);
+      return next;
+    });
   }
 
   function onInputChange(e: React.ChangeEvent<HTMLTextAreaElement>) {
@@ -331,13 +341,26 @@ export function DemoClient({
             says it, right where the reporting happens. */}
         {messages.length > 0 && (
           <span className="demo-reset">
+            {/* Phone only: the way back to the reports once the sheet is
+                closed. On a wide screen the panel is simply there. */}
+            <button
+              type="button"
+              className="demo-sheet-open"
+              onClick={() => setSheetOpen(true)}
+              aria-label={
+                notes.length === 1 ? "Ver tu reporte" : `Ver tus ${notes.length} reportes`
+              }
+            >
+              <IconNotes size={16} stroke={1.5} />
+              {notes.length > 0 && <span className="notes-count">{notes.length}</span>}
+            </button>
             <Button
               variant="ghost"
               size="sm"
               onClick={() => setResetOpen(true)}
               icon={<IconRefresh size={14} stroke={1.5} />}
             >
-              Reiniciar
+              <span className="btn-label">Reiniciar</span>
             </Button>
             <InfoHint
               placement="bottom"
@@ -417,12 +440,28 @@ export function DemoClient({
           </div>
         </div>
 
-        <aside className="notes-panel notes-card">
+        {sheetOpen && (
+          <div
+            className="demo-sheet-backdrop"
+            onClick={() => setSheetOpen(false)}
+            aria-hidden="true"
+          />
+        )}
+
+        <aside className={`notes-panel notes-card demo-sheet${sheetOpen ? " is-open" : ""}`}>
           <div className="notes-header">
             <p className="section-label" style={{ margin: 0 }}>
               Lo que reportaste
             </p>
             {notes.length > 0 && <span className="notes-count">{notes.length}</span>}
+            <button
+              type="button"
+              className="icon-btn demo-sheet-close"
+              onClick={() => setSheetOpen(false)}
+              aria-label="Cerrar reportes"
+            >
+              <IconX size={16} stroke={1.5} />
+            </button>
           </div>
 
           <div className="notes-list">

@@ -4,6 +4,7 @@ import { IconPencil } from "@tabler/icons-react";
 
 import type { DemoMessageRole } from "@/lib/db/demo-sessions";
 import { parseTurnBubbles } from "@/lib/adversarial-message";
+import { parseRichText } from "@/lib/rich-text";
 
 /**
  * One turn of a demo conversation, rendered identically wherever it shows up:
@@ -17,6 +18,25 @@ import { parseTurnBubbles } from "@/lib/adversarial-message";
  * Everything interactive is optional. Pass no `onToggleSelect` and the turn is
  * plain text with no affordances, which is what the admin transcript wants.
  */
+
+/**
+ * A bubble's text with its inline formatting applied. Both syntaxes are
+ * honored: WhatsApp's, which is what a real lead sees, and markdown's, which is
+ * what a model writes whether we like it or not.
+ */
+export function RichText({ text }: { text: string }) {
+  return (
+    <>
+      {parseRichText(text).map((t, i) => {
+        if (t.bold) return <strong key={i}>{t.text}</strong>;
+        if (t.italic) return <em key={i}>{t.text}</em>;
+        if (t.strike) return <s key={i}>{t.text}</s>;
+        if (t.mono) return <code key={i}>{t.text}</code>;
+        return <span key={i}>{t.text}</span>;
+      })}
+    </>
+  );
+}
 
 /** Any special state with no readable message names itself explicitly,
  *  e.g. "El bot pasó a estado «humano» y dejó de responder.", which is
@@ -139,7 +159,9 @@ export function DemoTurn({
         const isLast = i === bubbles.length - 1;
         return (
           <div key={i} className={`chat-msg${malformed ? " chat-msg-error" : ""}`}>
-            <div className={`chat-content${isEmpty ? " chat-empty" : ""}`}>{b}</div>
+            <div className={`chat-content${isEmpty ? " chat-empty" : ""}`}>
+              <RichText text={b} />
+            </div>
             {/* The estado hangs off the last bubble, WhatsApp-style. */}
             {state && isLast && !isEmpty && (
               <div className="chat-state">
