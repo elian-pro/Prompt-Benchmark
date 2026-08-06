@@ -120,14 +120,6 @@ export function DemoTurn({
           : undefined
       }
     >
-      {/* Selected for a report. The border alone says it on a wide screen; on a
-          phone, where several messages are picked one after another, the mark
-          is what makes the state unmistakable. */}
-      {selected && selectable && (
-        <span className="chat-check" aria-hidden="true">
-          <IconCheck size={12} stroke={2.5} />
-        </span>
-      )}
       {pins.length > 0 && (
         <div className="chat-pins">
           {pins.map((p) => (
@@ -148,6 +140,15 @@ export function DemoTurn({
       )}
       <span className="chat-turn-role">
         {roleLabel}
+        {/* Selected for a report. It rides on the line that already names the
+            message, so nothing has to move to make room for it: on the
+            agent's side it follows the label, on yours it leads it, always on
+            the side the bubble is on. */}
+        {selected && selectable && (
+          <span className="chat-check" aria-hidden="true">
+            <IconCheck size={9} stroke={3} />
+          </span>
+        )}
         {onEditOpening && (
           <button
             type="button"

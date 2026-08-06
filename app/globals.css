@@ -2617,22 +2617,19 @@ a.lab-card:hover {
    mirrored to the other side so a message that is both picked and reported
    shows both marks. */
 .chat-check {
-  position: absolute;
-  /* Centered against the row rather than pinned to a corner: the corner is
-     where the role label lives, and the two collided. */
-  top: 50%;
-  /* Straddling the bubble's edge, like the note pins on the other corner, so
-     it never sits on top of the first word. */
-  left: -9px;
-  transform: translateY(-50%);
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 18px;
-  height: 18px;
+  width: 13px;
+  height: 13px;
   border-radius: 100px;
   background: var(--accent);
   color: var(--bg);
+}
+/* Your own messages sit on the right, so the mark goes before the label and
+   stays on the bubble's side. */
+.turn-lead .chat-check {
+  order: -1;
 }
 .chat-pin {
   display: inline-flex;
