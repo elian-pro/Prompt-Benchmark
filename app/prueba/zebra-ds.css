@@ -217,6 +217,19 @@
   box-shadow: var(--shadow-lg);
 }
 
+/* Phone-only furniture, hidden everywhere else.
+   Both of these live inside the chat's two column grid, so without this they
+   take the column the reports panel needs and push it onto the next row, under
+   the composer. And on a wide screen the bar would be a second place saying
+   what the panel already shows: the selection is right there, quoted, in the
+   form.
+   It sits BEFORE the phone block on purpose: same specificity, so the one
+   written last wins, and written last it hid the bar on the phone as well. */
+.zebra-ds .demo-selection-bar,
+.zebra-ds .demo-sheet-backdrop {
+  display: none;
+}
+
 /* ===========================================================================
    Phone. Not a narrower desktop: a chat.
    =========================================================================== */
@@ -380,17 +393,6 @@
     background: var(--overlay, rgba(0, 0, 0, 0.6));
     backdrop-filter: blur(6px);
   }
-}
-
-/* Phone-only furniture, hidden everywhere else.
-   Both of these live inside the chat's two column grid, so without this they
-   take the column the reports panel needs and push it onto the next row, under
-   the composer. And on a wide screen the bar would be a second place saying
-   what the panel already shows: the selection is right there, quoted, in the
-   form. */
-.zebra-ds .demo-selection-bar,
-.zebra-ds .demo-sheet-backdrop {
-  display: none;
 }
 
 /* The handle back to the sheet, and its close button: both are phone-only, so
