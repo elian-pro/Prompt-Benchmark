@@ -373,12 +373,24 @@
     transform: none;
   }
   .zebra-ds .demo-sheet-backdrop {
+    display: block;
     position: fixed;
     inset: 0;
     z-index: 50;
     background: var(--overlay, rgba(0, 0, 0, 0.6));
     backdrop-filter: blur(6px);
   }
+}
+
+/* Phone-only furniture, hidden everywhere else.
+   Both of these live inside the chat's two column grid, so without this they
+   take the column the reports panel needs and push it onto the next row, under
+   the composer. And on a wide screen the bar would be a second place saying
+   what the panel already shows: the selection is right there, quoted, in the
+   form. */
+.zebra-ds .demo-selection-bar,
+.zebra-ds .demo-sheet-backdrop {
+  display: none;
 }
 
 /* The handle back to the sheet, and its close button: both are phone-only, so
