@@ -12,6 +12,7 @@ const message = (id: string, role: "human" | "bot", content: string): DemoMessag
   round: 1,
   role,
   content,
+  tool_calls: null,
   version_number_snapshot: "1.0",
   created_at: "2026-08-04T10:00:00Z",
 });

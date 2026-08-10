@@ -6,12 +6,19 @@
  * client demo link (`/api/prueba/[token]/messages`). They differ in who is
  * allowed to call them, not in how a turn works, and the two must not drift:
  * the whole point of a demo link is that the client sees exactly what the user
- * sees in the Playground.
+ * sees in the Playground. That includes the client's tools: a bot that cannot
+ * look up the catalog answers a different question than the one in production.
+ *
+ * The tool steps are deliberately not persisted as messages, so the next turn
+ * sees the question and the answer and nothing in between, which is what n8n's
+ * Simple Memory does to the agent it runs.
  */
 import { appendMessage, type DemoMessageRow, type DemoSessionDetail } from "./db/demo-sessions";
 import { getRoleDefault } from "./db/role-defaults";
+import { getRuntimeTools } from "./db/client-tools";
 import { RoleNotConfiguredError } from "./db/runs";
 import { chat, type ChatMessage } from "./providers";
+import { runToolLoop } from "./client-tools";
 import { asEnvelope } from "./adversarial-message";
 
 export async function runDemoTurn(
@@ -45,24 +52,36 @@ export async function runDemoTurn(
     versionNumberSnapshot: session.version_number_snapshot,
   });
 
-  const reply = await chat({
-    providerId: role.provider_id,
-    modelName: role.model_name,
-    systemPrompt: session.prompt_snapshot,
-    messages,
-    temperature: role.temperature ?? undefined,
-    topP: role.top_p ?? undefined,
-    maxTokens: role.max_tokens ?? undefined,
-    // prompt_snapshot is frozen for the session, so the whole prefix is stable
-    // and every turn after the first reads the history from cache.
-    cache: true,
-  });
+  // The client's own tools (their Supabase RPCs), the same ones their agent
+  // calls in n8n. Empty for a client with none configured, and then this is a
+  // single plain call, exactly as before.
+  const tools = await getRuntimeTools(session.client_id);
+
+  const { reply, steps } = await runToolLoop(
+    {
+      providerId: role.provider_id,
+      modelName: role.model_name,
+      systemPrompt: session.prompt_snapshot,
+      messages,
+      temperature: role.temperature ?? undefined,
+      topP: role.top_p ?? undefined,
+      maxTokens: role.max_tokens ?? undefined,
+      // prompt_snapshot is frozen for the session, so the whole prefix is
+      // stable and every turn after the first reads the history from cache.
+      cache: true,
+    },
+    tools,
+    { chat },
+  );
 
   const botMessage = await appendMessage(session.id, {
     turnNumber: nextTurn + 1,
     round: session.current_round,
     role: "bot",
     content: reply.content,
+    // Only the Playground keeps the trace: on a demo link the client has no
+    // business seeing the name of an internal RPC or a slice of its response.
+    toolCalls: session.link_id === null && steps.length ? steps : null,
     versionNumberSnapshot: session.version_number_snapshot,
   });
 

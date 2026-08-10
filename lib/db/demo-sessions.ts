@@ -10,6 +10,7 @@ import { getVersion } from "./versions";
 import { getRoleDefault } from "./role-defaults";
 import { RoleNotConfiguredError } from "./runs";
 import { listNotes, type DemoNoteRow } from "./demo-notes";
+import type { ToolStep } from "../client-tools";
 
 export type DemoSessionStatus = "active" | "sent_to_editor";
 export type DemoMessageRole = "human" | "bot";
@@ -49,6 +50,9 @@ export type DemoMessageRow = {
   round: number;
   role: DemoMessageRole;
   content: string;
+  /** What the client's tools did on this turn (migration 027). Diagnostics for
+   *  the Playground, null on demo-link sessions and on every human message. */
+  tool_calls: ToolStep[] | null;
   version_number_snapshot: string | null;
   created_at: string;
 };
@@ -71,7 +75,7 @@ const SESSION_COLS =
   "editor_session_id, current_round, opening_message, link_id, visitor_id, " +
   "visitor_ip, visitor_user_agent, last_seen_at, created_at, updated_at";
 const MESSAGE_COLS =
-  "id, session_id, turn_number, round, role, content, version_number_snapshot, created_at";
+  "id, session_id, turn_number, round, role, content, tool_calls, version_number_snapshot, created_at";
 
 function flattenListItem(row: any): DemoSessionListItem {
   const client = Array.isArray(row.clients) ? row.clients[0] : row.clients;
@@ -336,6 +340,7 @@ export async function appendMessage(
     content: string;
     round: number;
     versionNumberSnapshot?: string | null;
+    toolCalls?: ToolStep[] | null;
   },
 ): Promise<DemoMessageRow> {
   const sb = getSupabase();
@@ -347,6 +352,7 @@ export async function appendMessage(
       round: input.round,
       role: input.role,
       content: input.content,
+      tool_calls: input.toolCalls ?? null,
       version_number_snapshot: input.versionNumberSnapshot ?? null,
     })
     .select(MESSAGE_COLS)

@@ -5,7 +5,8 @@ import { runDemoTurn } from "@/lib/demo-turn";
 import { handleError, jsonError } from "@/lib/http";
 
 export const dynamic = "force-dynamic";
-export const maxDuration = 60;
+// A turn with tools is several model calls plus their HTTP round trips.
+export const maxDuration = 120;
 
 type Params = { params: Promise<{ id: string }> };
 
