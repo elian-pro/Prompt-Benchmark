@@ -4,6 +4,7 @@ import { ProviderInUseError } from "./db/providers";
 import { UnsupportedFileError, AttachmentUnavailableError } from "./db/uploads";
 import { RoleNotConfiguredError } from "./db/runs";
 import { ConnectionInUseError } from "./db/n8n-connections";
+import { ToolNameTakenError } from "./db/client-tools";
 import { N8nApiError } from "./n8n/client";
 import { ChatsAdminError } from "./chats-admin";
 import { GoogleChatError } from "./google-chat/auth.ts";
@@ -42,6 +43,9 @@ export function handleError(err: unknown) {
     return jsonError(err.message, 409);
   }
   if (err instanceof ConnectionInUseError) {
+    return jsonError(err.message, 409);
+  }
+  if (err instanceof ToolNameTakenError) {
     return jsonError(err.message, 409);
   }
   if (err instanceof VersionSwitchBlockedError) {

@@ -3677,9 +3677,62 @@ body[data-theme="light"] .dot-grid::after {
   padding: 8px 0;
   border-top: 0.5px solid var(--border);
 }
+/* Tool trace under a bot turn in the Playground (see DemoTurn.tsx). Collapsed
+   by default: it is diagnostics, not conversation. */
+.chat-tools {
+  margin-top: 6px;
+  font-size: 11px;
+  color: var(--faint);
+}
+.chat-tools summary {
+  cursor: pointer;
+  letter-spacing: 0.04em;
+}
+.chat-tool-step {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  margin-top: 6px;
+  padding-left: 8px;
+  border-left: 2px solid var(--border2);
+}
+.chat-tool-step.is-error {
+  border-left-color: var(--danger);
+}
+.chat-tool-name {
+  color: var(--muted);
+}
+.chat-tool-meta {
+  margin-left: 6px;
+  color: var(--faint);
+}
+.chat-tool-step code {
+  display: block;
+  overflow-x: auto;
+  white-space: pre-wrap;
+  word-break: break-word;
+  font-size: 11px;
+  color: var(--faint);
+}
+
+/* A disabled client tool: still listed, visibly out of play. */
+.n8n-binding.is-off {
+  opacity: 0.5;
+}
 .n8n-binding-body {
   display: flex;
   flex-direction: column;
+  min-width: 0;
+}
+/* Header and parameter rows in the tool modal: fields side by side with the
+   remove button hugging the end. */
+.tool-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 6px;
+}
+.tool-row .input {
   min-width: 0;
 }
 .n8n-binding-node {
