@@ -13,9 +13,39 @@ export type MessageAttachment = {
   data: string;
 };
 
+/** One argument the model fills in when it calls a tool (n8n's `$fromAI`). */
+export type ToolParam = {
+  name: string;
+  description: string;
+  type: "string" | "number" | "boolean";
+};
+
+/**
+ * A tool offered to the model. `description` is what makes it call the tool or
+ * ignore it, so it is as much part of the prompt as the system prompt is.
+ */
+export type ToolDef = {
+  name: string;
+  description: string;
+  params: ToolParam[];
+};
+
+/** A tool the model asked for. `args` is its raw JSON, unparsed and untrusted. */
+export type ToolCall = {
+  id: string;
+  name: string;
+  args: string;
+};
+
 export type ChatMessage = {
   role: "user" | "assistant";
   content: string;
+  /** Tools this assistant turn asked for. Round-tripped back to the provider so
+   *  the results can be matched to their calls. */
+  toolCalls?: ToolCall[];
+  /** This message carries tool results instead of text: adapters render it as
+   *  the provider's tool role and ignore `content`. */
+  toolResults?: { id: string; content: string }[];
   attachments?: MessageAttachment[];
   /**
    * This message is rebuilt on every turn (the Editor's working draft), so it
@@ -45,10 +75,17 @@ export type ChatRequest = {
    * (~1.25x) that is never read back. Ignored by adapters other than Anthropic.
    */
   cache?: boolean;
+  /** Tools the model may call. Only the openai_compat adapter (and openrouter,
+   *  which delegates to it) supports these; `chat()` rejects the rest rather
+   *  than silently dropping them. */
+  tools?: ToolDef[];
 };
 
 export type ChatResponse = {
   content: string;
+  /** Present when the model stopped to call tools instead of answering. The
+   *  caller runs them and asks again (see lib/client-tools.ts). */
+  toolCalls?: ToolCall[];
   tokensIn: number;
   tokensOut: number;
   /** True when the provider stopped because it hit the max_tokens ceiling,
