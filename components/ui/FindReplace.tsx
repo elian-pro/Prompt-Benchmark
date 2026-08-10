@@ -79,6 +79,10 @@ export function FindReplace({
   const [wholeWord, setWholeWord] = useState(false);
   const [active, setActive] = useState(-1);
   const searchRef = useRef<HTMLInputElement>(null);
+  const bandRef = useRef<HTMLDivElement>(null);
+  // Vertical offset of the marked line inside the textarea's scrolled content,
+  // null when there is no match to mark.
+  const bandTop = useRef<number | null>(null);
   // After a single replace, land on the next match at/after this offset
   // instead of re-selecting the text we just inserted.
   const pendingOffset = useRef<number | null>(null);
@@ -106,16 +110,88 @@ export function FindReplace({
     setActive((cur) => (cur >= matches.length ? matches.length - 1 : cur));
   }, [matches]);
 
-  // Select the active match in the textarea so it highlights and scrolls in.
+  // Put the band over the line at `bandTop` (an offset inside the textarea's
+  // scrolled content), or hide it when there is nothing to mark. Written
+  // straight to the DOM: this also runs on every scroll frame.
+  const placeBand = useCallback(() => {
+    const band = bandRef.current;
+    const ta = textareaRef.current;
+    if (!band || !ta) return;
+    if (bandTop.current == null) {
+      band.style.display = "none";
+      return;
+    }
+    const style = getComputedStyle(ta);
+    const lineHeight = parseFloat(style.lineHeight) || 0;
+    const border = parseFloat(style.borderTopWidth) || 0;
+    const rect = ta.getBoundingClientRect();
+    const y = bandTop.current - ta.scrollTop;
+    // Scrolled out of the textarea's own viewport: nothing to mark.
+    if (y + lineHeight <= 0 || y >= ta.clientHeight) {
+      band.style.display = "none";
+      return;
+    }
+    band.style.display = "block";
+    band.style.top = `${rect.top + border + y}px`;
+    band.style.left = `${rect.left + border}px`;
+    band.style.width = `${rect.width - border * 2}px`;
+    band.style.height = `${lineHeight}px`;
+  }, [textareaRef]);
+
+  // The band is positioned against the viewport, so it has to follow both the
+  // textarea's own scrollbar and the page's.
+  useEffect(() => {
+    const ta = textareaRef.current;
+    if (!ta) return;
+    const follow = () => placeBand();
+    ta.addEventListener("scroll", follow);
+    window.addEventListener("scroll", follow, true);
+    window.addEventListener("resize", follow);
+    return () => {
+      ta.removeEventListener("scroll", follow);
+      window.removeEventListener("scroll", follow, true);
+      window.removeEventListener("resize", follow);
+    };
+  }, [placeBand, textareaRef]);
+
+  // Any edit to the text or the search term moves every offset: drop the band
+  // until the next navigation puts it back.
+  useEffect(() => {
+    bandTop.current = null;
+    placeBand();
+  }, [matches, placeBand]);
+
+  // Select the active match, scroll it to the middle of the textarea and mark
+  // its line. The textarea is never focused: the search field keeps the focus
+  // so Enter keeps stepping through matches instead of typing a newline into
+  // the prompt. Chrome does not paint the selection of an unfocused textarea,
+  // which is what the band is for.
   const selectMatch = useCallback(
     (index: number) => {
       const m = matches[index];
       const ta = textareaRef.current;
       if (!m || !ta) return;
-      ta.focus();
+      const style = getComputedStyle(ta);
+      const lineHeight = parseFloat(style.lineHeight) || 0;
+      // Where the match sits inside the scroll box: put the text up to it in
+      // the textarea itself and read how tall that is. Measuring on the real
+      // element (rather than a mirror div) gets the wrapping, font and padding
+      // for free. Synchronous, so nothing renders in between. Measure before
+      // selecting: assigning `value` drops the selection.
+      const previous = ta.value;
+      ta.value = value.slice(0, m.start);
+      const top =
+        ta.scrollHeight - parseFloat(style.paddingBottom) - lineHeight;
+      ta.value = previous;
       ta.setSelectionRange(m.start, m.end);
+      ta.scrollTop = top + lineHeight / 2 - ta.clientHeight / 2;
+      // The textarea has its own scrollbar, but it can also be sitting off
+      // screen: bring it into the page's view too.
+      ta.scrollIntoView({ block: "nearest" });
+      bandTop.current = top;
+      placeBand();
     },
-    [matches, textareaRef],
+    [matches, placeBand, textareaRef, value],
   );
 
   function go(delta: number) {
@@ -160,6 +236,7 @@ export function FindReplace({
 
   return (
     <div className="find-replace">
+      <div ref={bandRef} className="find-replace-band" aria-hidden="true" />
       <div className="find-replace-row">
         <div className="find-replace-field">
           <IconSearch size={13} className="find-replace-field-icon" />

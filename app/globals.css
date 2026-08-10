@@ -2108,6 +2108,24 @@ a.lab-card:hover {
   border: 0.5px solid var(--border2);
   border-radius: 12px;
 }
+/* Marks the line holding the active match. Positioned against the viewport
+   from JS (the textarea cannot hold children), so it needs no wrapper around
+   the editor. Chrome does not paint the selection of an unfocused textarea,
+   and the search field keeps the focus, so this is what shows the hit. */
+.find-replace-band {
+  position: fixed;
+  display: none;
+  pointer-events: none;
+  background: rgba(255, 214, 2, 0.16);
+  border-left: 2px solid var(--accent);
+  border-radius: 2px;
+  z-index: 5;
+}
+/* The same yellow washes out on the light surface. */
+body[data-theme="light"] .find-replace-band {
+  background: rgba(255, 214, 2, 0.42);
+  border-left-color: #c9a900;
+}
 .find-replace-row {
   display: flex;
   align-items: center;
