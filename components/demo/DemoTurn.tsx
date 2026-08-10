@@ -3,6 +3,7 @@
 import { IconCheck, IconPencil } from "@tabler/icons-react";
 
 import type { DemoMessageRole } from "@/lib/db/demo-sessions";
+import type { ToolStep } from "@/lib/client-tools";
 import { parseTurnBubbles } from "@/lib/adversarial-message";
 import { parseRichText } from "@/lib/rich-text";
 
@@ -69,10 +70,14 @@ export function DemoTurn({
   onJumpToNote,
   registerRef,
   onEditOpening,
+  toolCalls,
 }: {
   id: string;
   role: DemoMessageRole;
   content: string;
+  /** What the client's tools did on this turn. Playground only: the client's
+   *  own link never receives them. */
+  toolCalls?: ToolStep[] | null;
   labels?: TurnLabels;
   selected?: boolean;
   /** Numbered markers for the notes that reference this turn. */
@@ -181,6 +186,30 @@ export function DemoTurn({
           </div>
         );
       })}
+      {/* A tool that answered with an empty list and a tool the model never
+          called produce the same bubble. This is how you tell them apart. */}
+      {toolCalls && toolCalls.length > 0 && (
+        <details className="chat-tools" onClick={(e) => e.stopPropagation()}>
+          <summary>
+            {toolCalls.length === 1
+              ? `1 herramienta: ${toolCalls[0].name}`
+              : `${toolCalls.length} herramientas`}
+          </summary>
+          {toolCalls.map((step, i) => (
+            <div key={i} className={`chat-tool-step${step.ok ? "" : " is-error"}`}>
+              <span className="chat-tool-name">
+                {step.name}
+                <span className="chat-tool-meta">
+                  {step.status ? `${step.status} · ` : ""}
+                  {step.ms} ms
+                </span>
+              </span>
+              <code>{step.args}</code>
+              <code>{step.preview}</code>
+            </div>
+          ))}
+        </details>
+      )}
     </div>
   );
 }

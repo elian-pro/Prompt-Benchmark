@@ -640,6 +640,7 @@ export default function PlaygroundSessionPage() {
                 id={m.id}
                 role={m.role}
                 content={m.content}
+                toolCalls={m.tool_calls}
                 selected={selectedIds.includes(m.id)}
                 pins={pinsByMessageId.get(m.id) ?? []}
                 flashed={flashMessageId === m.id}
