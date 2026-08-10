@@ -61,10 +61,17 @@ export function assertAllowedUrl(raw: string): URL {
   return url;
 }
 
-/** The request body: the fixed fields plus whatever the model filled in. For a
- *  PostgREST RPC that object IS the argument list. */
+/**
+ * The request body: the fixed fields plus whatever the model filled in. For a
+ * PostgREST RPC that object IS the argument list.
+ *
+ * An optional argument that came back empty is dropped rather than sent: a
+ * function declared `p_estilo text default null` filters on `''` and returns
+ * nothing, which reads like an empty catalog instead of an absent filter. This
+ * is the `|| null` that the n8n node writes into its own body expression.
+ */
 export function buildToolBody(
-  tool: Pick<RuntimeTool, "bodyTemplate">,
+  tool: Pick<RuntimeTool, "bodyTemplate" | "params">,
   rawArgs: string,
 ): Record<string, unknown> {
   let args: Record<string, unknown> = {};
@@ -72,6 +79,15 @@ export function buildToolBody(
     const parsed = JSON.parse(rawArgs);
     if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
       args = parsed as Record<string, unknown>;
+    }
+  }
+  for (const p of tool.params) {
+    if (p.required !== false) continue;
+    const v = args[p.name];
+    // 0 counts as empty for a number: it is what a model sends for "no budget
+    // mentioned", and no filter means it, either.
+    if (v === "" || v === null || v === undefined || (p.type === "number" && v === 0)) {
+      delete args[p.name];
     }
   }
   return { ...tool.bodyTemplate, ...args };

@@ -62,6 +62,44 @@ test("the body is the fixed fields plus the model's arguments, and the model win
   assert.throws(() => buildToolBody(TOOL, "{no es json"));
 });
 
+test("an optional parameter left empty is dropped, so the RPC uses its default", () => {
+  // recomendar_vehiculos: every p_* is `default null` in Postgres, and a model
+  // that does not know the style sends "" for it.
+  const recommend = {
+    bodyTemplate: { max_resultados: 5 },
+    params: [
+      { name: "p_tipo", description: "", type: "string" as const, required: false },
+      { name: "p_estilo", description: "", type: "string" as const, required: false },
+      { name: "p_presupuesto_max", description: "", type: "number" as const, required: false },
+    ],
+  };
+  assert.deepEqual(
+    buildToolBody(recommend, '{"p_tipo":"moto","p_estilo":"","p_presupuesto_max":0}'),
+    { max_resultados: 5, p_tipo: "moto" },
+  );
+});
+
+test("a required parameter is sent even when it comes back empty", () => {
+  // Nothing to fall back to: dropping it would make PostgREST fail to resolve
+  // the function at all.
+  const search = { bodyTemplate: {}, params: [{ name: "termino", description: "", type: "string" as const }] };
+  assert.deepEqual(buildToolBody(search, '{"termino":""}'), { termino: "" });
+});
+
+test("only required parameters go in the schema's required list", () => {
+  const fn = toOpenAiFunction(
+    toToolDef({
+      ...TOOL,
+      params: [
+        { name: "a", description: "", type: "string", required: false },
+        { name: "b", description: "", type: "string" },
+      ],
+    }),
+  );
+  assert.deepEqual(fn.function.parameters.required, ["b"]);
+  assert.deepEqual(Object.keys(fn.function.parameters.properties), ["a", "b"]);
+});
+
 test("a tool becomes a function with one required property per parameter", () => {
   const fn = toOpenAiFunction(toToolDef(TOOL));
   assert.equal(fn.function.name, "buscar_modelo_por_nombre");

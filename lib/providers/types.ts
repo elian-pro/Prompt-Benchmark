@@ -18,6 +18,10 @@ export type ToolParam = {
   name: string;
   description: string;
   type: "string" | "number" | "boolean";
+  /** Defaults to required (absent means true). An optional one is left out of
+   *  the schema's `required` list, so the model can omit it and the endpoint
+   *  falls back to its own default instead of filtering on an empty value. */
+  required?: boolean;
 };
 
 /**

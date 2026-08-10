@@ -16,6 +16,9 @@ const paramSchema = z.object({
     .trim()
     .min(1, "Describe el parámetro: es lo que lee el modelo para rellenarlo."),
   type: z.enum(["string", "number", "boolean"]),
+  // Absent means required, so tools saved before this existed keep behaving
+  // the same.
+  required: z.boolean().optional(),
 });
 
 /** Header names/values as a plain object, the shape the executor sends. */

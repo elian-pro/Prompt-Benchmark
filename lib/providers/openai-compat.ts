@@ -58,9 +58,9 @@ export function toOpenAiFunction(tool: ToolDef) {
       parameters: {
         type: "object",
         properties,
-        // Every argument is required: an optional one the model omits reads the
-        // same as one it decided to leave empty, and the tool cannot tell.
-        required: tool.params.map((p) => p.name),
+        // Optional ones are left out so the model can omit them instead of
+        // sending an empty value the endpoint would filter on.
+        required: tool.params.filter((p) => p.required !== false).map((p) => p.name),
       },
     },
   };
