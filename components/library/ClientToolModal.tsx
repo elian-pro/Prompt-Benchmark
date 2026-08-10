@@ -1,9 +1,10 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { IconPlus, IconTrash } from "@tabler/icons-react";
+import { IconPlus, IconTrash, IconClipboard } from "@tabler/icons-react";
 import type { MaskedTool } from "@/lib/db/client-tools";
 import type { ToolParam } from "@/lib/providers/types";
+import { parseToolNodes } from "@/lib/n8n/tool-import";
 import { Modal } from "@/components/ui/Modal";
 import { Button } from "@/components/ui/Button";
 
@@ -34,10 +35,14 @@ export function ClientToolModal({ open, clientId, tool, onClose, onSaved }: Prop
   const [bodyTemplate, setBodyTemplate] = useState("{}");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [pasted, setPasted] = useState("");
+  const [imported, setImported] = useState<string | null>(null);
 
   useEffect(() => {
     if (!open) return;
     setError(null);
+    setPasted("");
+    setImported(null);
     setName(tool?.name ?? "");
     setDescription(tool?.description ?? "");
     setUrl(tool?.url ?? "");
@@ -51,6 +56,30 @@ export function ClientToolModal({ open, clientId, tool, onClose, onSaved }: Prop
     setParams(tool?.params.length ? tool.params : [{ ...EMPTY_PARAM }]);
     setBodyTemplate(JSON.stringify(tool?.body_template ?? {}, null, 2));
   }, [open, tool]);
+
+  /** Fills the form from a node copied in n8n. Never saves on its own: what it
+   *  understood has to be visible before it becomes a tool. */
+  function fillFromN8n() {
+    setError(null);
+    setImported(null);
+    try {
+      const tools = parseToolNodes(pasted);
+      const [first, ...rest] = tools;
+      setName(first.name);
+      setDescription(first.description);
+      setUrl(first.url);
+      setHeaders(Object.entries(first.headers).map(([key, value]) => ({ key, value })));
+      setParams(first.params.length ? first.params : [{ ...EMPTY_PARAM }]);
+      setBodyTemplate(JSON.stringify(first.bodyTemplate, null, 2));
+      setImported(
+        rest.length
+          ? `Cargué «${first.name}». El JSON traía ${tools.length} herramientas: guarda esta y pega el resto una a una.`
+          : `Cargué «${first.name}». Revisa los campos y guarda.`,
+      );
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "No pude leer ese JSON.");
+    }
+  }
 
   async function save() {
     setError(null);
@@ -124,6 +153,33 @@ export function ClientToolModal({ open, clientId, tool, onClose, onSaved }: Prop
       }
     >
       {error && <p className="form-error">{error}</p>}
+
+      <details className="field" open={!tool}>
+        <summary className="field-label" style={{ cursor: "pointer" }}>
+          Pegar desde n8n
+        </summary>
+        <textarea
+          className="textarea"
+          rows={3}
+          value={pasted}
+          onChange={(e) => setPasted(e.target.value)}
+          placeholder="Selecciona el nodo en n8n, cópialo y pégalo aquí…"
+        />
+        <div className="row-between" style={{ marginTop: 6 }}>
+          <span className="field-hint" style={{ margin: 0 }}>
+            {imported ?? "Trae la URL, los headers con su llave y los parámetros del $fromAI."}
+          </span>
+          <Button
+            size="sm"
+            variant="secondary"
+            icon={<IconClipboard size={13} />}
+            onClick={fillFromN8n}
+            disabled={!pasted.trim()}
+          >
+            Rellenar campos
+          </Button>
+        </div>
+      </details>
 
       <div className="field">
         <label className="field-label">Nombre</label>
@@ -243,6 +299,18 @@ export function ClientToolModal({ open, clientId, tool, onClose, onSaved }: Prop
               <option value="number">número</option>
               <option value="boolean">sí/no</option>
             </select>
+            <label className="tool-optional" title="El modelo puede omitirlo">
+              <input
+                type="checkbox"
+                checked={p.required === false}
+                onChange={(e) =>
+                  setParams(
+                    params.map((x, j) => (j === i ? { ...x, required: !e.target.checked } : x)),
+                  )
+                }
+              />
+              opcional
+            </label>
             <Button
               size="sm"
               variant="ghost"
@@ -252,6 +320,10 @@ export function ClientToolModal({ open, clientId, tool, onClose, onSaved }: Prop
             />
           </div>
         ))}
+        <p className="field-hint">
+          Marca «opcional» el que la función acepte vacío. Si el modelo no lo sabe, no se envía y
+          la función usa su valor por defecto, en vez de filtrar por vacío y no devolver nada.
+        </p>
         <Button
           size="sm"
           variant="secondary"

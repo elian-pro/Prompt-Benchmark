@@ -3731,9 +3731,23 @@ body[data-theme="light"] .dot-grid::after {
   align-items: center;
   gap: 6px;
   margin-bottom: 6px;
+  /* A parameter row carries name, description, type, the optional box and the
+     delete button. Wrapping keeps them legible in a narrow modal instead of
+     squeezing five controls onto one line. */
+  flex-wrap: wrap;
 }
 .tool-row .input {
+  flex: 1 1 140px;
   min-width: 0;
+}
+.tool-optional {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex: none;
+  font-size: 11px;
+  color: var(--muted);
+  white-space: nowrap;
 }
 .n8n-binding-node {
   font-size: 13px;
