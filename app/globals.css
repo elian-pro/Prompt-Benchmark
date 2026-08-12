@@ -14,6 +14,12 @@ body[data-theme="dark"] {
   --danger: #e24b4a;
   --danger-soft: #f87171; /* brighter alert red: error status, crítico severity */
   --warn: #fbbf24; /* amber: medio severity */
+  /* The one green in the system: a state that is confirmed rather than
+     committed by the user. Sits next to --warn on the n8n drift badges, which
+     is why it cannot be the accent: two yellows there read as one. */
+  --success: #22c55e;
+  /* The accent on a light surface, where #ffd602 washes out against white. */
+  --accent-deep: #c9a900;
 }
 
 body[data-theme="light"] {
@@ -29,6 +35,8 @@ body[data-theme="light"] {
   --danger: #c2342f;
   --danger-soft: #cf4b46; /* readable on light bg */
   --warn: #b45309;
+  --success: #16a34a; /* deeper, to hold against white */
+  --accent-deep: #c9a900;
 }
 
 *,
@@ -278,7 +286,7 @@ button {
   align-items: baseline;
   justify-content: space-between;
   gap: 10px;
-  border-radius: 9px;
+  border-radius: 10px;
   padding: 8px 10px;
   transition: background 0.12s ease;
 }
@@ -637,7 +645,7 @@ button {
   margin-top: 4px;
 }
 .form-ok {
-  color: var(--success, #16a34a);
+  color: var(--success);
   font-size: 13px;
   margin-top: 4px;
 }
@@ -908,7 +916,7 @@ button {
   width: 100%;
   height: 2px;
   background: var(--border2);
-  border-radius: 2px;
+  border-radius: 100px;
   outline: none;
   cursor: pointer;
 }
@@ -1034,7 +1042,7 @@ button {
   transition: opacity 0.15s;
   z-index: 30;
   pointer-events: none;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.38);
 }
 /* Default: above the icon, centered. Right for a hint inside a form or card. */
 .info-hint-top {
@@ -1274,7 +1282,7 @@ button {
   padding: 28px;
   background: var(--surface);
   border: 0.5px solid var(--border);
-  border-radius: 16px;
+  border-radius: 14px;
   text-decoration: none;
   color: var(--fg);
   transition: border-color 0.15s ease, transform 0.15s ease;
@@ -1287,7 +1295,7 @@ a.lab-card:hover {
   color: var(--accent);
 }
 .lab-card-title {
-  font-size: 17px;
+  font-size: 18px;
   font-weight: 500;
 }
 .lab-card-desc {
@@ -1453,7 +1461,7 @@ a.lab-card:hover {
   align-items: center;
   gap: 10px;
   min-width: 0;
-  font-size: 15px;
+  font-size: 14px;
   font-weight: 500;
   white-space: nowrap;
   overflow: hidden;
@@ -1470,7 +1478,7 @@ a.lab-card:hover {
   text-overflow: ellipsis;
 }
 .row-version {
-  font-size: 16px;
+  font-size: 18px;
   font-weight: 500;
   font-feature-settings: "tnum";
 }
@@ -2118,14 +2126,14 @@ a.lab-card:hover {
   display: none;
   pointer-events: none;
   background: rgba(255, 214, 2, 0.16);
-  border-left: 2px solid var(--accent);
-  border-radius: 2px;
+  border-left: 0.5px solid var(--accent);
+  border-radius: 6px;
   z-index: 5;
 }
 /* The same yellow washes out on the light surface. */
 body[data-theme="light"] .find-replace-band {
   background: rgba(255, 214, 2, 0.42);
-  border-left-color: #c9a900;
+  border-left-color: var(--accent-deep);
 }
 .find-replace-row {
   display: flex;
@@ -2393,7 +2401,7 @@ body[data-theme="light"] .find-replace-band {
   margin-bottom: 0;
 }
 .chat-topbar-title {
-  font-size: 15px;
+  font-size: 14px;
   font-weight: 500;
   white-space: nowrap;
   overflow: hidden;
@@ -2540,7 +2548,7 @@ body[data-theme="light"] .find-replace-band {
   border-radius: 50%;
   background: currentColor;
   opacity: 0.35;
-  animation: typingBounce 1.2s infinite ease-in-out;
+  animation: typingPulse 1.2s infinite ease-in-out;
 }
 .typing-dots span:nth-child(2) {
   animation-delay: 0.15s;
@@ -2548,7 +2556,7 @@ body[data-theme="light"] .find-replace-band {
 .typing-dots span:nth-child(3) {
   animation-delay: 0.3s;
 }
-@keyframes typingBounce {
+@keyframes typingPulse {
   0%,
   60%,
   100% {
@@ -2576,7 +2584,7 @@ body[data-theme="light"] .find-replace-band {
   border-top: 0.5px dashed var(--border2);
 }
 .chat-state-label {
-  font-size: 8px;
+  font-size: 9px;
   letter-spacing: 0.18em;
   text-transform: uppercase;
   color: var(--faint);
@@ -3020,7 +3028,7 @@ body[data-theme="light"] .find-replace-band {
 .drawer-overlay {
   position: fixed;
   inset: 0;
-  background: rgba(0, 0, 0, 0.45);
+  background: rgba(0, 0, 0, 0.5);
   /* Below modals (50) and the toast (60): the drawer is context, not a modal. */
   z-index: 45;
   animation: overlay-in 0.18s ease;
@@ -3627,7 +3635,7 @@ body[data-theme="light"] .dot-grid::after {
   text-align: left;
   background: transparent;
   border: none;
-  border-radius: 9px;
+  border-radius: 10px;
   padding: 8px 10px;
   cursor: pointer;
   font-family: inherit;
@@ -3676,7 +3684,9 @@ body[data-theme="light"] .dot-grid::after {
 }
 @media (max-width: 600px) {
   .landing-greeting {
-    font-size: 26px;
+    /* The greeting steps down to the page-title size on a phone rather than
+       inventing a step that exists nowhere else. */
+    font-size: 24px;
   }
   .landing-hero {
     min-height: calc(100vh - 240px);
@@ -3813,8 +3823,8 @@ body[data-theme="light"] .dot-grid::after {
   cursor: pointer;
 }
 .agent-pick.is-active {
-  border-color: var(--accent, #6366f1);
-  background: var(--surface-2, rgba(99, 102, 241, 0.06));
+  border-color: var(--accent);
+  background: var(--surface2);
 }
 .agent-pick-body {
   display: flex;
@@ -3861,7 +3871,7 @@ body[data-theme="light"] .dot-grid::after {
   font-weight: 500;
 }
 .sync-ok {
-  color: var(--success, #16a34a);
+  color: var(--success);
 }
 .sync-err {
   color: var(--danger);
@@ -3876,7 +3886,7 @@ body[data-theme="light"] .dot-grid::after {
   align-items: flex-start;
   gap: 6px;
   font-size: 12px;
-  color: var(--warning, #b45309);
+  color: var(--warn);
   margin-top: 6px;
 }
 .sync-diff {
@@ -3902,7 +3912,7 @@ body[data-theme="light"] .dot-grid::after {
   max-height: 160px;
   overflow: auto;
   padding: 8px;
-  background: var(--surface-2, rgba(127, 127, 127, 0.06));
+  background: var(--surface2);
   border-radius: 8px;
   font-size: 12px;
   white-space: pre-wrap;
@@ -3926,7 +3936,7 @@ body[data-theme="light"] .dot-grid::after {
 .n8n-pending-icon {
   display: inline-flex;
   align-items: center;
-  color: var(--warning, #b45309);
+  color: var(--warn);
 }
 
 /* n8n drift badges (API bindings) */
@@ -3946,14 +3956,14 @@ body[data-theme="light"] .dot-grid::after {
   border: 0.5px solid var(--border);
 }
 .drift-synced {
-  color: var(--success, #16a34a);
-  border-color: var(--success, #16a34a);
+  color: var(--success);
+  border-color: var(--success);
 }
 .drift-drifted,
 .drift-not_found,
 .drift-not_agent {
-  color: var(--warning, #b45309);
-  border-color: var(--warning, #b45309);
+  color: var(--warn);
+  border-color: var(--warn);
 }
 .drift-no_baseline,
 .drift-unreachable {
@@ -3964,7 +3974,7 @@ body[data-theme="light"] .dot-grid::after {
   border: none;
   padding: 0;
   font-size: 12px;
-  color: var(--accent, #6366f1);
+  color: var(--accent);
   cursor: pointer;
   text-decoration: underline;
 }
@@ -3979,7 +3989,7 @@ body[data-theme="light"] .dot-grid::after {
   padding: 0;
   font-size: 13px;
   font-weight: 500;
-  color: var(--text);
+  color: var(--fg);
   cursor: pointer;
   width: 100%;
 }
@@ -4002,14 +4012,14 @@ body[data-theme="light"] .dot-grid::after {
      the text sideways. */
   padding: 8px 2px 8px 10px;
   cursor: pointer;
-  border-radius: 4px;
+  border-radius: 6px;
   /* A <button> does not inherit color: without this it falls back to the UA
      default (black), which is invisible on the dark theme. */
   color: var(--fg);
   font: inherit;
 }
 .conversation-item:hover {
-  background: var(--surface-2, rgba(127, 127, 127, 0.08));
+  background: var(--surface2);
 }
 /* The row whose transcript is open in the next column. */
 .conversation-item.is-selected {
@@ -4198,7 +4208,7 @@ body[data-theme="light"] .dot-grid::after {
 .deadline-presets button {
   flex: 1;
   padding: 8px 10px;
-  border-radius: 9px;
+  border-radius: 10px;
   border: 0.5px solid var(--border);
   background: transparent;
   color: var(--fg);
@@ -4580,7 +4590,7 @@ body[data-theme="dark"] .history-filters input[type="date"]::-webkit-calendar-pi
   background: var(--surface);
   color: var(--fg);
   cursor: pointer;
-  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.28);
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.38);
   transition: background 0.15s ease, color 0.15s ease;
 }
 .chat-jump-btn:hover {

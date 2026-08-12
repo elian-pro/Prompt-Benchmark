@@ -14,6 +14,10 @@ colors:
   danger: "#e24b4a"
   danger-soft: "#f87171"
   warn: "#fbbf24"
+  success: "#22c55e"
+  accent-deep: "#c9a900"
+  scrim: "rgba(0, 0, 0, 0.5)"
+  ink: "rgba(0, 0, 0, 0.38)"
   bg-light: "#fafaf7"
   surface-light: "#ffffff"
   surface2-light: "#f4f3ee"
@@ -25,7 +29,14 @@ colors:
   danger-light: "#c2342f"
   danger-soft-light: "#cf4b46"
   warn-light: "#b45309"
+  success-light: "#16a34a"
 typography:
+  greeting:
+    fontFamily: "Inter, system-ui, sans-serif"
+    fontSize: "34px"
+    fontWeight: 500
+    lineHeight: 1.2
+    letterSpacing: "-0.02em"
   display:
     fontFamily: "Inter, system-ui, sans-serif"
     fontSize: "28px"
@@ -33,6 +44,12 @@ typography:
     lineHeight: 1.2
     letterSpacing: "-0.02em"
     fontFeature: "tnum"
+  title:
+    fontFamily: "Inter, system-ui, sans-serif"
+    fontSize: "24px"
+    fontWeight: 500
+    lineHeight: 1.2
+    letterSpacing: "-0.02em"
   headline:
     fontFamily: "Inter, system-ui, sans-serif"
     fontSize: "18px"
@@ -51,12 +68,30 @@ typography:
     fontWeight: 400
     lineHeight: 1.6
     letterSpacing: "normal"
+  caption:
+    fontFamily: "Inter, system-ui, sans-serif"
+    fontSize: "12px"
+    fontWeight: 400
+    lineHeight: 1.5
+    letterSpacing: "normal"
+  code:
+    fontFamily: "SFMono-Regular, Menlo, Consolas, monospace"
+    fontSize: "12px"
+    fontWeight: 400
+    lineHeight: 1.5
+    letterSpacing: "normal"
   label:
     fontFamily: "Inter, system-ui, sans-serif"
     fontSize: "11px"
     fontWeight: 500
     lineHeight: 1
     letterSpacing: "0.18em"
+  label-small:
+    fontFamily: "Inter, system-ui, sans-serif"
+    fontSize: "10px"
+    fontWeight: 500
+    lineHeight: 1
+    letterSpacing: "0.16em"
   micro:
     fontFamily: "Inter, system-ui, sans-serif"
     fontSize: "9px"
@@ -65,9 +100,11 @@ typography:
     letterSpacing: "0.16em"
 rounded:
   chip: "6px"
-  item: "9px"
+  control: "8px"
+  item: "10px"
   panel: "12px"
   card: "14px"
+  well: "18px"
   pill: "100px"
 spacing:
   xs: "4px"
@@ -230,6 +267,24 @@ a second palette.
   severity in judge reports. Brighter than Peligro so a finding reads louder
   than a button.
 - **Ámbar Advertencia** (`{colors.warn}`): `medio` severity only.
+- **Verde Confirmado** (`{colors.success}`): the one green. It marks a state
+  the system verified, not one a person committed: the n8n binding in sync, a
+  setting saved. It exists because it sits directly beside Ámbar Advertencia on
+  the drift badges, where the accent and the amber would read as one color.
+
+### Neutral, non-palette
+
+Two inks that are not part of the ramp because they are never a surface or a
+text color:
+
+- **Velo** (`{colors.scrim}`): the single scrim behind a modal or an overlay.
+  There is no second opacity.
+- **Tinta de Elevación** (`{colors.ink}`): the one black every sanctioned
+  shadow is mixed from. Distance is carried by offset and blur, never by a
+  different alpha.
+
+`{colors.accent-deep}` is the accent on a light surface, where the yellow
+washes out against white. Light theme only.
 
 ### Named Rules
 
@@ -252,7 +307,9 @@ size, weight, or icon alone.
 system sans stack as fallback. One family for the whole Studio.
 
 **Mono Font:** JetBrains Mono, loaded **only** on `/prueba` as `--font-mono`.
-The Studio has no mono face.
+The Studio loads no mono webfont: where it needs one, for prompt text, diffs
+and JSON payloads, it sets the platform stack
+(`SFMono-Regular, Menlo, Consolas, monospace`) so code costs no bytes.
 
 **Character:** Inter set small, tight, and tracked. Headings pull their
 tracking in (`-0.02em`) so they read as one compact object; labels push theirs
@@ -260,17 +317,29 @@ out (`0.18em`) and go uppercase so they read as etched legends rather than
 words. The tension between those two is the type system.
 
 ### Hierarchy
+- **Greeting** (500, 34px, `-0.02em`): the Editor and Creator welcome line.
+  The one hero moment in the Studio; steps down to Title on a phone.
 - **Display** (500, 28px, tabular figures): version numbers and the few
   headline figures. The one place type is allowed to be large.
+- **Title** (500, 24px, `-0.02em`): page and detail titles.
 - **Headline** (500, 18px, `-0.02em`): modal titles, page headings.
 - **Body** (400, 14px, 1.6): all reading text. This is also the base
   `font-size` on `body`.
 - **Body Small** (400, 13px, 1.6): chat message content, dense panels.
+- **Caption** (400, 12px): metadata and secondary lines inside a card or a row.
+  The workhorse of the dense screens, and the most-used step after Label.
+- **Code** (400, 12px, mono stack): prompt text, diffs, JSON payloads.
 - **Label** (500, 11px, `0.18em`, uppercase): section labels, badges, the
   header pill logo. Buttons use the same size at `0.15em`; field labels at
   `0.12em`.
-- **Micro** (400, 9-11px, `0.16em`, uppercase): the BOT / LEAD role tags above
+- **Label Small** (500, 10px, `0.16em`, uppercase): the tracked capital where
+  11px does not fit, on badges and inline status pills.
+- **Micro** (400, 9px, `0.16em`, uppercase): the BOT / LEAD role tags above
   chat turns, notification section titles.
+
+Half-steps (10.5, 11.5, 12.5, 13.5px) exist in a few places where a component
+needed to sit between two steps. They are tolerated, not a scale: a new
+component picks a step from the list above.
 
 ### Named Rules
 
@@ -331,9 +400,13 @@ document plane, a popover or a floating panel, gets one. Everything else does
 not.
 
 ### Shadow Vocabulary
-- **Detached panel** (`box-shadow: 0 16px 36px rgba(0, 0, 0, 0.38)`): the
+
+Every shadow is mixed from one ink, `{colors.ink}`. Distance is carried by
+offset and blur; a different alpha would be a second ink.
+
+- **Detached panel** (`box-shadow: 0 16px 36px {colors.ink}`): the
   notifications panel and other panels anchored to a trigger.
-- **Detached tooltip** (`box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35)`): the
+- **Detached tooltip** (`box-shadow: 0 8px 24px {colors.ink}`): the
   `InfoHint` tooltip.
 - **Modal**: no shadow. The overlay is `rgba(0, 0, 0, 0.5)` plus
   `backdrop-filter: blur(6px)`, so what is behind stays recognizable as the
@@ -360,11 +433,17 @@ what the element *is*, not by how big it is.
   buttons, the header logo, the nav pill, badges, toasts, the toggle track, the
   notification count, the theme switch, the icon buttons.
 - **Card (`14px`)** for anything that contains: cards, modals, panels, chat
-  bubbles, popovers. `16px` appears on a few larger landing cards; `12px` and
-  `9px` on dense inner items (list rows, notification items).
+  bubbles, popovers.
 - **Chip (`6px`)** is the one deliberately square-ish shape, reserved for the
   LEGACY badge, where the squarer corner is what says "this one is not like the
   others".
+
+Three steps sit between them, each with one job. **Item (`10px`)** is the
+dense inner element: a list row, a note card, a finding, a picker option, and
+it is the most-used radius after the pill. **Control (`8px`)** is the small
+square control or inline block: icon buttons, inline fields, code blocks.
+**Well (`12px`, `18px`)** is a surface something is typed into: the panel and
+the composer.
 
 Borders are `0.5px` everywhere, including the transparent one on `.btn`, so a
 button never changes size when it gains a visible border.
@@ -376,7 +455,8 @@ in a run keeps the full `14px`, so a multi-bubble turn reads as one utterance.
 ### Named Rules
 
 **The Pill-or-Card Rule.** Pressable and token-like is a pill. Containing is a
-card. There is no third shape and no intermediate radius invented per screen.
+card. Anything between them takes a step from the scale above; a radius is
+never invented per screen.
 
 ## Components
 

@@ -1,6 +1,6 @@
 {
   "schemaVersion": 2,
-  "generatedAt": "2026-08-11T00:00:00.000Z",
+  "generatedAt": "2026-08-12T18:12:05.814Z",
   "title": "Design System: ZEBRA · Prompt Studio",
   "extensions": {
     "colorMeta": {
@@ -125,6 +125,30 @@
         "displayName": "Ámbar Advertencia",
         "canonical": "#fbbf24",
         "note": "`medio` severity only. Never a general-purpose accent."
+      },
+      "success": {
+        "role": "tertiary",
+        "displayName": "Verde Confirmado",
+        "canonical": "#22c55e",
+        "note": "A state the system verified rather than one the user committed: n8n in sync, a form saved. It cannot be the accent because it sits next to Ámbar Advertencia on the drift badges, where two yellows would read as one."
+      },
+      "accent-deep": {
+        "role": "primary",
+        "displayName": "Amarillo Profundo",
+        "canonical": "#c9a900",
+        "note": "The accent on a light surface, where #ffd602 washes out against white. Light theme only."
+      },
+      "scrim": {
+        "role": "neutral",
+        "displayName": "Velo",
+        "canonical": "rgba(0, 0, 0, 0.5)",
+        "note": "The single scrim behind a modal or an overlay. There is no second opacity."
+      },
+      "ink": {
+        "role": "neutral",
+        "displayName": "Tinta de Elevación",
+        "canonical": "rgba(0, 0, 0, 0.38)",
+        "note": "The one black every sanctioned shadow is mixed from. Distance is carried by offset and blur, never by a different alpha."
       }
     },
     "typographyMeta": {
@@ -151,6 +175,26 @@
       "micro": {
         "displayName": "Micro",
         "purpose": "BOT / LEAD role tags above chat turns, notification section titles."
+      },
+      "greeting": {
+        "displayName": "Greeting",
+        "purpose": "The Editor and Creator welcome line, the one hero moment in the Studio. Steps down to Title on a phone."
+      },
+      "title": {
+        "displayName": "Title",
+        "purpose": "Page and detail titles: Biblioteca, a client detail, the demo gate."
+      },
+      "caption": {
+        "displayName": "Caption",
+        "purpose": "Metadata and secondary lines inside a card or a row. The step below body-small, and the workhorse of dense screens."
+      },
+      "code": {
+        "displayName": "Code",
+        "purpose": "Prompt text, diffs and JSON payloads, in the system mono stack. JetBrains Mono is loaded only on /prueba."
+      },
+      "label-small": {
+        "displayName": "Label Small",
+        "purpose": "The tracked capital label where 11px does not fit: badges and inline status pills."
       }
     },
     "shadows": [
@@ -161,7 +205,7 @@
       },
       {
         "name": "detached-tooltip",
-        "value": "0 8px 24px rgba(0, 0, 0, 0.35)",
+        "value": "0 8px 24px rgba(0, 0, 0, 0.38)",
         "purpose": "The InfoHint tooltip. The only other sanctioned shadow."
       },
       {
@@ -198,11 +242,26 @@
       }
     ],
     "breakpoints": [
-      { "name": "phone", "value": "600px" },
-      { "name": "narrow", "value": "700px" },
-      { "name": "compact", "value": "760px" },
-      { "name": "tablet", "value": "900px" },
-      { "name": "desktop", "value": "999px" }
+      {
+        "name": "phone",
+        "value": "600px"
+      },
+      {
+        "name": "narrow",
+        "value": "700px"
+      },
+      {
+        "name": "compact",
+        "value": "760px"
+      },
+      {
+        "name": "tablet",
+        "value": "900px"
+      },
+      {
+        "name": "desktop",
+        "value": "999px"
+      }
     ],
     "notes": [
       "Breakpoints are component-local, not a global set. A component breaks at the width its own content stops fitting.",
