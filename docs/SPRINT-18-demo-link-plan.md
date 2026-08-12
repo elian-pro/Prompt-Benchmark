@@ -156,6 +156,29 @@ concreto, el usuario recibe el aviso, lo lee en contexto, lo aprueba y llega al
 Editor con el turno marcado y la respuesta esperada. Cero capturas de pantalla y
 cero Google Docs.
 
+## Añadido después del plan: la bandeja de cambios
+
+El sprint dejó la revisión colgando de la conversación, y esa desviación
+anotada arriba (la nota solo es alcanzable navegando link, conversación, nota)
+resultó ser la fricción real: el usuario tenía que entrar una por una y la tanda
+que llegaba al Editor la decidía la conversación, no él.
+
+`/lab/demo/cambios` es la pestaña que lee todos los reportes de un cliente
+juntos, filtrados por estado, con el turno citado en cada tarjeta para poder
+decidir sin abrir la conversación. Aprobar y descartar usan el mismo `PATCH` de
+siempre, que autoriza por link, conversación y nota. Enviar al Editor manda todo
+lo aprobado que no se haya enviado, agrupado por la versión contra la que se
+escribió cada reporte y sobre la más reciente de la tanda como versión base.
+
+`demo_notes.sent_to_editor_at` y `editor_session_id` (migración `028`) son lo
+que impide que la misma instrucción viaje dos veces ahora que un reporte se
+alcanza desde dos sitios. El filtro vive dentro de `approvedNotes`, junto al de
+aprobación y por la misma razón: una ruta nueva que lo olvide sigue sin poder
+reenviar.
+
+Sigue fuera de alcance deshacer un envío, y la bandeja no muestra las notas que
+el usuario se escribe a sí mismo en el Playground.
+
 ## Fuera de alcance, a propósito
 
 - Adjuntos en la demo pública. `uploads.session_id` apunta a `chat_sessions`,

@@ -4,6 +4,7 @@ import { getSession } from "@/lib/db/demo-sessions";
 import { getLink } from "@/lib/db/demo-links";
 import { getClient } from "@/lib/db/clients";
 import { createSession as createChatSession } from "@/lib/db/chat-sessions";
+import { markNotesSent } from "@/lib/db/demo-notes";
 import { approvedNotes, buildHandoffMessage } from "@/lib/prompts/playground-handoff";
 import { handleError, jsonError } from "@/lib/http";
 
@@ -43,7 +44,15 @@ export async function POST(_req: NextRequest, { params }: Params) {
 
     const approved = approvedNotes(session.notes);
     if (approved.length === 0) {
-      return jsonError("Aprueba al menos un reporte antes de enviar al Editor.", 400);
+      // Nothing to send reads two ways, and telling them apart is the whole
+      // point of stamping a note as sent.
+      const already = session.notes.some((n) => n.sent_to_editor_at);
+      return jsonError(
+        already
+          ? "Ya enviaste al Editor todos los reportes aprobados de esta conversación."
+          : "Aprueba al menos un reporte antes de enviar al Editor.",
+        400,
+      );
     }
 
     const editorSession = await createChatSession({
@@ -60,6 +69,13 @@ export async function POST(_req: NextRequest, { params }: Params) {
       session.notes,
       session.messages,
       { source: "demo-link", clientName: client?.name ?? null },
+    );
+
+    // After the message is composed, so a note that just travelled is not
+    // filtered out of the very document it belongs in.
+    await markNotesSent(
+      approved.map((n) => n.id),
+      editorSession.id,
     );
 
     return NextResponse.json({ editorSessionId: editorSession.id, draftMessage });

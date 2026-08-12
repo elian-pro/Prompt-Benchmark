@@ -6,6 +6,7 @@
  * message of an Editor session.
  */
 import { getSupabase } from "../supabase";
+import type { DemoMessageRow } from "./demo-sessions";
 
 export type DemoNoteSource = "admin" | "client";
 export type DemoNoteStatus = "pending" | "approved" | "rejected";
@@ -27,12 +28,32 @@ export type DemoNoteRow = {
    *  Notes the user writes in the Playground default to `approved`, which is
    *  how every note behaved before demo links existed. */
   status: DemoNoteStatus;
+  /** When this note was handed to the Editor. Null means it is still waiting,
+   *  which is what makes it sendable (migration 028). Set by whichever route
+   *  sent it, so the same instruction cannot travel twice. */
+  sent_to_editor_at: string | null;
+  /** The Editor conversation it went into, for tracing back. */
+  editor_session_id: string | null;
   created_at: string;
   updated_at: string;
 };
 
+/** A client's report as the inbox reads it: the note, where it came from, and
+ *  the turns it tagged, so a verdict can be given without opening the
+ *  conversation it belongs to. */
+export type DemoNoteWithContext = DemoNoteRow & {
+  link_id: string | null;
+  link_label: string | null;
+  version_id: string | null;
+  version_number: string | null;
+  /** The tagged turns, in the order the note lists them. Empty on a general
+   *  note, and short of `message_ids` if a round was wiped. */
+  messages: DemoMessageRow[];
+};
+
 const NOTE_COLS =
-  "id, session_id, text, expected, message_ids, source, status, created_at, updated_at";
+  "id, session_id, text, expected, message_ids, source, status, " +
+  "sent_to_editor_at, editor_session_id, created_at, updated_at";
 
 export async function listNotes(sessionId: string): Promise<DemoNoteRow[]> {
   const sb = getSupabase();
@@ -43,6 +64,79 @@ export async function listNotes(sessionId: string): Promise<DemoNoteRow[]> {
     .order("created_at", { ascending: true });
   if (error) throw new Error(`No se pudieron listar las notas: ${error.message}`);
   return (data ?? []) as unknown as DemoNoteRow[];
+}
+
+/**
+ * Every report a client wrote for this client's prompt, newest first, across
+ * all of their links and conversations.
+ *
+ * Only `source='client'`. The notes the user writes to themselves in the
+ * Playground already leave through that conversation's own handoff, and mixing
+ * them in would turn an inbox of proposals into a list of things half of which
+ * are already decisions.
+ *
+ * Two round trips, not one per note: the reports, then every tagged turn in a
+ * single `in` query. The turns are quoted here rather than fetched by the page
+ * because a verdict without the message it is about is a guess.
+ */
+export async function listClientNotes(clientId: string): Promise<DemoNoteWithContext[]> {
+  const sb = getSupabase();
+  const { data, error } = await sb
+    .from("demo_notes")
+    .select(
+      `${NOTE_COLS}, demo_sessions!inner(client_id, link_id, version_id, ` +
+        "version_number_snapshot, demo_links(label))",
+    )
+    .eq("source", "client")
+    .eq("demo_sessions.client_id", clientId)
+    .order("created_at", { ascending: false });
+  if (error) throw new Error(`No se pudieron listar los reportes: ${error.message}`);
+
+  const rows = (data ?? []) as any[];
+  const messageIds = [...new Set(rows.flatMap((r) => (r.message_ids ?? []) as string[]))];
+  const messagesById = new Map<string, DemoMessageRow>();
+  if (messageIds.length > 0) {
+    const { data: messages, error: mErr } = await sb
+      .from("demo_messages")
+      .select(
+        "id, session_id, turn_number, round, role, content, tool_calls, " +
+          "version_number_snapshot, created_at",
+      )
+      .in("id", messageIds);
+    if (mErr) throw new Error(`No se pudieron obtener los mensajes citados: ${mErr.message}`);
+    for (const m of (messages ?? []) as unknown as DemoMessageRow[]) messagesById.set(m.id, m);
+  }
+
+  return rows.map((row) => {
+    const session = Array.isArray(row.demo_sessions) ? row.demo_sessions[0] : row.demo_sessions;
+    const link = Array.isArray(session?.demo_links) ? session.demo_links[0] : session?.demo_links;
+    const { demo_sessions: _omit, ...note } = row;
+    return {
+      ...(note as DemoNoteRow),
+      link_id: session?.link_id ?? null,
+      link_label: link?.label ?? null,
+      // The version this conversation ran, which is what the report is about:
+      // a link can be pointed at another version mid round of testing.
+      version_id: session?.version_id ?? null,
+      version_number: session?.version_number_snapshot ?? null,
+      messages: ((row.message_ids ?? []) as string[])
+        .map((id) => messagesById.get(id))
+        .filter((m): m is DemoMessageRow => Boolean(m)),
+    };
+  });
+}
+
+/** Stamps the reports that just left for the Editor. Called by every handoff
+ *  route, right after the Editor session exists, so `approvedNotes` stops
+ *  offering them. */
+export async function markNotesSent(noteIds: string[], editorSessionId: string): Promise<void> {
+  if (noteIds.length === 0) return;
+  const sb = getSupabase();
+  const { error } = await sb
+    .from("demo_notes")
+    .update({ sent_to_editor_at: new Date().toISOString(), editor_session_id: editorSessionId })
+    .in("id", noteIds);
+  if (error) throw new Error(`No se pudo marcar los reportes como enviados: ${error.message}`);
 }
 
 /** Confirms every id in `messageIds` belongs to this session, so a note can

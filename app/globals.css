@@ -1250,6 +1250,7 @@ button {
 }
 .header-actions {
   display: flex;
+  align-items: center;
   gap: 10px;
   flex: none;
 }
@@ -2888,6 +2889,36 @@ body[data-theme="light"] .find-replace-band {
   line-height: 1.55;
   color: var(--fg);
   white-space: pre-wrap;
+}
+/* The per client inbox reads the same cards, but it is the page rather than a
+   panel beside a transcript: it scrolls with the document instead of opening a
+   second scroll area inside one, and stays column width so a report is still a
+   paragraph and not a line across the screen. */
+.notes-inbox-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  max-width: 720px;
+}
+/* Where a report came from, reusing the meta row of the link list: it is the
+   same kind of line about the same kind of thing. Only the link inside it is
+   new, since there it was the whole row that was clickable. */
+.note-card .demo-link-meta {
+  margin-top: 10px;
+}
+.note-card .demo-link-meta a {
+  color: var(--fg);
+  text-decoration: none;
+  border-bottom: 0.5px solid var(--border2);
+}
+.note-card .demo-link-meta a:hover {
+  border-bottom-color: var(--accent);
+}
+.notes-send-bar {
+  display: flex;
+  justify-content: flex-end;
+  max-width: 720px;
+  margin-top: 20px;
 }
 .note-composer {
   display: flex;

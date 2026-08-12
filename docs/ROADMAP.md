@@ -186,6 +186,17 @@ del login. Ver la sección de modelo de seguridad en `docs/ARCHITECTURE.md`.
 un mensaje concreto, Carlos recibe el aviso, lo revisa en contexto, lo aprueba y
 aterriza en el Editor con el turno marcado y la respuesta esperada.
 
+**Añadido después: la bandeja de cambios.** Revisar conversación por
+conversación hacía que el tamaño de la tanda que llega al Editor lo decidiera
+la conversación y no el usuario, y no había forma de ver de un vistazo qué se
+había descartado. La pestaña `Cambios` de Demo (`/lab/demo/cambios`) lee todos
+los reportes de un cliente, de todos sus links y conversaciones, con filtros por
+estado; se aprueba o descarta desde ahí y lo aprobado viaja al Editor como un
+solo documento agrupado por versión. Una nota enviada queda marcada
+(`demo_notes.sent_to_editor_at`, migración `028`) y sale de la cola, así que la
+misma instrucción no puede viajar dos veces ni desde la bandeja ni desde su
+conversación.
+
 ## Sprint 19 — El design system de Zebra en toda la app ⏳
 
 La página del cliente (`/prueba`) ya corre con el design system de Zebra

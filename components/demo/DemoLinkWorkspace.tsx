@@ -2,12 +2,13 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { IconArrowRight, IconCheck, IconNotes, IconPencil, IconX } from "@tabler/icons-react";
+import { IconArrowRight, IconNotes } from "@tabler/icons-react";
 
 import type { DemoSessionDetail } from "@/lib/db/demo-sessions";
-import type { DemoNoteRow, DemoNoteStatus } from "@/lib/db/demo-notes";
+import type { DemoNoteRow } from "@/lib/db/demo-notes";
 import { messagePreview } from "@/lib/adversarial-message";
 import { DemoTurn } from "@/components/demo/DemoTurn";
+import { NoteCard, type NoteReviewPatch } from "@/components/demo/NoteCard";
 import { RoundStack, type RoundSummary } from "@/components/demo/RoundStack";
 import { Button } from "@/components/ui/Button";
 import { EmptyState } from "@/components/ui/EmptyState";
@@ -36,9 +37,6 @@ export function DemoLinkWorkspace({
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [busyNoteId, setBusyNoteId] = useState<string | null>(null);
-  const [editingId, setEditingId] = useState<string | null>(null);
-  const [draftText, setDraftText] = useState("");
-  const [draftExpected, setDraftExpected] = useState("");
   const [handingOff, setHandingOff] = useState(false);
   /** Which of the visitor's conversations is on screen. Null means the last
    *  one, which is what they were doing when they stopped. */
@@ -63,10 +61,7 @@ export function DemoLinkWorkspace({
     void load();
   }, [load]);
 
-  async function review(
-    note: DemoNoteRow,
-    patch: { status?: DemoNoteStatus; text?: string | null; expected?: string | null },
-  ) {
+  async function review(note: DemoNoteRow, patch: NoteReviewPatch) {
     setBusyNoteId(note.id);
     setError(null);
     try {
@@ -83,19 +78,12 @@ export function DemoLinkWorkspace({
       setSession((prev) =>
         prev ? { ...prev, notes: prev.notes.map((n) => (n.id === updated.id ? updated : n)) } : prev,
       );
-      setEditingId(null);
       onReviewed?.();
     } catch (e) {
       setError(e instanceof Error ? e.message : "Error al guardar la revisión.");
     } finally {
       setBusyNoteId(null);
     }
-  }
-
-  function startEdit(note: DemoNoteRow) {
-    setEditingId(note.id);
-    setDraftText(note.text ?? "");
-    setDraftExpected(note.expected ?? "");
   }
 
   // Same handoff contract as the Playground: the Editor session is created
@@ -123,7 +111,11 @@ export function DemoLinkWorkspace({
   if (!session) return error ? <p className="form-error">{error}</p> : null;
 
   const notes = session.notes;
-  const approvedCount = notes.filter((n) => n.status === "approved").length;
+  // What the button would actually carry: approved, and not handed over yet by
+  // this panel or by the client's inbox.
+  const sendableCount = notes.filter(
+    (n) => n.status === "approved" && !n.sent_to_editor_at,
+  ).length;
   // note_messages carries the turns from rounds the client restarted past, so a
   // report about one of those still quotes what it was about instead of
   // pointing at a pin that is no longer on screen.
@@ -203,143 +195,27 @@ export function DemoLinkWorkspace({
             />
           )}
           {notes.map((note, i) => (
-            <div key={note.id} className="note-card">
-              <div className="note-head">
-                <span className="chat-pin note-index">{i + 1}</span>
-                {note.message_ids.length === 0 && <span className="note-general">General</span>}
-                <span className={`note-status is-${note.status}`}>
-                  {note.status === "pending"
-                    ? "Sin revisar"
-                    : note.status === "approved"
-                      ? "Aprobada"
-                      : "Descartada"}
-                </span>
-                {note.status !== "pending" && editingId !== note.id && (
-                  <div className="note-actions">
-                    <button
-                      type="button"
-                      className="icon-btn"
-                      onClick={() => startEdit(note)}
-                      aria-label="Editar nota"
-                    >
-                      <IconPencil size={14} />
-                    </button>
-                  </div>
-                )}
-              </div>
-
-              {note.message_ids.length > 0 && (
-                <div className="note-refs">
-                  <span className="section-label">Mensajes que marcó</span>
-                  {note.message_ids.map((mid) => {
-                    const m = messagesById.get(mid);
-                    return (
-                      <div
-                        key={mid}
-                        className={`note-ref${currentIds.has(mid) ? "" : " note-ref-stale"}`}
-                      >
-                        “{m ? messagePreview(m.content) : "(mensaje no disponible)"}”
-                        {!currentIds.has(mid) && (
-                          <span className="note-ref-tag">conversación anterior</span>
-                        )}
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
-
-              {editingId === note.id ? (
-                <div className="note-review-edit">
-                  {/* Same order as the client sees: the fix leads, the
-                      complaint is context. */}
-                  <textarea
-                    className="textarea"
-                    rows={3}
-                    value={draftExpected}
-                    onChange={(e) => setDraftExpected(e.target.value)}
-                    placeholder="Qué debió responder"
-                  />
-                  <textarea
-                    className="textarea"
-                    rows={2}
-                    value={draftText}
-                    onChange={(e) => setDraftText(e.target.value)}
-                    placeholder="Qué está mal"
-                  />
-                  <div className="note-composer-actions">
-                    <Button variant="ghost" size="sm" onClick={() => setEditingId(null)}>
-                      Cancelar
-                    </Button>
-                    <Button
-                      size="sm"
-                      disabled={
-                        !(draftExpected.trim() || draftText.trim()) || busyNoteId === note.id
-                      }
-                      onClick={() =>
-                        review(note, {
-                          expected: draftExpected.trim() || null,
-                          text: draftText.trim() || null,
-                        })
-                      }
-                    >
-                      Guardar
-                    </Button>
-                  </div>
-                </div>
-              ) : (
-                <>
-                  {note.expected && (
-                    <p className="note-field">
-                      <span className="section-label">Debió responder</span>
-                      {note.expected}
-                    </p>
-                  )}
-                  {note.text && (
-                    <p className="note-field">
-                      <span className="section-label">Qué está mal</span>
-                      {note.text}
-                    </p>
-                  )}
-                </>
-              )}
-
-              {note.status === "pending" && editingId !== note.id && (
-                <div className="note-review-actions">
-                  <Button
-                    size="sm"
-                    disabled={busyNoteId === note.id}
-                    onClick={() => review(note, { status: "approved" })}
-                    icon={<IconCheck size={14} />}
-                  >
-                    Aprobar
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    disabled={busyNoteId === note.id}
-                    onClick={() => startEdit(note)}
-                    icon={<IconPencil size={14} />}
-                  >
-                    Editar
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    disabled={busyNoteId === note.id}
-                    onClick={() => review(note, { status: "rejected" })}
-                    icon={<IconX size={14} />}
-                  >
-                    Descartar
-                  </Button>
-                </div>
-              )}
-            </div>
+            <NoteCard
+              key={note.id}
+              note={note}
+              index={i + 1}
+              quotes={note.message_ids.map((mid) => {
+                const m = messagesById.get(mid);
+                return {
+                  id: mid,
+                  preview: m ? messagePreview(m.content) : "(mensaje no disponible)",
+                  stale: !currentIds.has(mid),
+                };
+              })}
+              busy={busyNoteId === note.id}
+              onReview={(patch) => review(note, patch)}
+            />
           ))}
         </div>
 
         {error && <p className="form-error">{error}</p>}
 
-        {approvedCount > 0 && (
+        {sendableCount > 0 && (
           <Button
             variant="primary"
             onClick={sendToEditor}
@@ -348,7 +224,7 @@ export function DemoLinkWorkspace({
           >
             {handingOff
               ? "Abriendo el Editor…"
-              : `Enviar ${approvedCount} al Editor`}
+              : `Enviar ${sendableCount} al Editor`}
           </Button>
         )}
       </aside>

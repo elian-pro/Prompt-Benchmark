@@ -17,6 +17,7 @@ import { EmptyState } from "@/components/ui/EmptyState";
 import { SkeletonRows } from "@/components/ui/Skeleton";
 import { formatDeadlineShortEs, isExpired } from "@/lib/business-days";
 import { NewDemoLinkModal } from "@/components/demo/NewDemoLinkModal";
+import { DemoTabs } from "@/components/demo/DemoTabs";
 
 /**
  * Every demo link, newest first.
@@ -99,13 +100,16 @@ export default function DemoLinksPage() {
             Links de prueba para que el cliente valide su agente
           </p>
         </div>
-        <Button
-          variant="primary"
-          onClick={() => setNewOpen(true)}
-          icon={<IconPlus size={14} stroke={1.5} />}
-        >
-          Nuevo link
-        </Button>
+        <div className="header-actions">
+          <DemoTabs current="links" />
+          <Button
+            variant="primary"
+            onClick={() => setNewOpen(true)}
+            icon={<IconPlus size={14} stroke={1.5} />}
+          >
+            Nuevo link
+          </Button>
+        </div>
       </div>
 
       {error && <p className="form-error">{error}</p>}
