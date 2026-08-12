@@ -39,10 +39,13 @@ export function approvedNotes<T extends DemoNoteRow>(notes: T[]): T[] {
 
 /** One numbered report: the complaint, the fix, and the turns it tagged. */
 function noteBlock(note: DemoNoteRow, index: number, messagesById: Map<string, DemoMessageRow>) {
-  const quotes = note.message_ids
-    .map((mid) => messagesById.get(mid))
-    .filter((m): m is DemoMessageRow => Boolean(m))
-    .map((m) => `   - ${quoteMessage(m)}`);
+  // An id that does not resolve says so out loud. Dropping it silently is how
+  // a caller that read only the active round shipped notes to the Editor with
+  // their quotes missing and nothing on screen to show it.
+  const quotes = note.message_ids.map((mid) => {
+    const m = messagesById.get(mid);
+    return `   - ${m ? quoteMessage(m) : "(mensaje no disponible)"}`;
+  });
 
   // A client's report may carry only the fix, since "what went wrong" is
   // optional for them (migration 024). When that happens the fix leads the

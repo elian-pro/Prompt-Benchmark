@@ -107,6 +107,12 @@ test("quotes the tagged messages", () => {
   assert.ok(out.includes('Bot del cliente: "Abrimos a las 9."'));
 });
 
+test("a quote that cannot be resolved says so instead of vanishing", () => {
+  const out = buildHandoffMessage("1.0", [note({ message_ids: ["gone"] })], []);
+  assert.ok(out.includes("Mensajes citados:"));
+  assert.ok(out.includes("(mensaje no disponible)"));
+});
+
 test("numbering counts only the approved notes", () => {
   const out = buildHandoffMessage(
     "1.0",

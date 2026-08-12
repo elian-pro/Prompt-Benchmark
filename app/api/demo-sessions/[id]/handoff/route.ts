@@ -19,7 +19,12 @@ type Params = { params: Promise<{ id: string }> };
 export async function POST(_req: NextRequest, { params }: Params) {
   try {
     const { id } = await params;
-    const session = await getSession(id);
+    // Every round. The chat only shows the active one, but a note written
+    // before a reset or a version switch still tags turns from the round it
+    // was written in, and those quotes are the context the Editor edits
+    // against. Reading only the active round dropped them without a trace,
+    // since the composer resolves message ids and silently skips misses.
+    const session = await getSession(id, { allRounds: true });
     if (!session) return jsonError("Conversación no encontrada.", 404);
     if (session.status !== "active") {
       return jsonError("Esta conversación ya fue enviada al Editor.", 409);
