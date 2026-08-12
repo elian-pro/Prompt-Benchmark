@@ -19,9 +19,11 @@ export type CatalogModel = {
 
 export const MODEL_CATALOG: Record<AdapterType, CatalogModel[]> = {
   anthropic: [
+    { model_name: "claude-opus-5", display_name: "Claude Opus 5" },
+    { model_name: "claude-sonnet-5", display_name: "Claude Sonnet 5" },
+    // Stays listed while roles still point at it: a <select> whose value is
+    // missing from its options renders blank, not "the old model".
     { model_name: "claude-opus-4-8", display_name: "Claude Opus 4.8" },
-    { model_name: "claude-opus-4-7", display_name: "Claude Opus 4.7" },
-    { model_name: "claude-sonnet-4-6", display_name: "Claude Sonnet 4.6" },
     { model_name: "claude-haiku-4-5", display_name: "Claude Haiku 4.5" },
   ],
   openai_compat: [
@@ -38,8 +40,8 @@ export const MODEL_CATALOG: Record<AdapterType, CatalogModel[]> = {
     { model_name: "gemini-2.0-flash", display_name: "Gemini 2.0 Flash" },
   ],
   openrouter: [
-    { model_name: "anthropic/claude-opus-4-8", display_name: "Claude Opus 4.8" },
-    { model_name: "anthropic/claude-sonnet-4-6", display_name: "Claude Sonnet 4.6" },
+    { model_name: "anthropic/claude-opus-5", display_name: "Claude Opus 5" },
+    { model_name: "anthropic/claude-sonnet-5", display_name: "Claude Sonnet 5" },
     { model_name: "openai/gpt-4o", display_name: "GPT-4o" },
     { model_name: "google/gemini-2.5-pro", display_name: "Gemini 2.5 Pro" },
   ],
