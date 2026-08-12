@@ -28,7 +28,9 @@ and pastes into the corresponding n8n node.
 |---|---|
 | Product behavior, user flows, the 4 sections | `docs/SPEC.md` |
 | Tech stack, file structure, provider architecture, security model | `docs/ARCHITECTURE.md` |
-| Colors, typography, component patterns | `docs/DESIGN-SYSTEM.md` |
+| Colors, typography, components, layout, the `/prueba` boundary | `DESIGN.md` (the visual authority) |
+| Icon vocabulary, empty/loading placeholder specs | `docs/DESIGN-SYSTEM.md` (background notes only) |
+| Durable product truth: users, positioning, constraints | `PRODUCT.md` |
 | All sprints overview | `docs/ROADMAP.md` |
 | Sprint plans (all complete, archived) | `docs/SPRINT-1-archive.md` … `docs/SPRINT-9-archive.md` (no Sprint 7 file, see `docs/N8N-SYNC-PLAN.md`) |
 | Database schema source of truth | `supabase/migrations/` |

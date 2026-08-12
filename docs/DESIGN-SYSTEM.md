@@ -1,8 +1,14 @@
 # Design System
 
+> **Not the authority. `DESIGN.md` at the repo root is.**
+> If this file and `DESIGN.md` disagree, `DESIGN.md` wins and this one is
+> wrong. What survives here is the material `DESIGN.md` does not cover:
+> the icon vocabulary, and the placeholder specs for empty and loading
+> states. Everything else is kept as background notes.
+
 Visual language: monochromatic with a single Zebra-yellow accent (`#FFD602`).
-"Lujo silencioso" — minimal, weighted typography, lots of negative space.
-Reference: ZEBRA · COTI AUTO (sibling product).
+"La Mesa de Instrumentos": minimal, weighted typography, lots of negative
+space. Reference: ZEBRA · COTI AUTO (sibling product).
 
 ## Theme tokens
 
@@ -42,7 +48,9 @@ is dark.
 ## Typography
 
 - **Family**: Inter (via `next/font/google`).
-- **Two weights only**: 400 regular, 500 medium. Never 600 or 700.
+- **Two weights**: 400 regular, 500 medium. One sanctioned exception: 700 on
+  the emphasized team name in the Editor/Creator welcome greeting. 600 exists
+  only inside `.zebra-ds` (the `/prueba` route). See `DESIGN.md`.
 - **Headings**: tight tracking, `letter-spacing: -0.02em`.
 - **Section labels**: MAYÚSCULAS, `letter-spacing: 0.18em`, `font-size: 11px`.
 - **Body**: 14px, `line-height: 1.6`.
@@ -101,8 +109,9 @@ Placeholder uses `--faint`.
 
 - **Bot bubble**: anchored left. `background: var(--surface2)`,
   `color: var(--fg)`, `border-bottom-left-radius: 4px` (cola).
-- **Lead bubble**: anchored right. `background: var(--accent)`,
-  `color: #0A0A0A`, `border-bottom-right-radius: 4px` (cola), weight 500.
+- **Lead bubble**: anchored right, inverted. `background: var(--fg)`,
+  `color: var(--bg)`, `border-color: var(--fg)`,
+  `border-bottom-right-radius: 5px` (cola).
 - Both: max-width 82%, padding `11px 15px`, border-radius 14px (except
   the anchor corner).
 - Above each bubble: small label `BOT` / `LEAD` in 9-11px UPPERCASE

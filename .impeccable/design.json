@@ -1,0 +1,376 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-08-11T00:00:00.000Z",
+  "title": "Design System: ZEBRA · Prompt Studio",
+  "extensions": {
+    "colorMeta": {
+      "accent": {
+        "role": "primary",
+        "displayName": "Amarillo Zebra",
+        "canonical": "#ffd602",
+        "note": "Identical in both themes. Marks live, current, or committed state only.",
+        "tonalRamp": [
+          "oklch(20% 0.05 96)",
+          "oklch(32% 0.08 96)",
+          "oklch(45% 0.11 96)",
+          "oklch(57% 0.14 96)",
+          "oklch(69% 0.16 96)",
+          "oklch(80% 0.175 96)",
+          "oklch(88.5% 0.18 96)",
+          "oklch(95% 0.09 96)"
+        ]
+      },
+      "bg": {
+        "role": "neutral",
+        "displayName": "Fondo Casi Negro",
+        "canonical": "#0a0a0a",
+        "note": "Page ground. Also the text color on yellow fills and on the lead chat bubble.",
+        "tonalRamp": [
+          "#0a0a0a",
+          "#141414",
+          "#1c1c1c",
+          "#262626",
+          "#3a3a3a",
+          "#5a5a5a",
+          "#8a8a8a",
+          "#f5f5f5"
+        ]
+      },
+      "surface": {
+        "role": "neutral",
+        "displayName": "Superficie",
+        "canonical": "#141414",
+        "note": "Step one of a strictly three-tone depth ramp. Cards, panels, modals.",
+        "tonalRamp": [
+          "#0a0a0a",
+          "#141414",
+          "#1c1c1c",
+          "#262626",
+          "#3a3a3a",
+          "#5a5a5a",
+          "#8a8a8a",
+          "#f5f5f5"
+        ]
+      },
+      "surface2": {
+        "role": "neutral",
+        "displayName": "Superficie Anidada",
+        "canonical": "#1c1c1c",
+        "note": "Step two, and the last one. Bot bubbles, toasts, toggle track, hovered rows.",
+        "tonalRamp": [
+          "#0a0a0a",
+          "#141414",
+          "#1c1c1c",
+          "#262626",
+          "#3a3a3a",
+          "#5a5a5a",
+          "#8a8a8a",
+          "#f5f5f5"
+        ]
+      },
+      "border": {
+        "role": "neutral",
+        "displayName": "Borde",
+        "canonical": "#262626",
+        "note": "The default 0.5px hairline at rest."
+      },
+      "border2": {
+        "role": "neutral",
+        "displayName": "Borde Activo",
+        "canonical": "#3a3a3a",
+        "note": "The hairline on hover, focus, modal edges, and the input bottom rule. State changes the border's color, never its width."
+      },
+      "fg": {
+        "role": "neutral",
+        "displayName": "Texto Primario",
+        "canonical": "#f5f5f5",
+        "note": "Body and headings. Doubles as a surface on the lead chat bubble, where the ramp inverts."
+      },
+      "muted": {
+        "role": "neutral",
+        "displayName": "Texto Secundario",
+        "canonical": "#8a8a8a",
+        "note": "Labels, metadata, inactive nav, hints."
+      },
+      "faint": {
+        "role": "neutral",
+        "displayName": "Texto Terciario",
+        "canonical": "#5a5a5a",
+        "note": "Placeholders, timestamps, the (opcional) tag. Never body text."
+      },
+      "danger": {
+        "role": "tertiary",
+        "displayName": "Rojo Peligro",
+        "canonical": "#e24b4a",
+        "note": "Destructive actions and the notification count.",
+        "tonalRamp": [
+          "oklch(22% 0.06 25)",
+          "oklch(32% 0.10 25)",
+          "oklch(42% 0.14 25)",
+          "oklch(52% 0.17 25)",
+          "oklch(62% 0.18 25)",
+          "oklch(72% 0.15 25)",
+          "oklch(84% 0.09 25)",
+          "oklch(94% 0.03 25)"
+        ]
+      },
+      "danger-soft": {
+        "role": "tertiary",
+        "displayName": "Rojo Alerta",
+        "canonical": "#f87171",
+        "note": "Error status and `crítico` severity in judge reports. Brighter than Peligro so a finding reads louder than a button."
+      },
+      "warn": {
+        "role": "tertiary",
+        "displayName": "Ámbar Advertencia",
+        "canonical": "#fbbf24",
+        "note": "`medio` severity only. Never a general-purpose accent."
+      }
+    },
+    "typographyMeta": {
+      "display": {
+        "displayName": "Display",
+        "purpose": "Version numbers and headline figures, in tabular figures. The only place type is allowed to be large."
+      },
+      "headline": {
+        "displayName": "Headline",
+        "purpose": "Modal titles and page headings. Tracking pulled in to -0.02em."
+      },
+      "body": {
+        "displayName": "Body",
+        "purpose": "All reading text. Also the base font-size on body."
+      },
+      "body-small": {
+        "displayName": "Body Small",
+        "purpose": "Chat message content and dense panels."
+      },
+      "label": {
+        "displayName": "Label",
+        "purpose": "Section labels, badges, header pill logo. Uppercase, tracked 0.18em. Buttons use 0.15em, field labels 0.12em."
+      },
+      "micro": {
+        "displayName": "Micro",
+        "purpose": "BOT / LEAD role tags above chat turns, notification section titles."
+      }
+    },
+    "shadows": [
+      {
+        "name": "detached-panel",
+        "value": "0 16px 36px rgba(0, 0, 0, 0.38)",
+        "purpose": "Panels anchored to a trigger and floating above the page plane (notifications panel)."
+      },
+      {
+        "name": "detached-tooltip",
+        "value": "0 8px 24px rgba(0, 0, 0, 0.35)",
+        "purpose": "The InfoHint tooltip. The only other sanctioned shadow."
+      },
+      {
+        "name": "guest-lift",
+        "value": "0 0 0 1px rgba(255, 255, 255, 0.06), 0 6px 16px -4px rgba(0, 0, 0, 0.55)",
+        "purpose": "Hover lift on buttons inside .zebra-ds (/prueba) only. Never in the Studio."
+      }
+    ],
+    "motion": [
+      {
+        "name": "studio-state",
+        "value": "0.15s",
+        "purpose": "Default Studio transition, limited to background, border-color and color. No transform at rest."
+      },
+      {
+        "name": "studio-toggle",
+        "value": "0.18s ease",
+        "purpose": "Theme switch knob and icon color."
+      },
+      {
+        "name": "collapse",
+        "value": "0.28s cubic-bezier(0.22, 1, 0.36, 1)",
+        "purpose": "Collapsible card grid-template-rows expansion."
+      },
+      {
+        "name": "guest-ease",
+        "value": "0.18s cubic-bezier(0.16, 1, 0.3, 1)",
+        "purpose": "The /prueba easing, used for the button lift, field borders and focus ring."
+      },
+      {
+        "name": "reduced-motion",
+        "value": "prefers-reduced-motion: reduce → transition: none",
+        "purpose": "Honored on collapsibles and button press transforms."
+      }
+    ],
+    "breakpoints": [
+      { "name": "phone", "value": "600px" },
+      { "name": "narrow", "value": "700px" },
+      { "name": "compact", "value": "760px" },
+      { "name": "tablet", "value": "900px" },
+      { "name": "desktop", "value": "999px" }
+    ],
+    "notes": [
+      "Breakpoints are component-local, not a global set. A component breaks at the width its own content stops fitting.",
+      "Tokens are declared on body[data-theme=\"dark\"|\"light\"] in app/globals.css. Dark is the default and the theme the system was drawn in.",
+      "The /prueba route reassigns the same variable names inside .zebra-ds so shared component CSS re-skins itself. See The Guest World Rule."
+    ]
+  },
+  "components": [
+    {
+      "name": "Primary Button",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "The commit action. Yellow fill, near-black text, no hover change: the fill is already the loudest thing on screen.",
+      "html": "<button class=\"ds-btn ds-btn-primary\">Guardar versión</button>",
+      "css": ".ds-btn { display: inline-flex; align-items: center; gap: 8px; padding: 10px 18px; font-family: Inter, system-ui, sans-serif; font-size: 11px; font-weight: 500; letter-spacing: 0.15em; text-transform: uppercase; border-radius: 100px; border: 0.5px solid transparent; background: transparent; color: var(--fg, #f5f5f5); cursor: pointer; transition: background 0.15s, border-color 0.15s, color 0.15s; } .ds-btn:disabled { opacity: 0.4; cursor: not-allowed; } .ds-btn:focus-visible { outline: 2px solid var(--accent, #ffd602); outline-offset: 2px; } .ds-btn-primary { background: var(--accent, #ffd602); color: #0a0a0a; }"
+    },
+    {
+      "name": "Secondary Button",
+      "kind": "button",
+      "refersTo": "button-secondary",
+      "description": "The default action. Transparent with an active hairline. Same metrics as primary so the two never shift layout against each other.",
+      "html": "<button class=\"ds-btn ds-btn-secondary\">Cancelar</button>",
+      "css": ".ds-btn { display: inline-flex; align-items: center; gap: 8px; padding: 10px 18px; font-family: Inter, system-ui, sans-serif; font-size: 11px; font-weight: 500; letter-spacing: 0.15em; text-transform: uppercase; border-radius: 100px; border: 0.5px solid transparent; background: transparent; color: var(--fg, #f5f5f5); cursor: pointer; transition: background 0.15s, border-color 0.15s, color 0.15s; } .ds-btn:focus-visible { outline: 2px solid var(--accent, #ffd602); outline-offset: 2px; } .ds-btn-secondary { border-color: var(--border2, #3a3a3a); color: var(--fg, #f5f5f5); } .ds-btn-secondary:hover { border-color: var(--fg, #f5f5f5); }"
+    },
+    {
+      "name": "Danger Button",
+      "kind": "button",
+      "refersTo": "button-danger",
+      "description": "The one variant that inverts on hover. Outline at rest, solid red under the cursor, so a destructive action announces itself before the click.",
+      "html": "<button class=\"ds-btn ds-btn-danger\">Sí, eliminar</button>",
+      "css": ".ds-btn { display: inline-flex; align-items: center; gap: 8px; padding: 10px 18px; font-family: Inter, system-ui, sans-serif; font-size: 11px; font-weight: 500; letter-spacing: 0.15em; text-transform: uppercase; border-radius: 100px; border: 0.5px solid transparent; background: transparent; cursor: pointer; transition: background 0.15s, border-color 0.15s, color 0.15s; } .ds-btn:focus-visible { outline: 2px solid var(--accent, #ffd602); outline-offset: 2px; } .ds-btn-danger { border-color: var(--danger, #e24b4a); color: var(--danger, #e24b4a); } .ds-btn-danger:hover:not(:disabled) { background: var(--danger, #e24b4a); color: #fff; }"
+    },
+    {
+      "name": "Field",
+      "kind": "input",
+      "refersTo": "input",
+      "description": "The system's most distinctive primitive: no box. A tracked uppercase label over a bare bottom rule.",
+      "html": "<div class=\"ds-field\"><label class=\"ds-field-label\">Nombre del cliente <span class=\"ds-field-optional\">(opcional)</span></label><input class=\"ds-input\" placeholder=\"Chapur\" /></div>",
+      "css": ".ds-field { display: flex; flex-direction: column; gap: 4px; } .ds-field-label { font-family: Inter, system-ui, sans-serif; font-size: 11px; font-weight: 500; letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted, #8a8a8a); } .ds-field-optional { text-transform: none; letter-spacing: normal; color: var(--faint, #5a5a5a); font-weight: 400; } .ds-input { width: 100%; background: transparent; border: none; border-bottom: 0.5px solid var(--border2, #3a3a3a); padding: 12px 0; font-family: Inter, system-ui, sans-serif; font-size: 14px; line-height: 1.5; color: var(--fg, #f5f5f5); outline: none; transition: border-color 0.15s; } .ds-input::placeholder { color: var(--faint, #5a5a5a); } .ds-input:focus { border-color: var(--fg, #f5f5f5); }"
+    },
+    {
+      "name": "Card",
+      "kind": "card",
+      "refersTo": "card",
+      "description": "Flat container. On hover only the hairline brightens: no lift, no fill change, no shadow.",
+      "html": "<div class=\"ds-card\"><div class=\"ds-section-label\">Versión actual</div><div class=\"ds-display\">v2.4</div><p class=\"ds-body\">Promovida al nodo de n8n hace 3 días.</p></div>",
+      "css": ".ds-card { background: var(--surface, #141414); border: 0.5px solid var(--border, #262626); border-radius: 14px; padding: 22px; transition: border-color 0.15s; } .ds-card:hover { border-color: var(--border2, #3a3a3a); } .ds-section-label { font-family: Inter, system-ui, sans-serif; text-transform: uppercase; letter-spacing: 0.18em; font-size: 11px; font-weight: 500; color: var(--muted, #8a8a8a); } .ds-display { font-family: Inter, system-ui, sans-serif; font-size: 28px; font-weight: 500; letter-spacing: -0.02em; line-height: 1.2; color: var(--fg, #f5f5f5); font-feature-settings: \"tnum\"; margin: 10px 0 6px; } .ds-body { font-family: Inter, system-ui, sans-serif; font-size: 14px; line-height: 1.6; color: var(--muted, #8a8a8a); margin: 0; }"
+    },
+    {
+      "name": "Badges",
+      "kind": "chip",
+      "refersTo": "badge-new",
+      "description": "Three states, three shapes. Filled pill for new, outlined pill for a pending version, and a squarer 6px corner for LEGACY: the corner is the signal.",
+      "html": "<span class=\"ds-badge ds-badge-new\">Nuevo</span> <span class=\"ds-badge ds-badge-version\">Nueva versión</span> <span class=\"ds-badge ds-badge-legacy\">Legacy</span>",
+      "css": ".ds-badge { display: inline-flex; align-items: center; padding: 3px 9px; font-family: Inter, system-ui, sans-serif; font-size: 11px; font-weight: 500; letter-spacing: 0.18em; text-transform: uppercase; } .ds-badge-new { background: var(--accent, #ffd602); color: #0a0a0a; border-radius: 100px; } .ds-badge-version { background: transparent; border: 0.5px solid var(--accent, #ffd602); color: var(--accent, #ffd602); border-radius: 100px; } .ds-badge-legacy { background: var(--surface2, #1c1c1c); color: var(--muted, #8a8a8a); border-radius: 6px; letter-spacing: 0.1em; }"
+    },
+    {
+      "name": "Header Nav Pill",
+      "kind": "nav",
+      "refersTo": null,
+      "description": "Navigation as an opaque pill so labels survive the dotted background behind the Editor/Creator landing. Every nav icon is yellow regardless of active state.",
+      "html": "<nav class=\"ds-nav\"><a class=\"ds-nav-link is-active\"><svg class=\"ds-nav-icon\" width=\"14\" height=\"14\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.75\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M12 3v18M3 12h18\"/></svg>Lab</a><a class=\"ds-nav-link\"><svg class=\"ds-nav-icon\" width=\"14\" height=\"14\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.75\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M4 20h4L18.5 9.5a2.1 2.1 0 0 0-3-3L5 17v3z\"/></svg>Editor</a><a class=\"ds-nav-link\"><svg class=\"ds-nav-icon\" width=\"14\" height=\"14\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.75\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M4 5h6v14H4zM14 5h6v14h-6z\"/></svg>Library</a></nav>",
+      "css": ".ds-nav { display: inline-flex; align-items: center; gap: 22px; background: var(--surface, #141414); border: 0.5px solid var(--border, #262626); border-radius: 100px; padding: 8px 22px; } .ds-nav-link { display: inline-flex; align-items: center; gap: 6px; font-family: Inter, system-ui, sans-serif; font-size: 11px; font-weight: 500; letter-spacing: 0.15em; text-transform: uppercase; color: var(--muted, #8a8a8a); text-decoration: none; cursor: pointer; padding-bottom: 2px; border-bottom: 2px solid transparent; transition: color 0.15s, border-color 0.15s; } .ds-nav-link:hover { color: var(--fg, #f5f5f5); } .ds-nav-link.is-active { color: var(--fg, #f5f5f5); border-bottom-color: var(--accent, #ffd602); } .ds-nav-icon { color: var(--accent, #ffd602); }"
+    },
+    {
+      "name": "Chat Transcript",
+      "kind": "custom",
+      "refersTo": "chat-msg-bot",
+      "description": "The signature surface. A bot reply splits into one bubble per line break the way n8n delivers it to WhatsApp; only the last bubble of a run keeps its full corner. The lead's turn inverts the ramp so the human reads as the loud one.",
+      "html": "<div class=\"ds-chat\"><div class=\"ds-turn ds-turn-bot\"><div class=\"ds-role\">Bot del cliente</div><div class=\"ds-msg\">Hola, buen día.</div><div class=\"ds-msg ds-msg-last\">¿Me compartes tu nombre para darte seguimiento?</div></div><div class=\"ds-turn ds-turn-lead\"><div class=\"ds-role\">Lead</div><div class=\"ds-msg ds-msg-last\">soy carlos, busco algo de 3 recámaras</div></div></div>",
+      "css": ".ds-chat { display: flex; flex-direction: column; gap: 14px; font-family: Inter, system-ui, sans-serif; } .ds-turn { display: flex; flex-direction: column; gap: 3px; max-width: 92%; } .ds-turn-bot { align-self: flex-start; align-items: flex-start; } .ds-turn-lead { align-self: flex-end; align-items: flex-end; } .ds-role { font-size: 9px; letter-spacing: 0.16em; text-transform: uppercase; color: var(--muted, #8a8a8a); margin-bottom: 2px; padding: 0 2px; } .ds-msg { padding: 10px 16px; border-radius: 14px; border: 0.5px solid var(--border, #262626); font-size: 13px; line-height: 1.6; max-width: 100%; } .ds-turn-bot .ds-msg { background: var(--surface2, #1c1c1c); color: var(--fg, #f5f5f5); border-bottom-left-radius: 5px; } .ds-turn-bot .ds-msg-last { border-bottom-left-radius: 14px; } .ds-turn-lead .ds-msg { background: var(--fg, #f5f5f5); color: var(--bg, #0a0a0a); border-color: var(--fg, #f5f5f5); border-bottom-right-radius: 5px; } .ds-turn-lead .ds-msg-last { border-bottom-right-radius: 14px; }"
+    },
+    {
+      "name": "Toggle Switch",
+      "kind": "custom",
+      "refersTo": null,
+      "description": "38x20 track on a hairline, knob turns near-black when the track goes yellow. The one control where the accent doubles as an on-state fill.",
+      "html": "<label class=\"ds-switch\"><input type=\"checkbox\" checked /><span class=\"ds-slider\"></span></label>",
+      "css": ".ds-switch { position: relative; display: inline-block; width: 38px; height: 20px; flex: none; } .ds-switch input { opacity: 0; width: 0; height: 0; } .ds-slider { position: absolute; inset: 0; background: var(--surface2, #1c1c1c); border: 0.5px solid var(--border2, #3a3a3a); border-radius: 100px; cursor: pointer; transition: 0.15s; } .ds-slider::before { content: \"\"; position: absolute; height: 14px; width: 14px; left: 2px; top: 2px; background: var(--faint, #5a5a5a); border-radius: 50%; transition: 0.15s; } .ds-switch input:checked + .ds-slider { background: var(--accent, #ffd602); border-color: var(--accent, #ffd602); } .ds-switch input:checked + .ds-slider::before { transform: translateX(18px); background: #0a0a0a; }"
+    }
+  ],
+  "narrative": {
+    "northStar": "La Mesa de Instrumentos",
+    "overview": "This is an instrument panel, not a website. Everything on screen is drawn with the thinnest line that still reads: hairline borders at 0.5px, a near-black ground, one signal color. Nothing is decorated, because every mark on an instrument is supposed to mean something, and a mark that means nothing makes the panel harder to read. The operator is a professional who looks at this tool for hours; the design's job is to stay legible and stay out of the way.\n\nThe density is deliberate and calm. Type is small (14px body) but generously led (1.6), section labels are set in tracked capitals like the etched legends on a control surface, and the one place the type goes large is a version number, in tabular figures, because a number is the reading you came for. The palette is a monochrome gray ramp with a single yellow that appears only where something is live, current, or about to be committed. The interface is discreet but tactile: at rest nothing moves and nothing floats, but a control you can press acknowledges you, and the pressable surfaces are the only ones that ever do.\n\nThe system has an explicit border. Everything above describes the Studio, the internal tool. The one client-facing route, /prueba/<token>, runs a different world on purpose. Confirmed anti-reference for the Studio: the generic SaaS dashboard look, boxed inputs with heavy 1px borders on filled fields, and drop-shadowed cards floating on a gray page.",
+    "keyCharacteristics": [
+      "Hairlines (0.5px), never full-weight borders, in the Studio.",
+      "One accent (#ffd602), used only for live, current, or committed state.",
+      "Two font weights (400/500). No 600 in the Studio.",
+      "Uppercase tracked labels (0.18em) as the system's structural voice.",
+      "Flat by default; depth comes from tonal layering, not shadow.",
+      "Pill (100px) for anything pressable, 14px for anything containing.",
+      "Dark is the default theme and the one the system was drawn in."
+    ],
+    "rules": [
+      {
+        "name": "The One Signal Rule",
+        "body": "Yellow means live, current, or committed. If an element is not in one of those three states, it is gray. Adding yellow for emphasis, for decoration, or to make a screen \"less flat\" breaks the only color-coding the tool has.",
+        "section": "colors"
+      },
+      {
+        "name": "The Two-Step Surface Rule",
+        "body": "Depth is exactly three tones deep: ground, surface, nested surface. There is no fourth step. A panel that needs to sit inside a nested surface changes its border, not its fill.",
+        "section": "colors"
+      },
+      {
+        "name": "The Severity Ladder Rule",
+        "body": "crítico is danger-soft, medio is warn, bajo is muted. Severity is never communicated by size, weight, or icon alone.",
+        "section": "colors"
+      },
+      {
+        "name": "The Two Weights Rule",
+        "body": "400 and 500. That is the whole scale. There is one sanctioned exception in the Studio, the emphasized team name in the Editor/Creator welcome greeting, which loads 700 and is the only 700 on any Studio screen. Do not add a third weight to create hierarchy; use size, color, or tracking.",
+        "section": "typography"
+      },
+      {
+        "name": "The Tracked Capitals Rule",
+        "body": "Anything that names or classifies rather than reads (label, badge, button, role tag, field label) is uppercase and tracked. Anything a person reads as a sentence is sentence case and untracked. There is no middle category.",
+        "section": "typography"
+      },
+      {
+        "name": "The Tabular Figures Rule",
+        "body": "Any number that will be compared against another number (versions, counts, durations) sets font-feature-settings: \"tnum\".",
+        "section": "typography"
+      },
+      {
+        "name": "The One Column Rule",
+        "body": "The Studio never grows a persistent sidebar. Everything lives in one 1100px column under one header row. A screen that needs a second pane makes it a grid inside the column, and that pane collapses first.",
+        "section": "layout"
+      },
+      {
+        "name": "The Flat-Unless-Detached Rule",
+        "body": "If an element is part of the page, it has no shadow. If it has left the page (popover, tooltip, floating panel), it has exactly one of the two sanctioned shadows. There is no third shadow and no elevation scale.",
+        "section": "elevation"
+      },
+      {
+        "name": "The Hairline Rule",
+        "body": "Borders in the Studio are 0.5px. A border never thickens to show state; it changes color. On /prueba the same rule holds at 1px.",
+        "section": "elevation"
+      },
+      {
+        "name": "The Pill-or-Card Rule",
+        "body": "Pressable and token-like is a pill (100px). Containing is a card (14px). There is no third shape and no intermediate radius invented per screen.",
+        "section": "shapes"
+      },
+      {
+        "name": "The Guest World Rule",
+        "body": "/prueba/<token> is not the Studio. It is the one client-facing route and it runs the Zebra corporate system (Virtual Stripes 26) scoped entirely to the .zebra-ds wrapper in app/prueba/zebra-ds.css, by reassigning the same CSS variable names inside that scope. Inside .zebra-ds only: the accent is white, hairlines are 1px, buttons are 10px radius in sentence case with a 2px hover lift, radii run 6/8/10/12, 600 is bold, eyebrows are JetBrains Mono at 0.22em, focus is an animated 1px ring on pressable elements only, base reading size is 15px with fields at 16px under 900px, icons are stroke-width 1.5, and under 900px the route is a fixed-viewport chat. Style it by adding rules to that file; never let a corporate-DS value leak into app/globals.css.",
+        "section": "dos-and-donts"
+      }
+    ],
+    "dos": [
+      "Do use 0.5px hairlines and change their color to show state, never their width.",
+      "Do keep the accent at #ffd602 and spend it only on live, current, or committed state.",
+      "Do write every label, badge and button in uppercase with tracking (0.18em labels, 0.15em buttons, 0.12em field labels).",
+      "Do give both themes a real value for anything you add. Tokens are declared on body[data-theme=\"dark\"|\"light\"] in app/globals.css; a literal color in a component is a bug in one of the two themes.",
+      "Do use pill for pressable, 14px for containing.",
+      "Do honor prefers-reduced-motion: reduce on anything that moves.",
+      "Do keep transitions at 0.15s in the Studio and limited to background, border-color, color."
+    ],
+    "donts": [
+      "Don't add a drop shadow to anything that has not left the page plane. Cards, inputs, modals and bubbles are flat.",
+      "Don't put a box around an input. Bottom rule only.",
+      "Don't introduce a third font weight in the Studio. 400 and 500, plus the one sanctioned 700 in the Editor/Creator welcome greeting.",
+      "Don't add a fourth surface tone. Ground, surface, nested surface.",
+      "Don't use yellow as a decorative accent, a large fill, or a background for reading text.",
+      "Don't use an em dash anywhere, including UI strings. This is a project-wide rule, not only a visual one.",
+      "Don't ship English UI copy. Visible strings are Spanish; code, comments and class names are English.",
+      "Don't invent a new radius, tracking value, or breakpoint for one screen."
+    ]
+  }
+}
