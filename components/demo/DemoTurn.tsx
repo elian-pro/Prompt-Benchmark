@@ -217,11 +217,11 @@ export function DemoTurn({
       )}
       {debug && (
         <details className="chat-tools" onClick={(e) => e.stopPropagation()}>
-          <summary>Debug: {debug.reglaAplicada}</summary>
+          <summary>Razonamiento: {debug.reglaAplicada}</summary>
           <div className="chat-tool-step">
             <span className="chat-tool-name">razonamiento</span>
             <code>{debug.razonamiento}</code>
-            <span className="chat-tool-name">regla_aplicada</span>
+            <span className="chat-tool-name">regla aplicada</span>
             <code>{debug.reglaAplicada}</code>
           </div>
         </details>

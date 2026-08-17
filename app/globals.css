@@ -3861,6 +3861,8 @@ body[data-theme="light"] .dot-grid::after {
   font-size: 12px;
   color: var(--muted);
   white-space: nowrap;
+  /* The label wraps its control, so the text toggles it too. */
+  cursor: pointer;
 }
 .sync-ok,
 .sync-err {

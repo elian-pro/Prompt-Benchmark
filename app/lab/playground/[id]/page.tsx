@@ -695,14 +695,18 @@ export default function PlaygroundSessionPage() {
                 disabled={sending || !isActive}
               />
               <div className="idle-composer-footrow">
+                {/* One label wraps both, so the text is a click target too. */}
                 <label className="switch-inline">
-                  <input
-                    type="checkbox"
-                    checked={debug}
-                    onChange={(e) => toggleDebug(e.target.checked)}
-                    disabled={!isActive}
-                  />
-                  <span>Modo debug</span>
+                  <span className="switch">
+                    <input
+                      type="checkbox"
+                      checked={debug}
+                      onChange={(e) => toggleDebug(e.target.checked)}
+                      disabled={!isActive}
+                    />
+                    <span className="slider" />
+                  </span>
+                  <span>Razonamiento</span>
                 </label>
                 <span className="idle-composer-hint">
                   {sending ? "Enviando…" : "⌘/Ctrl + Enter para enviar"}
