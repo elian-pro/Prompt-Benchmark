@@ -83,6 +83,12 @@ export type ChatRequest = {
    *  which delegates to it) supports these; `chat()` rejects the rest rather
    *  than silently dropping them. */
   tools?: ToolDef[];
+  /** OpenAI structured output. Same adapter support as tools; `chat()` rejects
+   *  the rest rather than silently dropping it. */
+  responseFormat?: {
+    type: "json_schema";
+    json_schema: { name: string; strict: boolean; schema: Record<string, unknown> };
+  };
 };
 
 export type ChatResponse = {

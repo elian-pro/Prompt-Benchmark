@@ -62,6 +62,13 @@ export async function chat(req: ChatRequest): Promise<ChatResponse> {
       `El proveedor "${name}" no admite herramientas. Asigna uno de OpenAI al rol Bot de prueba en Configuración.`,
     );
   }
+  // Same reasoning for structured output: a debug turn that silently loses its
+  // schema looks like a model failure, not a config one.
+  if (req.responseFormat && !TOOL_CAPABLE.includes(type)) {
+    throw new Error(
+      `El proveedor "${name}" no admite salida estructurada. Asigna uno de OpenAI al rol Bot de prueba en Configuración.`,
+    );
+  }
   return adapter.chat(req, ctx);
 }
 

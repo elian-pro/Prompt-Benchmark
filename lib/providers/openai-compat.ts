@@ -86,6 +86,7 @@ function buildBody(req: ChatRequest, stream: boolean) {
     ...(req.tools?.length
       ? { tools: req.tools.map(toOpenAiFunction), tool_choice: "auto" }
       : {}),
+    ...(req.responseFormat ? { response_format: req.responseFormat } : {}),
   });
 }
 
