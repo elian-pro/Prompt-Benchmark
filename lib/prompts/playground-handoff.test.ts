@@ -107,6 +107,38 @@ test("quotes the tagged messages", () => {
   assert.ok(out.includes('Bot del cliente: "Abrimos a las 9."'));
 });
 
+test("a debug-mode turn quotes the bot's reasoning under the message", () => {
+  const out = buildHandoffMessage(
+    "1.0",
+    [note({ message_ids: ["m1"] })],
+    [
+      message(
+        "m1",
+        "bot",
+        JSON.stringify({
+          razonamiento: "El lead ya dio la cantidad, paso a validar el material.",
+          regla_aplicada: "PREGUNTA 5: CANTIDAD",
+          estado: "activo",
+          mensajes: ["Abrimos a las 9."],
+        }),
+      ),
+    ],
+  );
+  assert.ok(out.includes('Bot del cliente: "Abrimos a las 9."'));
+  assert.ok(out.includes("[razonamiento del bot: El lead ya dio la cantidad, paso a validar el material.]"));
+  assert.ok(out.includes("[regla aplicada: PREGUNTA 5: CANTIDAD]"));
+});
+
+test("a turn without debug fields quotes exactly as before", () => {
+  const out = buildHandoffMessage(
+    "1.0",
+    [note({ message_ids: ["m1"] })],
+    [message("m1", "bot", JSON.stringify({ estado: "activo", mensajes: ["Abrimos a las 9."] }))],
+  );
+  assert.ok(out.includes('- Bot del cliente: "Abrimos a las 9."'));
+  assert.ok(!out.includes("razonamiento"));
+});
+
 test("a quote that cannot be resolved says so instead of vanishing", () => {
   const out = buildHandoffMessage("1.0", [note({ message_ids: ["gone"] })], []);
   assert.ok(out.includes("Mensajes citados:"));

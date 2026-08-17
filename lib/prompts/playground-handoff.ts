@@ -12,7 +12,7 @@
  */
 import type { DemoMessageRow, DemoMessageRole } from "../db/demo-sessions";
 import type { DemoNoteRow, DemoNoteWithContext } from "../db/demo-notes";
-import { parseTurn } from "../adversarial-message.ts";
+import { parseDebug, parseTurn } from "../adversarial-message.ts";
 
 const ROLE_LABEL: Record<DemoMessageRole, string> = {
   human: "Tú (lead)",
@@ -22,7 +22,16 @@ const ROLE_LABEL: Record<DemoMessageRole, string> = {
 function quoteMessage(m: DemoMessageRow): string {
   const { message } = parseTurn(m.content);
   const text = message || "(sin mensaje)";
-  return `${ROLE_LABEL[m.role]}: "${text}"`;
+  const base = `${ROLE_LABEL[m.role]}: "${text}"`;
+  // A turn generated with the Playground's debug mode carries the bot's own
+  // reasoning. Quoting it gives the Editor the why, not just the what.
+  const debug = m.role === "bot" ? parseDebug(m.content) : null;
+  if (!debug) return base;
+  return [
+    base,
+    `     [razonamiento del bot: ${debug.razonamiento}]`,
+    `     [regla aplicada: ${debug.reglaAplicada}]`,
+  ].join("\n");
 }
 
 /**
