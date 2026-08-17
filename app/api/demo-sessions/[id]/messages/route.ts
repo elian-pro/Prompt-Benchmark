@@ -30,7 +30,7 @@ export async function POST(req: NextRequest, { params }: Params) {
     }
 
     const input = appendDemoMessageSchema.parse(await req.json());
-    const result = await runDemoTurn(session, input.content);
+    const result = await runDemoTurn(session, input.content, input.debug ?? false);
     return NextResponse.json(result);
   } catch (err) {
     return handleError(err);

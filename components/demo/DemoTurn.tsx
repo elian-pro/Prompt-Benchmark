@@ -4,7 +4,7 @@ import { IconCheck, IconPencil } from "@tabler/icons-react";
 
 import type { DemoMessageRole } from "@/lib/db/demo-sessions";
 import type { ToolStep } from "@/lib/client-tools";
-import { parseTurnBubbles } from "@/lib/adversarial-message";
+import { parseDebug, parseTurnBubbles } from "@/lib/adversarial-message";
 import { parseRichText } from "@/lib/rich-text";
 
 /**
@@ -71,6 +71,7 @@ export function DemoTurn({
   registerRef,
   onEditOpening,
   toolCalls,
+  showDebug = false,
 }: {
   id: string;
   role: DemoMessageRole;
@@ -90,6 +91,9 @@ export function DemoTurn({
   /** When set, this turn is the editable opening message: shows a pencil that
    *  opens the edit modal (Sprint 15). */
   onEditOpening?: () => void;
+  /** Show the debug metadata (razonamiento, regla_aplicada) a debug-mode turn
+   *  carries. Playground only: the client's own link never passes this. */
+  showDebug?: boolean;
 }) {
   const side = role === "bot" ? "turn-bot" : "turn-lead";
   const roleLabel = role === "bot" ? labels.bot : labels.human;
@@ -104,6 +108,7 @@ export function DemoTurn({
       : [emptyBotMessage(state)];
   const isEmpty = malformed || messages.length === 0;
   const selectable = Boolean(onToggleSelect);
+  const debug = showDebug && role === "bot" ? parseDebug(content) : null;
 
   return (
     <div
@@ -208,6 +213,17 @@ export function DemoTurn({
               <code>{step.preview}</code>
             </div>
           ))}
+        </details>
+      )}
+      {debug && (
+        <details className="chat-tools" onClick={(e) => e.stopPropagation()}>
+          <summary>Debug: {debug.reglaAplicada}</summary>
+          <div className="chat-tool-step">
+            <span className="chat-tool-name">razonamiento</span>
+            <code>{debug.razonamiento}</code>
+            <span className="chat-tool-name">regla_aplicada</span>
+            <code>{debug.reglaAplicada}</code>
+          </div>
         </details>
       )}
     </div>

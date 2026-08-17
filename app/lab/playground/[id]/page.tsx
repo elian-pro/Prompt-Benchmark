@@ -237,6 +237,18 @@ export default function PlaygroundSessionPage() {
   const [input, setInput] = useState("");
   const [pendingHuman, setPendingHuman] = useState<string | null>(null);
   const [sending, setSending] = useState(false);
+  // Debug mode: the bot's replies carry razonamiento / regla_aplicada, injected
+  // at the API layer without touching the prompt under test (lib/demo-turn.ts).
+  // Starts false and reads localStorage in an effect to avoid a hydration
+  // mismatch; persisted per conversation under the zebra-* key convention.
+  const [debug, setDebug] = useState(false);
+  useEffect(() => {
+    setDebug(window.localStorage.getItem(`zebra-playground-debug:${id}`) === "1");
+  }, [id]);
+  function toggleDebug(on: boolean) {
+    setDebug(on);
+    window.localStorage.setItem(`zebra-playground-debug:${id}`, on ? "1" : "0");
+  }
 
   const [notes, setNotes] = useState<DemoNoteRow[]>([]);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
@@ -425,7 +437,7 @@ export default function PlaygroundSessionPage() {
       const res = await fetch(`/api/demo-sessions/${id}/messages`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ content }),
+        body: JSON.stringify({ content, debug }),
       });
       if (!res.ok) throw new Error((await res.json()).error ?? "No se pudo enviar el mensaje.");
       await load({ silent: true });
@@ -641,6 +653,7 @@ export default function PlaygroundSessionPage() {
                 role={m.role}
                 content={m.content}
                 toolCalls={m.tool_calls}
+                showDebug
                 selected={selectedIds.includes(m.id)}
                 pins={pinsByMessageId.get(m.id) ?? []}
                 flashed={flashMessageId === m.id}
@@ -682,6 +695,15 @@ export default function PlaygroundSessionPage() {
                 disabled={sending || !isActive}
               />
               <div className="idle-composer-footrow">
+                <label className="switch-inline">
+                  <input
+                    type="checkbox"
+                    checked={debug}
+                    onChange={(e) => toggleDebug(e.target.checked)}
+                    disabled={!isActive}
+                  />
+                  <span>Modo debug</span>
+                </label>
                 <span className="idle-composer-hint">
                   {sending ? "Enviando…" : "⌘/Ctrl + Enter para enviar"}
                 </span>

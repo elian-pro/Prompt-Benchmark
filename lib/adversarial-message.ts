@@ -94,6 +94,25 @@ export function parseTurn(content: string): { message: string; state: string | n
   }
 }
 
+/**
+ * Debug metadata a Playground turn carries when debug mode was on (see
+ * DEBUG_RESPONSE_FORMAT in lib/demo-turn.ts). The fields live inside the same
+ * stored JSON envelope; turns generated without debug simply lack them.
+ */
+export function parseDebug(
+  content: string,
+): { razonamiento: string; reglaAplicada: string } | null {
+  try {
+    const parsed: unknown = JSON.parse(stripCodeFence(content));
+    if (typeof parsed !== "object" || parsed === null) return null;
+    const { razonamiento, regla_aplicada } = parsed as Record<string, unknown>;
+    if (typeof razonamiento !== "string" || typeof regla_aplicada !== "string") return null;
+    return { razonamiento, reglaAplicada: regla_aplicada };
+  } catch {
+    return null;
+  }
+}
+
 /** Splits readable text into WhatsApp-style bubbles: one per line break (a
  *  single `\n` already means a separate WhatsApp message in production), empty
  *  segments dropped. */

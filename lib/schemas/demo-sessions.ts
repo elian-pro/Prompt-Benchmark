@@ -29,6 +29,9 @@ export const appendDemoMessageSchema = z.object({
     .string({ required_error: "El mensaje es obligatorio." })
     .trim()
     .min(1, "El mensaje es obligatorio."),
+  // Playground's debug mode. Parsed but never forwarded by the /prueba route,
+  // so a client link cannot turn it on.
+  debug: z.boolean().optional(),
 });
 
 export type CreateDemoSessionInput = z.infer<typeof createDemoSessionSchema>;

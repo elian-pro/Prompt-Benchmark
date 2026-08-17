@@ -21,9 +21,49 @@ import { chat, type ChatMessage } from "./providers";
 import { runToolLoop } from "./client-tools";
 import { asEnvelope } from "./adversarial-message";
 
+/**
+ * Debug mode's contract, injected at the API layer (n8n output-parser style):
+ * the field descriptions carry the instructions, so the system prompt under
+ * test is never touched. Playground-only; the demo link never turns this on.
+ */
+const DEBUG_RESPONSE_FORMAT = {
+  type: "json_schema",
+  json_schema: {
+    name: "debug_envelope",
+    strict: true,
+    schema: {
+      type: "object",
+      additionalProperties: false,
+      properties: {
+        razonamiento: {
+          type: "string",
+          description:
+            "Escribe esto PRIMERO, antes de decidir la respuesta: qué señales viste en las palabras literales del usuario, y por qué elegiste este estado y esta respuesta y no otra alternativa.",
+        },
+        regla_aplicada: {
+          type: "string",
+          description:
+            'Nombre literal de la sección o regla del prompt del sistema que aplicaste en esta respuesta, o "ninguna - respuesta libre".',
+        },
+        estado: {
+          type: "string",
+          description: "El estado de la conversación según el prompt del sistema.",
+        },
+        mensajes: {
+          type: "array",
+          items: { type: "string" },
+          description: "La respuesta al usuario, un elemento por burbuja.",
+        },
+      },
+      required: ["razonamiento", "regla_aplicada", "estado", "mensajes"],
+    },
+  },
+} as const;
+
 export async function runDemoTurn(
   session: DemoSessionDetail,
   content: string,
+  debug = false,
 ): Promise<{ humanMessage: DemoMessageRow; botMessage: DemoMessageRow }> {
   const role = await getRoleDefault("test_bot");
   if (!role) {
@@ -69,6 +109,7 @@ export async function runDemoTurn(
       // prompt_snapshot is frozen for the session, so the whole prefix is
       // stable and every turn after the first reads the history from cache.
       cache: true,
+      responseFormat: debug ? DEBUG_RESPONSE_FORMAT : undefined,
     },
     tools,
     { chat },
