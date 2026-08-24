@@ -8,13 +8,13 @@
 
 /** What a search box entry should become, once decided. */
 export type SearchFilter =
-  /** A single `.ilike` on a column: supabase-js encodes the value. */
-  | { kind: "ilike"; column: string; pattern: string }
-  /** A PostgREST `or=(...)` filter string, already assembled. */
-  | { kind: "or"; filter: string };
+  /** Free text, matched case-insensitively against `historial`. */
+  | { kind: "text"; value: string }
+  /** A run of digits: a Kommo lead id, and possibly our own row id too. */
+  | { kind: "numeric"; value: string; includeId: boolean };
 
-/** `id` is a bigint. A longer run of digits overflows and errors the whole
- *  query instead of simply not matching, so it is left out of the filter. */
+/** `id` is a bigint. A longer run of digits overflows the cast and errors the
+ *  whole query instead of simply not matching, so it is left out. */
 const MAX_BIGINT_DIGITS = 18;
 
 /**
@@ -24,19 +24,14 @@ const MAX_BIGINT_DIGITS = 18;
  * inside the transcript); anything else is free text matched against
  * `historial`, which is where the lead's name is written.
  *
- * Only digits are ever interpolated into the `or` filter. Free text goes
- * through `ilike`, where the value is encoded as a parameter. Keep it that
- * way: a comma or a paren inside an `or` string breaks PostgREST's parser, and
- * a lead's message is full of both.
+ * The caller turns this into SQL with bound parameters. Nothing here is ever
+ * interpolated: a lead's message is full of quotes and parens.
  */
 export function searchFilterFor(raw: string): SearchFilter | null {
   const q = raw.trim();
   if (!q) return null;
-  if (!/^\d+$/.test(q)) return { kind: "ilike", column: "historial", pattern: `%${q}%` };
-
-  const parts = [`id_de_kommo.eq.${q}`, `historial.ilike.*${q}*`];
-  if (q.length <= MAX_BIGINT_DIGITS) parts.unshift(`id.eq.${q}`);
-  return { kind: "or", filter: parts.join(",") };
+  if (!/^\d+$/.test(q)) return { kind: "text", value: q };
+  return { kind: "numeric", value: q, includeId: q.length <= MAX_BIGINT_DIGITS };
 }
 
 /** True for a date with no time, as an `<input type="date">` produces. */

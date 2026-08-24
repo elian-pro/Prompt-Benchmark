@@ -453,7 +453,7 @@ one).
 
 Sprint 16. Creating a client used to be followed by two manual chores:
 duplicating the n8n workflow and renaming the copy `IA Mensajes <Cliente>`,
-and creating the `chats_<Cliente>` table in the chats project. Both are now
+and creating the client's schema in the conversation-history database. Both are now
 checkboxes in the Nuevo cliente modal, and buttons on the client detail page
 when they need retrying.
 
@@ -513,17 +513,23 @@ always created inactive: n8n's POST cannot set `active`, which is what we
 want, since a duplicate inherits the template's credentials and `webhookId`
 and needs a human look before it answers real leads.
 
-**DDL and the access token.** `lib/chats-admin.ts` is the only module in the
-app that writes to the chats project and the only one that runs DDL anywhere.
-PostgREST cannot run DDL and the chats project has no RPC for it, so it goes
-through the Supabase Management API with `SUPABASE_ACCESS_TOKEN`. That token
-is account-wide, so the module is deliberately narrow: the project ref comes
-from `CHATS_SUPABASE_PROJECT_REF`, never from a request; the SQL is built by
-`buildCreateChatsTableSql` from a fixed template; and the table name is
-validated against `CHATS_TABLE_RE` before interpolation. Nothing
-user-authored reaches the endpoint. If that scope is ever judged too broad,
-the drop-in replacement is a `security definer` function in the chats project
-(like `supabase/chats/001_list_chat_tables.sql`) and only this file changes.
+**DDL.** `lib/chats-admin.ts` is the only module in the app that writes to
+the history database and the only one that runs DDL anywhere. It creates the
+client's schema and its `chats` table over the pg driver, in one transaction,
+with `if not exists` throughout so a retry is safe.
+
+Until August 2026 the history lived in a second Supabase project, PostgREST
+could not run DDL, and this had to go through the Supabase Management API with
+`SUPABASE_ACCESS_TOKEN`, a token scoped to the whole account. Moving to a plain
+Postgres removed that token: DDL now uses the same credentials as every read.
+
+The module stays narrow: the SQL is built by `buildCreateChatsTableSql` from a
+fixed template, and the schema name is validated by `isValidChatsTable` and
+double-quoted by `quoteIdent` before interpolation. Schema names carry spaces
+and accents ("SIW Copacker", "Sofía") so they cannot be charset-validated the
+way `chats_*` names were; quoting is what makes injection impossible, and the
+validator covers what quoting cannot, namely the 63-byte identifier limit and
+control characters. Nothing user-authored reaches the database as SQL.
 
 The table shape is fixed and matches what the agents already write to:
 `id bigint identity primary key`, `created_at timestamptz not null default
@@ -631,10 +637,9 @@ See `.env.example`. Required at runtime:
 | `SUPABASE_URL` | Supabase project URL |
 | `SUPABASE_SERVICE_ROLE_KEY` | Server-side full-access key |
 | `KEY_ENCRYPTION_SECRET` | 32+ byte secret for AES-256-GCM |
-| `CHATS_SUPABASE_URL` | Chats project, read-only history panel |
-| `CHATS_SUPABASE_SERVICE_ROLE_KEY` | Same, server-side only |
-| `SUPABASE_ACCESS_TOKEN` | Optional; Management API token used only to create a client's `chats_*` table |
-| `CHATS_SUPABASE_PROJECT_REF` | Optional; the project that token may touch |
+| `CHATS_DB_PASSWORD` | Conversation-history Postgres; enables the history panel and schema creation |
+| `CHATS_DB_HOST` | Optional; defaults to the public address. Set it to use EasyPanel's internal network |
+| `CHATS_DB_PORT` / `CHATS_DB_USER` / `CHATS_DB_NAME` | Optional; sensible defaults |
 | `NEXT_PUBLIC_BUILD_TAG` | Optional; shown in footer |
 
 Leaving the last two blank disables the "Crear tabla de chats" option

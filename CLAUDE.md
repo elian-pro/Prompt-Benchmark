@@ -99,7 +99,7 @@ conversation already happened. Plan in
 verification.
 
 Sprint 16 (client provisioning) is verified end to end: Chapur was provisioned
-from the template, retargeted to `chats_Chapur` and bound to
+from the template, retargeted to its own history schema and bound to
 `dudas/conversacion`.
 
 Sprints 1 through 15 are complete (there is no Sprint 12). Sprints 1 to 6, 8

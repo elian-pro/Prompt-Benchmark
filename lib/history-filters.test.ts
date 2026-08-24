@@ -7,33 +7,36 @@ import assert from "node:assert/strict";
 
 import { isDateOnly, nextDay, searchFilterFor } from "./history-filters.ts";
 
-test("a Kommo id matches both id columns and the transcript", () => {
+test("a Kommo id is classified as numeric and keeps the id column", () => {
   assert.deepEqual(searchFilterFor("65030998"), {
-    kind: "or",
-    filter: "id.eq.65030998,id_de_kommo.eq.65030998,historial.ilike.*65030998*",
+    kind: "numeric",
+    value: "65030998",
+    includeId: true,
   });
 });
 
 test("a run of digits too long for a bigint drops the id column", () => {
-  // Keeping id.eq here would overflow and error the whole query rather than
-  // simply not matching.
-  const out = searchFilterFor("1".repeat(25));
-  assert.equal(out?.kind, "or");
-  assert.ok(!(out as { filter: string }).filter.includes("id.eq."));
-  assert.ok((out as { filter: string }).filter.includes("id_de_kommo.eq."));
+  // Casting it to bigint would overflow and error the whole query rather than
+  // simply not matching, so the caller leaves `id` out of the OR.
+  assert.deepEqual(searchFilterFor("1".repeat(25)), {
+    kind: "numeric",
+    value: "1".repeat(25),
+    includeId: false,
+  });
 });
 
-test("free text never reaches the or filter, where a comma would break it", () => {
+test("free text is carried as a value, never as SQL", () => {
+  // Commas, parens and quotes are ordinary characters here because the caller
+  // binds this as a parameter. That is the whole reason the shape is neutral.
   assert.deepEqual(searchFilterFor("Gustavo López, arquitecto"), {
-    kind: "ilike",
-    column: "historial",
-    pattern: "%Gustavo López, arquitecto%",
+    kind: "text",
+    value: "Gustavo López, arquitecto",
   });
   assert.deepEqual(searchFilterFor("(sin interés)"), {
-    kind: "ilike",
-    column: "historial",
-    pattern: "%(sin interés)%",
+    kind: "text",
+    value: "(sin interés)",
   });
+  assert.deepEqual(searchFilterFor("O'Brien"), { kind: "text", value: "O'Brien" });
 });
 
 test("blank and whitespace-only searches filter nothing", () => {
@@ -42,7 +45,11 @@ test("blank and whitespace-only searches filter nothing", () => {
 });
 
 test("a search is trimmed before being classified", () => {
-  assert.equal(searchFilterFor("  65030998  ")?.kind, "or");
+  assert.deepEqual(searchFilterFor("  65030998  "), {
+    kind: "numeric",
+    value: "65030998",
+    includeId: true,
+  });
 });
 
 test("isDateOnly separates a date input from a timestamp", () => {

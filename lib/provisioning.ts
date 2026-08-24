@@ -5,8 +5,8 @@
  *   1. duplicate the n8n template workflow and rename the copy
  *      "IA Mensajes <Cliente>", then bind its AI Agent node so promoting a
  *      version pushes the prompt (Sprint 7 sync);
- *   2. create the client's conversation table chats_<Cliente> in the chats
- *      project and connect it to the history panel.
+ *   2. create the client's conversation schema (with its `chats` table) in the
+ *      history database and connect it to the history panel.
  *
  * Two rules shape this module:
  *
@@ -27,7 +27,7 @@ import { listChatsTables } from "./db/chats-history";
 import { isChatsConfigured } from "./supabase";
 import { createWorkflow, getWorkflow, listWorkflows } from "./n8n/client";
 import { listAgentNodes, pickPromptAgent } from "./n8n/agent-node";
-import { retargetChatsTable } from "./n8n/chats-table";
+import { retargetChatsTable, countLegacySupabaseNodes } from "./n8n/chats-table";
 import { createChatsTable, isChatsAdminConfigured } from "./chats-admin";
 import { chatsTableName } from "./chats-table-name";
 
@@ -90,8 +90,8 @@ async function duplicateAndBind(
     workflowId = existing.id;
     adopted = true;
   } else {
-    // The template is a copy of a real client's workflow, so its Supabase
-    // nodes still point at that client's chats_* table. Retarget them before
+    // The template is a copy of a real client's workflow, so its Postgres
+    // nodes still point at that client's schema. Retarget them before
     // creating, or the new client's conversations land in someone else's
     // history. The chats step runs after this one, so chats_table is usually
     // still null here and the name is derived the same way that step derives it.
@@ -99,11 +99,28 @@ async function duplicateAndBind(
     if (!table) {
       return {
         ok: false,
-        error: "El nombre del cliente no produce un nombre de tabla válido: no se puede duplicar el flujo sin saber a qué tabla debe escribir.",
+        error: "El nombre del cliente no produce un nombre de esquema válido: no se puede duplicar el flujo sin saber a qué esquema debe escribir.",
       };
     }
     const source = await getWorkflow(creds, template.workflowId);
+    // A template still carrying Supabase nodes was never migrated off the old
+    // chats project. Its copy would write where nothing reads, so refuse
+    // instead of creating a flow that looks fine and loses every conversation.
+    const legacy = countLegacySupabaseNodes(source);
+    if (legacy > 0) {
+      return {
+        ok: false,
+        error: `El flujo plantilla todavía tiene ${legacy} nodo(s) de Supabase. Actualízalo a nodos de Postgres antes de dar de alta clientes, o sus conversaciones se guardarán donde ya nadie las lee.`,
+      };
+    }
     const { workflow: retargetedWorkflow, retargeted } = retargetChatsTable(source, table);
+    // 0 means the template has no conversation node at all: its shape changed.
+    if (retargeted === 0) {
+      return {
+        ok: false,
+        error: "El flujo plantilla no tiene ningún nodo de Postgres sobre la tabla chats: no se puede saber a qué esquema debe escribir el cliente nuevo. Revisa la plantilla.",
+      };
+    }
     const created = await createWorkflow(creds, { ...retargetedWorkflow, name: wanted });
     workflowId = String(created.id ?? "");
     if (!workflowId) {
@@ -151,22 +168,22 @@ async function duplicateAndBind(
       ? // An adopted flow was not retargeted (it may be an older copy still
         // pointing at the template's client), so say it instead of implying
         // the copy is clean.
-        `${wanted} (flujo existente, vinculado; revisa a qué tabla de chats escribe)`
-      : `${wanted} (duplicado y vinculado, ${retargetedNodes} nodo(s) de Supabase reapuntados)`,
+        `${wanted} (flujo existente, vinculado; revisa a qué esquema de chats escribe)`
+      : `${wanted} (duplicado y vinculado, ${retargetedNodes} nodo(s) reapuntados)`,
   };
 }
 
 /**
- * Creates chats_<Cliente> and connects it to the client. Adopts the table when
- * it already exists (the agents may have created it first), and the DDL itself
- * is `create table if not exists`, so this is safe to retry.
+ * Creates the client's schema (with its `chats` table) and connects it. Adopts
+ * the schema when it already exists (the agents may have created it first), and
+ * the DDL is `if not exists` throughout, so this is safe to retry.
  */
 async function ensureChatsTable(client: Client): Promise<StepResult> {
   const table = chatsTableName(client.name);
   if (!table) {
     return {
       ok: false,
-      error: "El nombre del cliente no produce un nombre de tabla válido.",
+      error: "El nombre del cliente no produce un nombre de esquema válido.",
     };
   }
   if (client.chats_table === table) {
@@ -179,15 +196,12 @@ async function ensureChatsTable(client: Client): Promise<StepResult> {
   const existing = (await listChatsTables()).some((t) => t.table === table);
   if (!existing) {
     if (!isChatsAdminConfigured()) {
-      return {
-        ok: false,
-        error: "Falta configurar SUPABASE_ACCESS_TOKEN y CHATS_SUPABASE_PROJECT_REF.",
-      };
+      return { ok: false, error: "Falta configurar CHATS_DB_PASSWORD." };
     }
     await createChatsTable(table);
   }
   await updateClient(client.id, { chats_table: table });
-  return { ok: true, detail: existing ? `${table} (tabla existente, conectada)` : `${table} (creada)` };
+  return { ok: true, detail: existing ? `${table} (esquema existente, conectado)` : `${table} (creado)` };
 }
 
 /**

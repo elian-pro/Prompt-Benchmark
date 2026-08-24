@@ -5,66 +5,93 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 
-import { retargetChatsTable, SUPABASE_NODE_TYPE } from "./chats-table.ts";
+import {
+  retargetChatsTable,
+  countLegacySupabaseNodes,
+  POSTGRES_NODE_TYPE,
+  SUPABASE_NODE_TYPE,
+} from "./chats-table.ts";
 import type { N8nWorkflow } from "./agent-node.ts";
 
 function wf(nodes: N8nWorkflow["nodes"]): N8nWorkflow {
   return { name: "IA mensajes Plantilla", nodes, connections: {} };
 }
 
-const supabase = (id: string, tableId: unknown) => ({
+const rl = (value: string) => ({ __rl: true, mode: "name", value });
+
+/** A conversation node as the migrated template carries it. */
+const pg = (id: string, schema: string, table = "chats") => ({
   id,
   name: id,
-  type: SUPABASE_NODE_TYPE,
-  parameters: { operation: "update", tableId },
+  type: POSTGRES_NODE_TYPE,
+  parameters: { operation: "update", schema: rl(schema), table: rl(table) },
 });
 
-test("points every chats_* Supabase node at the client's table", () => {
+const schemaOf = (n: { parameters?: Record<string, unknown> }) =>
+  (n.parameters?.schema as { value?: string } | undefined)?.value;
+
+test("points every chats node at the client's schema", () => {
   const out = retargetChatsTable(
     wf([
-      supabase("Get a row", "chats_Valcasa"),
-      supabase("Update a row", "chats_Valcasa"),
+      pg("Get a row", "Valcasa"),
+      pg("Update a row", "Valcasa"),
       { id: "agent", name: "AI Agent", type: "@n8n/n8n-nodes-langchain.agent", parameters: {} },
     ]),
-    "chats_Kuyabeh",
+    "Grupo de la Torre",
   );
   assert.equal(out.retargeted, 2);
-  assert.deepEqual(
-    out.workflow.nodes.map((n) => n.parameters?.tableId),
-    ["chats_Kuyabeh", "chats_Kuyabeh", undefined],
-  );
+  assert.deepEqual(out.workflow.nodes.map(schemaOf), [
+    "Grupo de la Torre",
+    "Grupo de la Torre",
+    undefined,
+  ]);
 });
 
-test("leaves Supabase nodes reading a non-chats table alone", () => {
-  const out = retargetChatsTable(wf([supabase("Get a row", "vehiculos")]), "chats_Kuyabeh");
+test("leaves a Postgres node reading another table alone", () => {
+  const out = retargetChatsTable(wf([pg("Get a row", "Valcasa", "vehiculos")]), "Acalai");
   assert.equal(out.retargeted, 0);
-  assert.equal(out.workflow.nodes[0].parameters?.tableId, "vehiculos");
+  assert.equal(schemaOf(out.workflow.nodes[0]), "Valcasa");
 });
 
-test("handles the resource-locator shape and keeps its other keys", () => {
+test("does not count a node already on the target schema", () => {
   const out = retargetChatsTable(
-    wf([supabase("Get a row", { __rl: true, mode: "list", value: "chats_Valcasa" })]),
-    "chats_Kuyabeh",
+    wf([pg("a", "Acalai"), pg("b", "Valcasa")]),
+    "Acalai",
   );
   assert.equal(out.retargeted, 1);
-  assert.deepEqual(out.workflow.nodes[0].parameters?.tableId, {
-    __rl: true,
-    mode: "list",
-    value: "chats_Kuyabeh",
-  });
 });
 
-test("counts nothing when the template already points at the right table", () => {
-  const out = retargetChatsTable(wf([supabase("Get a row", "chats_Kuyabeh")]), "chats_Kuyabeh");
-  assert.equal(out.retargeted, 0);
+test("handles a schema stored as a plain string", () => {
+  const node = {
+    id: "n",
+    name: "n",
+    type: POSTGRES_NODE_TYPE,
+    parameters: { schema: "Valcasa", table: "chats" },
+  };
+  const out = retargetChatsTable(wf([node]), "Sofía");
+  assert.equal(out.retargeted, 1);
+  assert.equal(schemaOf(out.workflow.nodes[0]), "Sofía");
 });
 
-test("does not mutate the workflow it was given", () => {
-  const original = wf([supabase("Get a row", "chats_Valcasa")]);
-  retargetChatsTable(original, "chats_Kuyabeh");
-  assert.equal(original.nodes[0].parameters?.tableId, "chats_Valcasa");
+test("does not mutate the input workflow", () => {
+  const input = wf([pg("Get a row", "Valcasa")]);
+  retargetChatsTable(input, "Acalai");
+  assert.equal(schemaOf(input.nodes[0]), "Valcasa");
 });
 
-test("refuses a table name that is not a valid chats_* identifier", () => {
-  assert.throws(() => retargetChatsTable(wf([]), "leads; drop table"), /inválido/);
+test("rejects an invalid schema name", () => {
+  assert.throws(() => retargetChatsTable(wf([pg("a", "Valcasa")]), " Acalai"));
+  assert.throws(() => retargetChatsTable(wf([pg("a", "Valcasa")]), ""));
+});
+
+test("countLegacySupabaseNodes catches a template that was never migrated", () => {
+  // This is the case that made the August 2026 migration dangerous: the flows
+  // moved to Postgres nodes while the retarget still looked for Supabase ones,
+  // so a copy silently kept writing to the template client's history.
+  const legacy = wf([
+    { id: "s", name: "Get a row", type: SUPABASE_NODE_TYPE, parameters: { tableId: "chats_Valcasa" } },
+  ]);
+  assert.equal(countLegacySupabaseNodes(legacy), 1);
+  assert.equal(retargetChatsTable(legacy, "Acalai").retargeted, 0);
+  assert.equal(countLegacySupabaseNodes(wf([pg("a", "Valcasa")])), 0);
 });

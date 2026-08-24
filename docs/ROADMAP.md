@@ -129,11 +129,12 @@ Settings (`016_composer_settings.sql`).
 
 Creating a client can now duplicate the n8n template flow as
 `IA Mensajes <Cliente>` (created disabled, its AI Agent node auto-bound) and
-create the `chats_<Cliente>` history table in the chats project. Both are
+create the client's history schema. Both are
 checkboxes in the modal, both are idempotent, and both can be retried from the
 client detail page when they fail. Template picked per n8n connection
-(`019_n8n_template_workflow.sql`); the table DDL goes through the Supabase
-Management API from `lib/chats-admin.ts`. Plan in
+(`019_n8n_template_workflow.sql`); the DDL runs from `lib/chats-admin.ts`
+(through the Supabase Management API originally, over the pg driver since the
+August 2026 migration). Plan in
 `docs/SPRINT-16-provisioning-plan.md`.
 
 ## Post Sprint 15 (unnumbered work) ✅

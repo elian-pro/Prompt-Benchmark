@@ -35,39 +35,14 @@ export function getSupabase(): SupabaseClient {
 }
 
 /**
- * Server-side client for the SECOND Supabase project ("chats"), where the
- * agents store their real client/lead conversation history (one table per
- * client, chats_<Cliente>). Same service_role rules as getSupabase: never
- * import from a client component; read-only usage lives in lib/db/chats-history.
+ * Whether the conversation-history database is configured.
  *
- * Separate singleton bound to its own project via CHATS_SUPABASE_URL /
- * CHATS_SUPABASE_SERVICE_ROLE_KEY.
+ * The history used to live in a second Supabase project and had its own
+ * service_role client here (getChatsSupabase). Since the August 2026 migration
+ * it is a plain Postgres reached with the pg driver, so the client is gone and
+ * only this check remains, kept at this path because seven modules import it.
+ * The connection itself lives in lib/chats-db.ts.
  */
-let chatsClient: SupabaseClient | null = null;
-
-export function getChatsSupabase(): SupabaseClient {
-  if (chatsClient) return chatsClient;
-
-  const url = process.env.CHATS_SUPABASE_URL;
-  const serviceRoleKey = process.env.CHATS_SUPABASE_SERVICE_ROLE_KEY;
-
-  if (!url || !serviceRoleKey) {
-    throw new Error(
-      "Faltan variables de entorno: CHATS_SUPABASE_URL y CHATS_SUPABASE_SERVICE_ROLE_KEY son obligatorias para el historial de conversaciones.",
-    );
-  }
-
-  chatsClient = createClient(url, serviceRoleKey, {
-    auth: {
-      persistSession: false,
-      autoRefreshToken: false,
-    },
-  });
-
-  return chatsClient;
-}
-
-/** Whether the "chats" DB connection is configured (both env vars present). */
 export function isChatsConfigured(): boolean {
-  return Boolean(process.env.CHATS_SUPABASE_URL && process.env.CHATS_SUPABASE_SERVICE_ROLE_KEY);
+  return Boolean(process.env.CHATS_DB_PASSWORD);
 }

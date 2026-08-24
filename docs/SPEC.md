@@ -204,10 +204,11 @@ clipboard button.
   Agent node is bound automatically so promoting a version pushes the prompt
   with no extra setup. The template is configured once per n8n connection in
   Settings, and can be overridden for a single creation.
-- **Crear la tabla de historial**, which creates `chats_<Cliente>` in the
-  chats project and connects it to the history panel. The name drops accents,
-  spaces and punctuation and keeps capitalization: "Bad Boys Toys" becomes
-  `chats_BadBoysToys`, shown in the modal as the user types.
+- **Crear la tabla de historial**, which creates the client's schema (holding
+  a single `chats` table) in the conversation-history database and connects it
+  to the history panel. The schema is named after the client exactly as
+  written, accents and spaces included: "Bad Boys Toys" stays "Bad Boys Toys",
+  shown in the modal as the user types.
 
 Each option hides itself when it is not configured (no template, or no access
 token for the chats project), so the modal never offers something that can
