@@ -88,3 +88,19 @@ test("buildCreateChatsTableSql rejects what quoting cannot save", () => {
   assert.throws(() => buildCreateChatsTableSql(""));
   assert.throws(() => buildCreateChatsTableSql("á".repeat(40)));
 });
+
+test("a client name matches an existing schema regardless of case or accents", () => {
+  // The Arkai case: the client already had a schema with its 12 reporting
+  // tables, provisioning used the client's own spelling, and a second schema
+  // appeared next to it differing only in capitalization.
+  const enBase = ["Arkai", "Grupo Tactical", "Sofía", "Bad Boys Toys"];
+  const norm = (v: string) =>
+    v.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z0-9]/g, "");
+  const casa = (cliente: string) => enBase.filter((e) => norm(e) === norm(cliente));
+
+  assert.deepEqual(casa("ARKAI"), ["Arkai"]);
+  assert.deepEqual(casa("arkai"), ["Arkai"]);
+  assert.deepEqual(casa("GRUPO TACTICAL"), ["Grupo Tactical"]);
+  assert.deepEqual(casa("Sofia"), ["Sofía"]);
+  assert.deepEqual(casa("Cliente Nuevo"), []);
+});

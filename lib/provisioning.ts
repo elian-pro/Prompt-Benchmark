@@ -23,7 +23,7 @@ import type { Client } from "./db/clients";
 import { getClient, updateClient } from "./db/clients";
 import { getConnectionCreds, getConnection, listConnections } from "./db/n8n-connections";
 import { createApiBinding, listBindings } from "./db/n8n-bindings";
-import { listChatsTables } from "./db/chats-history";
+import { listChatsTables, resolveClientSchema } from "./db/chats-history";
 import { isChatsConfigured } from "./supabase";
 import { createWorkflow, getWorkflow, listWorkflows } from "./n8n/client";
 import { listAgentNodes, pickPromptAgent } from "./n8n/agent-node";
@@ -95,7 +95,11 @@ async function duplicateAndBind(
     // creating, or the new client's conversations land in someone else's
     // history. The chats step runs after this one, so chats_table is usually
     // still null here and the name is derived the same way that step derives it.
-    const table = client.chats_table ?? chatsTableName(client.name);
+    // resolveClientSchema first: the client may already have a schema in that
+    // database (its reporting tables) under a slightly different spelling, and
+    // the flow has to write THERE, not into a near-duplicate.
+    const table =
+      client.chats_table ?? (await resolveClientSchema(client.name)) ?? chatsTableName(client.name);
     if (!table) {
       return {
         ok: false,
@@ -179,7 +183,11 @@ async function duplicateAndBind(
  * the DDL is `if not exists` throughout, so this is safe to retry.
  */
 async function ensureChatsTable(client: Client): Promise<StepResult> {
-  const table = chatsTableName(client.name);
+  // An existing schema wins over the name derived from the client: "Arkai"
+  // already holds this client's reporting tables, so its conversations belong
+  // in it rather than in a new "ARKAI" that differs only in case.
+  const existingSchema = await resolveClientSchema(client.name);
+  const table = existingSchema ?? chatsTableName(client.name);
   if (!table) {
     return {
       ok: false,
@@ -201,7 +209,15 @@ async function ensureChatsTable(client: Client): Promise<StepResult> {
     await createChatsTable(table);
   }
   await updateClient(client.id, { chats_table: table });
-  return { ok: true, detail: existing ? `${table} (esquema existente, conectado)` : `${table} (creado)` };
+  if (existing) return { ok: true, detail: `${table} (esquema existente, conectado)` };
+  // Say when the table went into a schema that was already there under another
+  // spelling, so the difference is visible instead of looking like a typo.
+  return {
+    ok: true,
+    detail: existingSchema
+      ? `${table} (tabla creada en el esquema que ya existía para este cliente)`
+      : `${table} (creado)`,
+  };
 }
 
 /**

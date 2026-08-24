@@ -78,6 +78,52 @@ export async function listChatsTables(): Promise<ChatsTable[]> {
     .filter((t) => isValidChatsTable(t.table));
 }
 
+/**
+ * Every schema a client could live in, whether or not it already has a `chats`
+ * table.
+ *
+ * listChatsTables only sees schemas that already hold conversations, which is
+ * right for the history picker and wrong for provisioning: a client can have
+ * had a schema in that database for months (its 12 reporting tables) and no
+ * conversation table yet. Creating a client from its name alone then made a
+ * SECOND schema whose name differed only in case, "ARKAI" beside "Arkai", and
+ * the client's data ended up split across both.
+ *
+ * Only the true system schemas are excluded. The shared ones (ops, crm, mart,
+ * ads) are left in on purpose: matchChatsTable requires an exact normalized
+ * match against the client name, so they can never be picked, and a hardcoded
+ * denylist would rot the first time a shared schema is added.
+ */
+export async function listClientSchemas(): Promise<string[]> {
+  const rows = await chatsQuery<{ nspname: string }>(
+    `select nspname from pg_namespace
+      where nspname not like 'pg\\_%'
+        and nspname not in ('information_schema', 'public')
+      order by nspname`,
+  );
+  return rows.map((r) => r.nspname).filter(isValidChatsTable);
+}
+
+/**
+ * The schema a client's conversations belong in: the existing one whose name
+ * matches, or null when there is none and a new one has to be created.
+ *
+ * Matching on the normalized name is what stops a second schema appearing over
+ * a difference in capitalization or accents. The name returned is the one the
+ * database already uses, never the client's spelling, so the `chats` table
+ * lands beside the client's other tables.
+ *
+ * Never throws: provisioning must not fail because this lookup could not run.
+ */
+export async function resolveClientSchema(clientName: string): Promise<string | null> {
+  if (!isChatsConfigured()) return null;
+  try {
+    return matchChatsTable(clientName, await listClientSchemas());
+  } catch {
+    return null;
+  }
+}
+
 export type HistoryFilters = {
   /** One box, three meanings: a Kommo lead id, our own row id, or free text. */
   search?: string;
