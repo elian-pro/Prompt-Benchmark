@@ -1,9 +1,15 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { IconBell } from "@tabler/icons-react";
+import { IconBell, IconPencil, IconSparkles, IconUser } from "@tabler/icons-react";
 
-import { pushLog, finishedTurns, LOG_KEY, type NotifEntry } from "@/lib/notifications";
+import {
+  pushLog,
+  finishedTurns,
+  LOG_KEY,
+  type NotifEntry,
+  type NotifKind,
+} from "@/lib/notifications";
 
 /**
  * The header's single notification slot: what needs attention now, plus the
@@ -91,6 +97,30 @@ function modeLabel(mode: Turn["mode"]) {
   return mode === "creator" ? "Creator" : "Editor";
 }
 
+/** Same icon a section wears in the header nav, so an entry says where it came
+ *  from before the sentence is read. A client's report is the third origin and
+ *  has no nav item of its own: it is a person, not a section. */
+function NotifIcon({ kind }: { kind: NotifKind | undefined }) {
+  const Icon = kind === "creator" ? IconSparkles : kind === "note" ? IconUser : IconPencil;
+  if (!kind) return null;
+  return <Icon className="notif-icon" size={14} stroke={1.5} />;
+}
+
+/** Renders `text` with its one emphasized run in the foreground color. Nothing
+ *  to emphasize, or a term that is not in the text (an entry logged before the
+ *  field existed): the plain sentence. */
+function emphasized(text: string, term: string | undefined) {
+  const at = term ? text.indexOf(term) : -1;
+  if (at < 0 || !term) return text;
+  return (
+    <>
+      {text.slice(0, at)}
+      <strong>{term}</strong>
+      {text.slice(at + term.length)}
+    </>
+  );
+}
+
 function formatWhen(at: number) {
   const date = new Date(at);
   const today = new Date().toDateString() === date.toDateString();
@@ -104,7 +134,37 @@ function formatWhen(at: number) {
       });
 }
 
+let audio: AudioContext | null = null;
+
+/** A short two tone chime, synthesized so there is no asset to ship and no
+ *  request to make. Browsers only let audio play once the user has interacted
+ *  with the page, so before the first click this is silently a no op, which is
+ *  fine: nothing is waiting on a notification that early. */
+function chime() {
+  try {
+    audio ??= new AudioContext();
+    void audio.resume();
+    const t = audio.currentTime;
+    const osc = audio.createOscillator();
+    const gain = audio.createGain();
+    osc.type = "sine";
+    osc.frequency.setValueAtTime(880, t);
+    osc.frequency.setValueAtTime(1320, t + 0.11);
+    gain.gain.setValueAtTime(0.12, t);
+    gain.gain.exponentialRampToValueAtTime(0.0001, t + 0.3);
+    osc.connect(gain).connect(audio.destination);
+    osc.start(t);
+    osc.stop(t + 0.32);
+  } catch {
+    // No audio device, or the browser blocked it. Never worth breaking a
+    // notification over.
+  }
+}
+
 function notify(title: string, body: string, tag: string, href: string) {
+  // Before the permission guard: the bell logged the event either way, so it
+  // is worth hearing even when the OS notification itself was never allowed.
+  chime();
   if (typeof Notification === "undefined" || Notification.permission !== "granted") return;
   const notification = new Notification(title, { body, tag });
   notification.onclick = () => {
@@ -156,6 +216,8 @@ export function NotificationsBell() {
         at,
         text: `${modeLabel(turn.mode)}: la respuesta de ${turn.title} está lista.`,
         href: sessionHref(turn),
+        kind: turn.mode,
+        emphasis: turn.title,
       })),
     );
     for (const turn of done) {
@@ -198,7 +260,16 @@ export function NotificationsBell() {
       const name = top?.client_name ?? "Un cliente";
       const text = fresh === 1 ? `${name} dejó un reporte.` : `${fresh} reportes nuevos.`;
       const at = Date.now();
-      record([{ id: `notes-${at}-${current.total}`, at, text, href: linkHref(top) }]);
+      record([
+        {
+          id: `notes-${at}-${current.total}`,
+          at,
+          text,
+          href: linkHref(top),
+          kind: "note",
+          emphasis: fresh === 1 ? name : undefined,
+        },
+      ]);
       notify(text, "Ábrelo en Lab para revisarlo.", "demo-pending-notes", linkHref(top));
     }
     writeSeenNotes(current.total);
@@ -253,32 +324,53 @@ export function NotificationsBell() {
             <div className="notif-section">
               <span className="notif-section-title">Pendientes</span>
               {pending === 0 && <p className="notif-empty">Nada pendiente.</p>}
-              {summary.by_link.map((link) => (
-                <a key={link.link_id} className="notif-item" href={linkHref(link)}>
-                  <span className="notif-item-text">
-                    {link.client_name ?? "Un cliente"}:{" "}
-                    {link.count === 1 ? "1 reporte sin revisar" : `${link.count} reportes sin revisar`}
-                  </span>
-                </a>
-              ))}
-              {running.map((turn) => (
-                <a key={turn.sessionId} className="notif-item" href={sessionHref(turn)}>
-                  <span className="notif-item-text">
-                    {modeLabel(turn.mode)}: generando respuesta en {turn.title}
-                  </span>
-                </a>
-              ))}
+              <div className="notif-list notif-list-pending">
+                {summary.by_link.map((link) => (
+                  <a
+                    key={link.link_id}
+                    className="notif-item notif-item-pending"
+                    href={linkHref(link)}
+                  >
+                    {/* Only an unreviewed report gets the dot: it is the one
+                        thing here that is waiting on the user rather than on
+                        the machine. */}
+                    <span className="notif-dot" aria-hidden="true" />
+                    <NotifIcon kind="note" />
+                    <span className="notif-item-text">
+                      <strong>{link.client_name ?? "Un cliente"}</strong>:{" "}
+                      {link.count === 1
+                        ? "1 reporte sin revisar"
+                        : `${link.count} reportes sin revisar`}
+                    </span>
+                  </a>
+                ))}
+                {running.map((turn) => (
+                  <a
+                    key={turn.sessionId}
+                    className="notif-item notif-item-pending"
+                    href={sessionHref(turn)}
+                  >
+                    <NotifIcon kind={turn.mode} />
+                    <span className="notif-item-text">
+                      {modeLabel(turn.mode)}: generando respuesta en <strong>{turn.title}</strong>
+                    </span>
+                  </a>
+                ))}
+              </div>
             </div>
 
             <div className="notif-section">
               <span className="notif-section-title">Historial</span>
               {log.length === 0 && <p className="notif-empty">Aquí se acumula lo que pase.</p>}
-              {log.map((e) => (
-                <a key={e.id} className="notif-item" href={e.href}>
-                  <span className="notif-item-text">{e.text}</span>
-                  <span className="notif-item-time">{formatWhen(e.at)}</span>
-                </a>
-              ))}
+              <div className="notif-list">
+                {log.map((e) => (
+                  <a key={e.id} className="notif-item" href={e.href}>
+                    <NotifIcon kind={e.kind} />
+                    <span className="notif-item-text">{emphasized(e.text, e.emphasis)}</span>
+                    <span className="notif-item-time">{formatWhen(e.at)}</span>
+                  </a>
+                ))}
+              </div>
             </div>
           </div>
         </>

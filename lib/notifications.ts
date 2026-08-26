@@ -9,12 +9,22 @@
  * with read state) is the upgrade if the team needs the same history on two
  * machines or wants it to survive clearing site data.
  */
+/** What produced the entry, which is all the bell needs to pick its icon.
+ *  Optional on `NotifEntry`: entries logged before this shipped are already in
+ *  localStorage without it and still render, just without an icon. */
+export type NotifKind = "editor" | "creator" | "note";
+
 export type NotifEntry = {
   /** Stable per event, so a re-poll of the same fact never logs it twice. */
   id: string;
   at: number;
   text: string;
   href: string;
+  kind?: NotifKind;
+  /** The one substring of `text` worth reading first, normally the client
+   *  name. Stored rather than parsed out later: only the writer knows which
+   *  words are the name. */
+  emphasis?: string;
 };
 
 export const LOG_KEY = "zebra-notif-log";
