@@ -65,6 +65,14 @@ Sprint 8 changes:
   break / `mensajes` array item (the way n8n delivers it to WhatsApp): the
   first bubble is labeled "Bot del cliente", the estado JSON hangs off the
   last. Tagging is per turn, not per individual bubble.
+- **Canonical states.** Every client prompt answers with the same envelope,
+  `{"estado": "...", "mensajes": [...]}`, and the `estado` is one of seven:
+  `por-perfilar`, `perfilado`, `no-perfila`, `lead-no-interes`, `lead-grosero`,
+  `mensaje-aut`, `humano`. A client may add sub-states on top of one of the
+  seven, never replacing or renaming one. The list and the contract both
+  personas receive live in `lib/estados.ts`; the Creator writes the seven into
+  every new prompt, and the Editor flags a prompt that drifted without fixing
+  it on its own.
 - **Opening message (Sprint 14).** Starting a conversation can optionally
   include a canned bot message (e.g. a WhatsApp-style greeting), so the chat
   opens with the bot having already "spoken" instead of always waiting on

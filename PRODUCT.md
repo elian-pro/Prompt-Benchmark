@@ -53,6 +53,11 @@ and the shipped artifact are the same one.
 - **Production runtime is n8n.** Prompts live in n8n nodes and answer over
   WhatsApp. The bot's replies are split into multiple messages the way n8n
   delivers them, and the Studio mirrors that.
+- **The state vocabulary is shared across clients.** Every bot answers in JSON
+  and n8n routes on its `estado`. The seven canonical states (`por-perfilar`,
+  `perfilado`, `no-perfila`, `lead-no-interes`, `lead-grosero`, `mensaje-aut`,
+  `humano`) are the same for every client, so a flow built once reads any
+  client's bot. Per-client nuance goes in sub-states layered on top.
 - **Clients are mostly real estate developers**; the bots qualify leads.
 - **Four sections.** Lab (four modes: IA vs IA red-teaming with a judge,
   Playground for manual testing, Demo for the client behind a shared link,

@@ -34,6 +34,7 @@ and pastes into the corresponding n8n node.
 | All sprints overview | `docs/ROADMAP.md` |
 | Sprint plans (all complete, archived) | `docs/SPRINT-1-archive.md` … `docs/SPRINT-9-archive.md` (no Sprint 7 file, see `docs/N8N-SYNC-PLAN.md`) |
 | Database schema source of truth | `supabase/migrations/` |
+| The seven canonical `estado` values and the contract both personas get | `lib/estados.ts` |
 
 ## Rules of engagement
 
