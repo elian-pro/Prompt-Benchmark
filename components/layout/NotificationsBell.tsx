@@ -5,6 +5,7 @@ import { IconBell, IconPencil, IconSparkles, IconUser } from "@tabler/icons-reac
 
 import {
   pushLog,
+  restoreLog,
   finishedTurns,
   LOG_KEY,
   type NotifEntry,
@@ -100,9 +101,8 @@ function modeLabel(mode: Turn["mode"]) {
 /** Same icon a section wears in the header nav, so an entry says where it came
  *  from before the sentence is read. A client's report is the third origin and
  *  has no nav item of its own: it is a person, not a section. */
-function NotifIcon({ kind }: { kind: NotifKind | undefined }) {
+function NotifIcon({ kind }: { kind: NotifKind }) {
   const Icon = kind === "creator" ? IconSparkles : kind === "note" ? IconUser : IconPencil;
-  if (!kind) return null;
   return <Icon className="notif-icon" size={14} stroke={1.5} />;
 }
 
@@ -193,8 +193,10 @@ export function NotificationsBell() {
     });
   }, []);
 
+  // Read through `restoreLog`, not raw: it prunes what has aged out and gives
+  // entries written before the icons existed the kind their sentence implies.
   useEffect(() => {
-    setLog(readJson<NotifEntry[]>(LOG_KEY, []));
+    setLog(restoreLog(readJson<NotifEntry[]>(LOG_KEY, [])));
   }, []);
 
   const pollGenerating = useCallback(async () => {
@@ -365,7 +367,7 @@ export function NotificationsBell() {
               <div className="notif-list">
                 {log.map((e) => (
                   <a key={e.id} className="notif-item" href={e.href}>
-                    <NotifIcon kind={e.kind} />
+                    <NotifIcon kind={e.kind ?? "note"} />
                     <span className="notif-item-text">{emphasized(e.text, e.emphasis)}</span>
                     <span className="notif-item-time">{formatWhen(e.at)}</span>
                   </a>

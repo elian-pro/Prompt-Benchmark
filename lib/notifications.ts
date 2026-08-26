@@ -29,12 +29,48 @@ export type NotifEntry = {
 
 export const LOG_KEY = "zebra-notif-log";
 export const LOG_CAP = 50;
+/** A month back is as far as anyone has looked. Two limits, not one: the cap
+ *  keeps a busy week from filling the panel, this keeps a quiet month from
+ *  leaving stale entries at the bottom of it. */
+export const LOG_MAX_AGE_MS = 30 * 24 * 60 * 60 * 1000;
 
-/** Newest first, deduped by id, capped. Older entries fall off the end. */
-export function pushLog(log: NotifEntry[], entries: NotifEntry[]): NotifEntry[] {
+/** Newest first, deduped by id, capped, and without anything older than
+ *  `LOG_MAX_AGE_MS`. Returns the very same array when nothing changed, so the
+ *  caller can skip a pointless write. */
+export function pushLog(
+  log: NotifEntry[],
+  entries: NotifEntry[],
+  now: number = Date.now(),
+): NotifEntry[] {
   const known = new Set(log.map((e) => e.id));
   const fresh = entries.filter((e) => !known.has(e.id));
-  return fresh.length === 0 ? log : [...fresh, ...log].slice(0, LOG_CAP);
+  const next = [...fresh, ...log]
+    .filter((e) => now - e.at <= LOG_MAX_AGE_MS)
+    .slice(0, LOG_CAP);
+  return fresh.length === 0 && next.length === log.length ? log : next;
+}
+
+const TITLE_RE = /la respuesta de (.+) está lista\.$/;
+
+/** Fills in what an entry written before `kind` and `emphasis` existed cannot
+ *  carry. The sentences are ours (see the bell), so reading one back to find
+ *  out which section wrote it is safe, and an entry that matches nothing just
+ *  keeps the plain text it already had. */
+function decorate(entry: NotifEntry): NotifEntry {
+  if (entry.kind) return entry;
+  const kind: NotifKind = entry.text.startsWith("Creator:")
+    ? "creator"
+    : entry.text.startsWith("Editor:")
+      ? "editor"
+      : "note";
+  return { ...entry, kind, emphasis: entry.emphasis ?? TITLE_RE.exec(entry.text)?.[1] };
+}
+
+/** The log as read back from storage: whatever was there, decorated, pruned
+ *  and capped. Anything that is not an array reads as an empty log. */
+export function restoreLog(raw: unknown, now: number = Date.now()): NotifEntry[] {
+  const parsed = Array.isArray(raw) ? (raw as NotifEntry[]) : [];
+  return pushLog([], parsed.map(decorate), now);
 }
 
 /** Turns that were running when we last looked and are not running now, which
