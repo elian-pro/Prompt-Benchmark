@@ -26,6 +26,7 @@ import { OPTIONS_CONTRACT } from "@/lib/prompts/options-block";
 import { ANTI_OVERFIT_CONTRACT } from "@/lib/prompts/anti-overfit";
 import { CREATOR_PERSONA } from "@/lib/prompts/creator-persona";
 import { buildJudgeSystemPrompt } from "@/lib/prompts/judge";
+import { resError } from "@/lib/res-error";
 
 /** What buildEditorSystemPrompt and buildCreatorSystemPrompt append after the
  *  persona, shown here read only so the card matches what is actually sent.
@@ -75,12 +76,12 @@ export default function SettingsPage() {
         fetch("/api/composer-settings"),
         fetch("/api/integrations/google-chat"),
       ]);
-      if (!pRes.ok) throw new Error((await pRes.json()).error ?? "Error al cargar proveedores.");
-      if (!rRes.ok) throw new Error((await rRes.json()).error ?? "Error al cargar roles.");
-      if (!oRes.ok) throw new Error((await oRes.json()).error ?? "Error al cargar los prompts.");
-      if (!cRes.ok) throw new Error((await cRes.json()).error ?? "Error al cargar las conexiones n8n.");
+      if (!pRes.ok) throw new Error(await resError(pRes, "Error al cargar proveedores."));
+      if (!rRes.ok) throw new Error(await resError(rRes, "Error al cargar roles."));
+      if (!oRes.ok) throw new Error(await resError(oRes, "Error al cargar los prompts."));
+      if (!cRes.ok) throw new Error(await resError(cRes, "Error al cargar las conexiones n8n."));
       if (!csRes.ok) {
-        throw new Error((await csRes.json()).error ?? "Error al cargar Smart Paste.");
+        throw new Error(await resError(csRes, "Error al cargar Smart Paste."));
       }
       setProviders(await pRes.json());
       setRoleDefaults(await rRes.json());

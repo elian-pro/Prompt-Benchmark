@@ -18,6 +18,7 @@ import { ClientCard } from "@/components/library/ClientCard";
 import { NewClientModal } from "@/components/library/NewClientModal";
 import { ImportModal } from "@/components/library/ImportModal";
 import { DeleteClientModal } from "@/components/library/DeleteClientModal";
+import { resError } from "@/lib/res-error";
 
 const FILTERS: { key: ClientFilter; label: string }[] = [
   { key: "all", label: "Todos" },
@@ -131,8 +132,8 @@ export default function LibraryPage() {
         fetch("/api/clients?filter=all"),
         fetch("/api/clients?filter=archived"),
       ]);
-      if (!aRes.ok) throw new Error((await aRes.json()).error ?? "Error al cargar.");
-      if (!arRes.ok) throw new Error((await arRes.json()).error ?? "Error al cargar.");
+      if (!aRes.ok) throw new Error(await resError(aRes, "Error al cargar."));
+      if (!arRes.ok) throw new Error(await resError(arRes, "Error al cargar."));
       setNonArchived(await aRes.json());
       setArchived(await arRes.json());
     } catch (e) {

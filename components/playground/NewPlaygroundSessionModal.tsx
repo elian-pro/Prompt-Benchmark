@@ -8,6 +8,7 @@ import type { VersionListItem } from "@/lib/db/versions";
 import { Modal } from "@/components/ui/Modal";
 import { Button } from "@/components/ui/Button";
 import { SearchableChip } from "@/components/ui/SearchableChip";
+import { resError } from "@/lib/res-error";
 
 /**
  * Configures a new Playground session: pick the client + version to converse
@@ -37,7 +38,7 @@ export function NewPlaygroundSessionModal({
     setError(null);
     fetch("/api/clients?filter=all")
       .then(async (res) => {
-        if (!res.ok) throw new Error((await res.json()).error ?? "Error al cargar.");
+        if (!res.ok) throw new Error(await resError(res, "Error al cargar."));
         return res.json();
       })
       .then((data: ClientSummary[]) => setClients(data))
@@ -54,7 +55,7 @@ export function NewPlaygroundSessionModal({
     }
     fetch(`/api/clients/${clientId}`)
       .then(async (res) => {
-        if (!res.ok) throw new Error((await res.json()).error ?? "Error al cargar el cliente.");
+        if (!res.ok) throw new Error(await resError(res, "Error al cargar el cliente."));
         return res.json();
       })
       .then((detail: ClientDetail) => {
@@ -78,7 +79,7 @@ export function NewPlaygroundSessionModal({
           openingMessage: openingMessage.trim() || undefined,
         }),
       });
-      if (!res.ok) throw new Error((await res.json()).error ?? "No se pudo crear la conversación.");
+      if (!res.ok) throw new Error(await resError(res, "No se pudo crear la conversación."));
       const session = await res.json();
       router.push(`/lab/playground/${session.id}`);
     } catch (e) {

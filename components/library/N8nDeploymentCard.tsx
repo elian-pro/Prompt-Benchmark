@@ -14,6 +14,7 @@ import type { N8nBinding } from "@/lib/db/n8n-bindings";
 import type { DriftResult, DriftStatus } from "@/lib/n8n/sync";
 import { Button } from "@/components/ui/Button";
 import { N8nBindingModal, type BindingSelection } from "./N8nBindingModal";
+import { resError } from "@/lib/res-error";
 
 type ProductionVersion = { id: string; version_number: string; content: string } | null;
 
@@ -81,7 +82,7 @@ export function N8nDeploymentCard({ clientId, productionVersion, onRequestSync }
     setLoading(true);
     try {
       const res = await fetch(`/api/clients/${clientId}/n8n-bindings`);
-      if (!res.ok) throw new Error((await res.json()).error ?? "Error al cargar los vínculos.");
+      if (!res.ok) throw new Error(await resError(res, "Error al cargar los vínculos."));
       const rows: N8nBinding[] = await res.json();
       setBindings(rows);
       setError(null);

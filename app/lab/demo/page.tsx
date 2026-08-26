@@ -18,6 +18,7 @@ import { SkeletonRows } from "@/components/ui/Skeleton";
 import { formatDeadlineShortEs, isExpired } from "@/lib/business-days";
 import { NewDemoLinkModal } from "@/components/demo/NewDemoLinkModal";
 import { DemoTabs } from "@/components/demo/DemoTabs";
+import { resError } from "@/lib/res-error";
 
 /**
  * Every demo link, newest first.
@@ -44,7 +45,7 @@ export default function DemoLinksPage() {
   const load = useCallback(async () => {
     try {
       const res = await fetch("/api/demo-links");
-      if (!res.ok) throw new Error((await res.json()).error ?? "Error al cargar los links.");
+      if (!res.ok) throw new Error(await resError(res, "Error al cargar los links."));
       setLinks(await res.json());
     } catch (e) {
       setError(e instanceof Error ? e.message : "Error al cargar los links.");
@@ -84,7 +85,7 @@ export default function DemoLinksPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ status: link.status === "active" ? "closed" : "active" }),
       });
-      if (!res.ok) throw new Error((await res.json()).error ?? "No se pudo cambiar el link.");
+      if (!res.ok) throw new Error(await resError(res, "No se pudo cambiar el link."));
       await load();
     } catch (e) {
       setError(e instanceof Error ? e.message : "Error al cambiar el link.");

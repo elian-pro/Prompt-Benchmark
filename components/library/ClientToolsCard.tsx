@@ -12,6 +12,7 @@ import {
 import type { MaskedTool } from "@/lib/db/client-tools";
 import { Button } from "@/components/ui/Button";
 import { ClientToolModal } from "./ClientToolModal";
+import { resError } from "@/lib/res-error";
 
 /**
  * "Herramientas" card in the client detail sidebar: the HTTP tools the bot
@@ -33,7 +34,7 @@ export function ClientToolsCard({ clientId }: { clientId: string }) {
     try {
       const res = await fetch(`/api/clients/${clientId}/tools`);
       if (!res.ok) {
-        throw new Error((await res.json()).error ?? "Error al cargar las herramientas.");
+        throw new Error(await resError(res, "Error al cargar las herramientas."));
       }
       setTools(await res.json());
       setError(null);
@@ -56,7 +57,7 @@ export function ClientToolsCard({ clientId }: { clientId: string }) {
         body: JSON.stringify({ enabled: !tool.enabled }),
       });
       if (!res.ok) {
-        throw new Error((await res.json()).error ?? "No se pudo cambiar la herramienta.");
+        throw new Error(await resError(res, "No se pudo cambiar la herramienta."));
       }
       await load();
     } catch (e) {
@@ -69,7 +70,7 @@ export function ClientToolsCard({ clientId }: { clientId: string }) {
     try {
       const res = await fetch(`/api/clients/${clientId}/tools/${tool.id}`, { method: "DELETE" });
       if (!res.ok) {
-        throw new Error((await res.json()).error ?? "No se pudo eliminar la herramienta.");
+        throw new Error(await resError(res, "No se pudo eliminar la herramienta."));
       }
       await load();
     } catch (e) {

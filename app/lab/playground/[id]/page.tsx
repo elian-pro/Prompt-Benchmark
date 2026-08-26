@@ -29,6 +29,7 @@ import { SearchableChip } from "@/components/ui/SearchableChip";
 import { InfoHint } from "@/components/ui/InfoHint";
 import { DeleteDemoSessionModal } from "@/components/playground/DeleteDemoSessionModal";
 import { DemoTurn, PendingTurn, TypingIndicator } from "@/components/demo/DemoTurn";
+import { resError } from "@/lib/res-error";
 
 function NotesPanel({
   notes,
@@ -282,7 +283,7 @@ export default function PlaygroundSessionPage() {
     setError(null);
     try {
       const res = await fetch(`/api/demo-sessions/${id}`);
-      if (!res.ok) throw new Error((await res.json()).error ?? "Error al cargar.");
+      if (!res.ok) throw new Error(await resError(res, "Error al cargar."));
       const data: DemoSessionDetail = await res.json();
       setSession(data);
       setNotes(data.notes);
@@ -370,7 +371,7 @@ export default function PlaygroundSessionPage() {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ text, messageIds: selectedIds }),
         });
-        if (!res.ok) throw new Error((await res.json()).error ?? "No se pudo actualizar la nota.");
+        if (!res.ok) throw new Error(await resError(res, "No se pudo actualizar la nota."));
         const updated: DemoNoteRow = await res.json();
         setNotes((prev) => prev.map((n) => (n.id === updated.id ? updated : n)));
       } else {
@@ -379,7 +380,7 @@ export default function PlaygroundSessionPage() {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ text, messageIds: selectedIds }),
         });
-        if (!res.ok) throw new Error((await res.json()).error ?? "No se pudo guardar la nota.");
+        if (!res.ok) throw new Error(await resError(res, "No se pudo guardar la nota."));
         const created: DemoNoteRow = await res.json();
         setNotes((prev) => [...prev, created]);
       }
@@ -394,7 +395,7 @@ export default function PlaygroundSessionPage() {
   async function removeNote(noteId: string) {
     try {
       const res = await fetch(`/api/demo-sessions/${id}/notes/${noteId}`, { method: "DELETE" });
-      if (!res.ok) throw new Error((await res.json()).error ?? "No se pudo eliminar la nota.");
+      if (!res.ok) throw new Error(await resError(res, "No se pudo eliminar la nota."));
       setNotes((prev) => prev.filter((n) => n.id !== noteId));
       if (editingNoteId === noteId) cancelCompose();
     } catch (e) {
@@ -439,7 +440,7 @@ export default function PlaygroundSessionPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ content, debug }),
       });
-      if (!res.ok) throw new Error((await res.json()).error ?? "No se pudo enviar el mensaje.");
+      if (!res.ok) throw new Error(await resError(res, "No se pudo enviar el mensaje."));
       await load({ silent: true });
     } catch (e) {
       setError(e instanceof Error ? e.message : "Error al enviar el mensaje.");
@@ -460,7 +461,7 @@ export default function PlaygroundSessionPage() {
     setHandoffError(null);
     try {
       const res = await fetch(`/api/demo-sessions/${id}/handoff`, { method: "POST" });
-      if (!res.ok) throw new Error((await res.json()).error ?? "No se pudo enviar al Editor.");
+      if (!res.ok) throw new Error(await resError(res, "No se pudo enviar al Editor."));
       const { editorSessionId, draftMessage } = await res.json();
       window.sessionStorage.setItem(`playground-handoff:${editorSessionId}`, draftMessage);
       router.push(`/editor/${editorSessionId}`);
@@ -476,7 +477,7 @@ export default function PlaygroundSessionPage() {
     setResetting(true);
     try {
       const res = await fetch(`/api/demo-sessions/${id}/reset`, { method: "POST" });
-      if (!res.ok) throw new Error((await res.json()).error ?? "No se pudo reiniciar.");
+      if (!res.ok) throw new Error(await resError(res, "No se pudo reiniciar."));
       setResetOpen(false);
       cancelCompose();
       await load({ silent: true });
@@ -507,7 +508,7 @@ export default function PlaygroundSessionPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ openingMessage: text }),
       });
-      if (!res.ok) throw new Error((await res.json()).error ?? "No se pudo actualizar el mensaje.");
+      if (!res.ok) throw new Error(await resError(res, "No se pudo actualizar el mensaje."));
       setOpeningEditOpen(false);
       await load({ silent: true });
     } catch (e) {
@@ -529,7 +530,7 @@ export default function PlaygroundSessionPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ version_id: versionId }),
       });
-      if (!res.ok) throw new Error((await res.json()).error ?? "No se pudo cambiar la versión.");
+      if (!res.ok) throw new Error(await resError(res, "No se pudo cambiar la versión."));
       cancelCompose();
       await load({ silent: true });
     } catch (e) {

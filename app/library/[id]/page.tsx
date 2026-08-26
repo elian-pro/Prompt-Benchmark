@@ -27,6 +27,7 @@ import { N8nSyncHistory } from "@/components/library/N8nSyncHistory";
 import { N8nSyncModal } from "@/components/library/N8nSyncModal";
 import { ConversationHistory } from "@/components/library/ConversationHistory";
 import { ClientToolsCard } from "@/components/library/ClientToolsCard";
+import { resError } from "@/lib/res-error";
 
 const SOURCE_LABELS: Record<string, string> = {
   manual: "Manual",
@@ -90,7 +91,7 @@ export default function ClientDetailPage() {
     setError(null);
     try {
       const res = await fetch(`/api/clients/${id}`);
-      if (!res.ok) throw new Error((await res.json()).error ?? "Error al cargar el cliente.");
+      if (!res.ok) throw new Error(await resError(res, "Error al cargar el cliente."));
       const data: ClientDetail = await res.json();
       setDetail(data);
       hasEdited.current = false;
@@ -181,7 +182,7 @@ export default function ClientDetailPage() {
         body: JSON.stringify({ clientId: id, baseVersionId }),
       });
       if (!res.ok) {
-        throw new Error((await res.json()).error ?? "No se pudo abrir la edición.");
+        throw new Error(await resError(res, "No se pudo abrir la edición."));
       }
       const session = await res.json();
       router.push(`/editor/${session.id}`);

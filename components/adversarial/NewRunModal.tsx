@@ -15,6 +15,7 @@ import {
 import { Modal } from "@/components/ui/Modal";
 import { Button } from "@/components/ui/Button";
 import { SearchableChip } from "@/components/ui/SearchableChip";
+import { resError } from "@/lib/res-error";
 
 const INTENSITIES: Intensity[] = [1, 2, 3];
 
@@ -44,7 +45,7 @@ export function NewRunModal({ open, onClose }: { open: boolean; onClose: () => v
     setError(null);
     fetch("/api/clients?filter=all")
       .then(async (res) => {
-        if (!res.ok) throw new Error((await res.json()).error ?? "Error al cargar.");
+        if (!res.ok) throw new Error(await resError(res, "Error al cargar."));
         return res.json();
       })
       .then((data: ClientSummary[]) => setClients(data))
@@ -61,7 +62,7 @@ export function NewRunModal({ open, onClose }: { open: boolean; onClose: () => v
     }
     fetch(`/api/clients/${clientId}`)
       .then(async (res) => {
-        if (!res.ok) throw new Error((await res.json()).error ?? "Error al cargar el cliente.");
+        if (!res.ok) throw new Error(await resError(res, "Error al cargar el cliente."));
         return res.json();
       })
       .then((detail: ClientDetail) => {
@@ -89,7 +90,7 @@ export function NewRunModal({ open, onClose }: { open: boolean; onClose: () => v
           leadBrief: leadBrief.trim() || undefined,
         }),
       });
-      if (!res.ok) throw new Error((await res.json()).error ?? "No se pudo crear la prueba.");
+      if (!res.ok) throw new Error(await resError(res, "No se pudo crear la prueba."));
       const run = await res.json();
       router.push(`/adversarial/${run.id}`);
     } catch (e) {

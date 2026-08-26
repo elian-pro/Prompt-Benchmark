@@ -11,6 +11,7 @@ import { SkeletonRows } from "@/components/ui/Skeleton";
 import { NewPlaygroundSessionModal } from "@/components/playground/NewPlaygroundSessionModal";
 import { DeleteDemoSessionModal } from "@/components/playground/DeleteDemoSessionModal";
 import { DangerConfirmModal } from "@/components/ui/DangerConfirmModal";
+import { resError } from "@/lib/res-error";
 
 const STATUS_LABELS: Record<string, string> = {
   active: "Activa",
@@ -30,7 +31,7 @@ export default function PlaygroundPage() {
     setError(null);
     try {
       const res = await fetch("/api/demo-sessions");
-      if (!res.ok) throw new Error((await res.json()).error ?? "Error al cargar.");
+      if (!res.ok) throw new Error(await resError(res, "Error al cargar."));
       setSessions(await res.json());
     } catch (e) {
       setError(e instanceof Error ? e.message : "Error al cargar las conversaciones.");

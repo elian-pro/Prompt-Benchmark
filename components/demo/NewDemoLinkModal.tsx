@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/Button";
 import { SearchableChip } from "@/components/ui/SearchableChip";
 import { businessDaysFrom, formatDeadlineEs, todayInMexico, WORKING_WEEK } from "@/lib/business-days";
 import { DeadlinePicker } from "@/components/ui/DeadlinePicker";
+import { resError } from "@/lib/res-error";
 
 /**
  * Cuts a new demo link: a client, the version it freezes, and how the chat
@@ -48,7 +49,7 @@ export function NewDemoLinkModal({
     setError(null);
     fetch("/api/clients?filter=all")
       .then(async (res) => {
-        if (!res.ok) throw new Error((await res.json()).error ?? "Error al cargar.");
+        if (!res.ok) throw new Error(await resError(res, "Error al cargar."));
         return res.json();
       })
       .then((data: ClientSummary[]) => setClients(data))
@@ -64,7 +65,7 @@ export function NewDemoLinkModal({
     }
     fetch(`/api/clients/${clientId}`)
       .then(async (res) => {
-        if (!res.ok) throw new Error((await res.json()).error ?? "Error al cargar el cliente.");
+        if (!res.ok) throw new Error(await resError(res, "Error al cargar el cliente."));
         return res.json();
       })
       .then((detail: ClientDetail) => {
@@ -92,7 +93,7 @@ export function NewDemoLinkModal({
           expiresOn,
         }),
       });
-      if (!res.ok) throw new Error((await res.json()).error ?? "No se pudo crear el link.");
+      if (!res.ok) throw new Error(await resError(res, "No se pudo crear el link."));
       onCreated();
       onClose();
       setClientId("");

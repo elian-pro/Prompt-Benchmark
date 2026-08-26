@@ -10,6 +10,7 @@ import { ConversationHistory } from "@/components/library/ConversationHistory";
 import { ReplayWorkspace } from "@/components/replay/ReplayWorkspace";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { Button } from "@/components/ui/Button";
+import { resError } from "@/lib/res-error";
 
 function formatDate(iso: string): string {
   return new Date(iso).toLocaleString("es-MX", {
@@ -43,7 +44,7 @@ export default function ReplayClientPage() {
   useEffect(() => {
     fetch(`/api/clients/${clientId}`)
       .then(async (res) => {
-        if (!res.ok) throw new Error((await res.json()).error ?? "Cliente no encontrado.");
+        if (!res.ok) throw new Error(await resError(res, "Cliente no encontrado."));
         return res.json();
       })
       .then(setClient)

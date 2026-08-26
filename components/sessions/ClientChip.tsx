@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { IconChevronDown, IconSearch, IconTargetArrow, IconTemplate } from "@tabler/icons-react";
 import type { ClientSummary } from "@/lib/db/clients";
+import { resError } from "@/lib/res-error";
 
 export type ClientChipValue =
   | { kind: "client"; id: string; name: string }
@@ -46,7 +47,7 @@ export function ClientChip({
     setError(null);
     fetch("/api/clients?filter=all")
       .then(async (res) => {
-        if (!res.ok) throw new Error((await res.json()).error ?? "Error al cargar.");
+        if (!res.ok) throw new Error(await resError(res, "Error al cargar."));
         return res.json();
       })
       .then((data: ClientSummary[]) => {

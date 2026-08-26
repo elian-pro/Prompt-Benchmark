@@ -8,6 +8,7 @@ import { IconArrowLeft } from "@tabler/icons-react";
 import type { ConversationTurn } from "@/lib/conversation-turns";
 import { CaseReplayWorkspace } from "@/components/replay/CaseReplayWorkspace";
 import { SkeletonRows } from "@/components/ui/Skeleton";
+import { resError } from "@/lib/res-error";
 
 /** The case as its own endpoint returns it: the row plus the conversation it
  *  was filed against, already parsed into turns. */
@@ -55,7 +56,7 @@ export default function CasePage() {
   useEffect(() => {
     fetch(`/api/cases/${caseId}`)
       .then(async (res) => {
-        if (!res.ok) throw new Error((await res.json()).error ?? "Caso no encontrado.");
+        if (!res.ok) throw new Error(await resError(res, "Caso no encontrado."));
         return res.json();
       })
       .then(setCase)

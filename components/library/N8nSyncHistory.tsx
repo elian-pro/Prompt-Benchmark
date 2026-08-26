@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import { IconChevronDown, IconChevronRight, IconHistory } from "@tabler/icons-react";
 import type { SyncEvent } from "@/lib/db/n8n-sync-events";
 import { Button } from "@/components/ui/Button";
+import { resError } from "@/lib/res-error";
 
 type Props = {
   clientId: string;
@@ -30,7 +31,7 @@ export function N8nSyncHistory({ clientId }: Props) {
   const load = useCallback(async () => {
     try {
       const res = await fetch(`/api/clients/${clientId}/n8n-sync/history`);
-      if (!res.ok) throw new Error((await res.json()).error ?? "No se pudo cargar el historial.");
+      if (!res.ok) throw new Error(await resError(res, "No se pudo cargar el historial."));
       setEvents(await res.json());
       setError(null);
     } catch (e) {
@@ -49,7 +50,7 @@ export function N8nSyncHistory({ clientId }: Props) {
       const res = await fetch(`/api/clients/${clientId}/n8n-sync/${eventId}/revert`, {
         method: "POST",
       });
-      if (!res.ok) throw new Error((await res.json()).error ?? "No se pudo revertir.");
+      if (!res.ok) throw new Error(await resError(res, "No se pudo revertir."));
       await load();
     } catch (e) {
       setError(e instanceof Error ? e.message : "Error inesperado.");

@@ -8,6 +8,7 @@ import { SearchableChip } from "@/components/ui/SearchableChip";
 import type { MaskedConnection } from "@/lib/db/n8n-connections";
 import type { WorkflowListItem } from "@/lib/n8n/client";
 import type { AgentNodeSummary } from "@/lib/n8n/agent-node";
+import { resError } from "@/lib/res-error";
 
 export type BindingSelection = {
   connection_id: string;
@@ -78,7 +79,7 @@ export function N8nBindingModal({
     setNodeId("");
     try {
       const res = await fetch(`/api/integrations/n8n/${connId}/workflows`);
-      if (!res.ok) throw new Error((await res.json()).error ?? "No se pudieron cargar los flujos.");
+      if (!res.ok) throw new Error(await resError(res, "No se pudieron cargar los flujos."));
       setWorkflows(await res.json());
     } catch (e) {
       setError(e instanceof Error ? e.message : "Error inesperado.");
@@ -94,7 +95,7 @@ export function N8nBindingModal({
     setNodeId("");
     try {
       const res = await fetch(`/api/integrations/n8n/${connId}/workflows/${encodeURIComponent(wfId)}/agents`);
-      if (!res.ok) throw new Error((await res.json()).error ?? "No se pudieron cargar los agentes.");
+      if (!res.ok) throw new Error(await resError(res, "No se pudieron cargar los agentes."));
       setAgents(await res.json());
     } catch (e) {
       setError(e instanceof Error ? e.message : "Error inesperado.");

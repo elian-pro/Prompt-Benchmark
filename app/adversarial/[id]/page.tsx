@@ -8,6 +8,7 @@ import type { RunDetail, RunMessageRole, ReportRow } from "@/lib/db/runs";
 import { PRESET_LABELS } from "@/lib/prompts/adversarial-personas";
 import { parseTurn } from "@/lib/adversarial-message";
 import { relativeTimeEs } from "@/lib/format";
+import { resError } from "@/lib/res-error";
 
 const STATUS_LABELS: Record<string, string> = {
   pending: "Pendiente",
@@ -134,7 +135,7 @@ export default function RunDetailPage() {
 
   const load = useCallback(async () => {
     const res = await fetch(`/api/runs/${id}`);
-    if (!res.ok) throw new Error((await res.json()).error ?? "Error al cargar.");
+    if (!res.ok) throw new Error(await resError(res, "Error al cargar."));
     return (await res.json()) as RunDetail;
   }, [id]);
 

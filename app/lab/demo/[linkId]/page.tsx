@@ -12,6 +12,7 @@ import { formatDeadlineEs, isExpired } from "@/lib/business-days";
 import { DeadlinePicker } from "@/components/ui/DeadlinePicker";
 import { DangerConfirmModal } from "@/components/ui/DangerConfirmModal";
 import { DemoLinkWorkspace } from "@/components/demo/DemoLinkWorkspace";
+import { resError } from "@/lib/res-error";
 
 type LinkDetail = Omit<DemoLink, "prompt_snapshot"> & {
   client_name: string | null;
@@ -60,7 +61,7 @@ export default function DemoLinkDetailPage() {
   const load = useCallback(async () => {
     try {
       const res = await fetch(`/api/demo-links/${linkId}`);
-      if (!res.ok) throw new Error((await res.json()).error ?? "Link no encontrado.");
+      if (!res.ok) throw new Error(await resError(res, "Link no encontrado."));
       setDetail(await res.json());
     } catch (e) {
       setError(e instanceof Error ? e.message : "Error al cargar el link.");
@@ -85,7 +86,7 @@ export default function DemoLinkDetailPage() {
       body: JSON.stringify({ expiresOn: value }),
     });
     if (!res.ok) {
-      setError((await res.json()).error ?? "No se pudo cambiar la fecha.");
+      setError(await resError(res, "No se pudo cambiar la fecha."));
       return;
     }
     await load();
@@ -93,7 +94,7 @@ export default function DemoLinkDetailPage() {
 
   async function removeLink() {
     const res = await fetch(`/api/demo-links/${linkId}`, { method: "DELETE" });
-    if (!res.ok) throw new Error((await res.json()).error ?? "No se pudo eliminar el link.");
+    if (!res.ok) throw new Error(await resError(res, "No se pudo eliminar el link."));
     router.push("/lab/demo");
   }
 

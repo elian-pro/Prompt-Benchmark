@@ -6,6 +6,7 @@ import { Modal } from "@/components/ui/Modal";
 import { Button } from "@/components/ui/Button";
 import type { PushWarning } from "@/lib/n8n/agent-node";
 import type { N8nBinding } from "@/lib/db/n8n-bindings";
+import { resError } from "@/lib/res-error";
 
 type Preview =
   | {
@@ -81,7 +82,7 @@ export function N8nSyncModal({
         }),
         fetch(`/api/clients/${clientId}/n8n-bindings`),
       ]);
-      if (!pRes.ok) throw new Error((await pRes.json()).error ?? "No se pudo leer n8n.");
+      if (!pRes.ok) throw new Error(await resError(pRes, "No se pudo leer n8n."));
       const rows: Preview[] = await pRes.json();
       setPreviews(rows);
       // Default-select pushable targets that actually change.
@@ -119,7 +120,7 @@ export function N8nSyncModal({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ version_id: versionId }),
       });
-      if (!res.ok) throw new Error((await res.json()).error ?? "No se pudo confirmar.");
+      if (!res.ok) throw new Error(await resError(res, "No se pudo confirmar."));
       setManualBindings((rows) => rows.filter((b) => b.id !== bindingId));
     } catch (e) {
       setLoadError(e instanceof Error ? e.message : "Error inesperado.");
@@ -148,7 +149,7 @@ export function N8nSyncModal({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ version_id: versionId, targets }),
       });
-      if (!res.ok) throw new Error((await res.json()).error ?? "No se pudo sincronizar.");
+      if (!res.ok) throw new Error(await resError(res, "No se pudo sincronizar."));
       const results: Outcome[] = await res.json();
       setOutcomes(results);
       const pushed = results.filter((r) => r.status === "success").length;

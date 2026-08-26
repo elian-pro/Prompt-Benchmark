@@ -16,6 +16,7 @@ import {
 import { DemoInstructions } from "@/components/demo/DemoInstructions";
 import { gateStateFor } from "@/lib/demo-visit";
 import { ZebraWordmark } from "@/components/ui/ZebraWordmark";
+import { resError } from "@/lib/res-error";
 
 /**
  * The client's whole experience of a demo link: read the instructions, talk to
@@ -245,7 +246,7 @@ export function DemoClient({
     setError(null);
     try {
       const res = await fetch(`/api/prueba/${token}/reset`, { method: "POST" });
-      if (!res.ok) throw new Error((await res.json()).error ?? "No se pudo reiniciar.");
+      if (!res.ok) throw new Error(await resError(res, "No se pudo reiniciar."));
       setSelectedIds([]);
       setResetOpen(false);
       await openSession();
@@ -259,7 +260,7 @@ export function DemoClient({
   async function removeNote(noteId: string) {
     try {
       const res = await fetch(`/api/prueba/${token}/notes/${noteId}`, { method: "DELETE" });
-      if (!res.ok) throw new Error((await res.json()).error ?? "No se pudo eliminar la nota.");
+      if (!res.ok) throw new Error(await resError(res, "No se pudo eliminar la nota."));
       setSession((prev) =>
         prev ? { ...prev, notes: prev.notes.filter((n) => n.id !== noteId) } : prev,
       );

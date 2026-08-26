@@ -12,6 +12,7 @@ import { NoteCard, type NoteReviewPatch } from "@/components/demo/NoteCard";
 import { RoundStack, type RoundSummary } from "@/components/demo/RoundStack";
 import { Button } from "@/components/ui/Button";
 import { EmptyState } from "@/components/ui/EmptyState";
+import { resError } from "@/lib/res-error";
 
 /**
  * One client conversation as the user reads it: the transcript exactly as the
@@ -48,7 +49,7 @@ export function DemoLinkWorkspace({
     setRound(null);
     try {
       const res = await fetch(`/api/demo-links/${linkId}/sessions/${sessionId}`);
-      if (!res.ok) throw new Error((await res.json()).error ?? "No se pudo cargar.");
+      if (!res.ok) throw new Error(await resError(res, "No se pudo cargar."));
       setSession(await res.json());
     } catch (e) {
       setError(e instanceof Error ? e.message : "Error al cargar la conversación.");
@@ -73,7 +74,7 @@ export function DemoLinkWorkspace({
           body: JSON.stringify(patch),
         },
       );
-      if (!res.ok) throw new Error((await res.json()).error ?? "No se pudo guardar.");
+      if (!res.ok) throw new Error(await resError(res, "No se pudo guardar."));
       const updated: DemoNoteRow = await res.json();
       setSession((prev) =>
         prev ? { ...prev, notes: prev.notes.map((n) => (n.id === updated.id ? updated : n)) } : prev,
@@ -97,7 +98,7 @@ export function DemoLinkWorkspace({
       const res = await fetch(`/api/demo-links/${linkId}/sessions/${sessionId}/handoff`, {
         method: "POST",
       });
-      if (!res.ok) throw new Error((await res.json()).error ?? "No se pudo enviar al Editor.");
+      if (!res.ok) throw new Error(await resError(res, "No se pudo enviar al Editor."));
       const { editorSessionId, draftMessage } = await res.json();
       window.sessionStorage.setItem(`playground-handoff:${editorSessionId}`, draftMessage);
       router.push(`/editor/${editorSessionId}`);

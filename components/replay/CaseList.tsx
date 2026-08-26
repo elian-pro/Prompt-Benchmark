@@ -6,6 +6,7 @@ import { IconChevronRight, IconPlayerPlay } from "@tabler/icons-react";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { SkeletonRows } from "@/components/ui/Skeleton";
 import { relativeTimeEs } from "@/lib/format";
+import { resError } from "@/lib/res-error";
 
 /** The case as the list endpoint returns it: no snapshots. */
 type CaseRow = {
@@ -53,7 +54,7 @@ export function CaseList({
   const load = useCallback(async () => {
     try {
       const res = await fetch("/api/cases");
-      if (!res.ok) throw new Error((await res.json()).error ?? "No se pudieron cargar los casos.");
+      if (!res.ok) throw new Error(await resError(res, "No se pudieron cargar los casos."));
       const data = await res.json();
       setCases(data.cases);
     } catch (e) {

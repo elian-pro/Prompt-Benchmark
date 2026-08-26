@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/Button";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { SkeletonRows } from "@/components/ui/Skeleton";
 import { NewRunModal } from "@/components/adversarial/NewRunModal";
+import { resError } from "@/lib/res-error";
 
 const STATUS_LABELS: Record<string, string> = {
   pending: "Pendiente",
@@ -30,7 +31,7 @@ export default function AdversarialPage() {
     setError(null);
     try {
       const res = await fetch("/api/runs");
-      if (!res.ok) throw new Error((await res.json()).error ?? "Error al cargar.");
+      if (!res.ok) throw new Error(await resError(res, "Error al cargar."));
       setRuns(await res.json());
     } catch (e) {
       setError(e instanceof Error ? e.message : "Error al cargar las pruebas.");

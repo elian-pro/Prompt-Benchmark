@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import type { Client } from "@/lib/db/clients";
 import { Modal } from "@/components/ui/Modal";
+import { resError } from "@/lib/res-error";
 
 /**
  * Picks the client to file a case for. Only clients with a connected history
@@ -20,7 +21,7 @@ export function NewCaseModal({ open, onClose }: { open: boolean; onClose: () => 
     if (!open || clients !== null) return;
     fetch("/api/clients")
       .then(async (res) => {
-        if (!res.ok) throw new Error((await res.json()).error ?? "Error al cargar.");
+        if (!res.ok) throw new Error(await resError(res, "Error al cargar."));
         return res.json();
       })
       .then((data: Client[]) => setClients(data.filter((c) => c.chats_table)))

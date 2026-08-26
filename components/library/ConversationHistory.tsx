@@ -14,6 +14,7 @@ import { EmptyState } from "@/components/ui/EmptyState";
 import { SearchableChip } from "@/components/ui/SearchableChip";
 import { chatsTableName } from "@/lib/chats-table-name";
 import { ConversationTranscript } from "./ConversationTranscript";
+import { resError } from "@/lib/res-error";
 
 type Props = {
   clientId: string;
@@ -162,7 +163,7 @@ export function ConversationHistory({
           return;
         }
         if (!res.ok) {
-          throw new Error((await res.json()).error ?? "No se pudo cargar el historial.");
+          throw new Error(await resError(res, "No se pudo cargar el historial."));
         }
         const data: Page = await res.json();
         if (!current) return;
@@ -189,7 +190,7 @@ export function ConversationHistory({
       const res = await fetch(
         `/api/clients/${clientId}/conversations?${historyQuery(offset, applied)}`,
       );
-      if (!res.ok) throw new Error((await res.json()).error ?? "No se pudo cargar más.");
+      if (!res.ok) throw new Error(await resError(res, "No se pudo cargar más."));
       const data: Page = await res.json();
       setRows((prev) => [...prev, ...data.rows]);
       setOffset((prev) => prev + data.rows.length);
@@ -231,7 +232,7 @@ export function ConversationHistory({
     if (tables === null) {
       try {
         const res = await fetch("/api/chats-tables");
-        if (!res.ok) throw new Error((await res.json()).error ?? "No se pudieron listar las tablas.");
+        if (!res.ok) throw new Error(await resError(res, "No se pudieron listar las tablas."));
         const data: { configured: boolean; tables: ChatsTable[] } = await res.json();
         if (!data.configured) setUnconfigured(true);
         setTables(data.tables);
@@ -251,7 +252,7 @@ export function ConversationHistory({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ chats_table: chosen }),
       });
-      if (!res.ok) throw new Error((await res.json()).error ?? "No se pudo conectar la tabla.");
+      if (!res.ok) throw new Error(await resError(res, "No se pudo conectar la tabla."));
       // Reload the history for the newly connected table.
       setPicking(false);
       setChosen("");

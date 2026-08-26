@@ -10,6 +10,7 @@ import { SkeletonRows } from "@/components/ui/Skeleton";
 import { ClientChip, type ClientChipValue } from "@/components/sessions/ClientChip";
 import { DeleteSessionModal } from "@/components/sessions/DeleteSessionModal";
 import { ATTACHMENT_ACCEPT, isAcceptedFile, uploadAttachment } from "@/lib/attachments";
+import { resError } from "@/lib/res-error";
 
 type Mode = "editor" | "creator";
 
@@ -44,7 +45,7 @@ type FirstMessage = { content: string; attachments: Attachment[] };
 
 async function fetchClientDetail(id: string): Promise<ClientDetail> {
   const res = await fetch(`/api/clients/${id}`);
-  if (!res.ok) throw new Error((await res.json()).error ?? "No se pudo cargar el cliente.");
+  if (!res.ok) throw new Error(await resError(res, "No se pudo cargar el cliente."));
   return res.json();
 }
 
@@ -92,7 +93,7 @@ export function IdleComposer({
     setHistoryError(null);
     try {
       const res = await fetch(`/api/chat-sessions?type=${mode}`);
-      if (!res.ok) throw new Error((await res.json()).error ?? "Error al cargar.");
+      if (!res.ok) throw new Error(await resError(res, "Error al cargar."));
       setSessions(await res.json());
     } catch (e) {
       setHistoryError(e instanceof Error ? e.message : "Error al cargar las sesiones.");
@@ -171,7 +172,7 @@ export function IdleComposer({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(body),
       });
-      if (!res.ok) throw new Error((await res.json()).error ?? "No se pudo crear la sesión.");
+      if (!res.ok) throw new Error(await resError(res, "No se pudo crear la sesión."));
       const created = await res.json();
       const sessionId = created.id as string;
 

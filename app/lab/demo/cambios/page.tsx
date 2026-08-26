@@ -14,6 +14,7 @@ import { Button } from "@/components/ui/Button";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { SearchableChip } from "@/components/ui/SearchableChip";
 import { SkeletonRows } from "@/components/ui/Skeleton";
+import { resError } from "@/lib/res-error";
 
 /**
  * Every report one client wrote, from every link and every conversation, in one
@@ -65,7 +66,7 @@ export default function DemoNotesInboxPage() {
   useEffect(() => {
     fetch("/api/clients?filter=all")
       .then(async (res) => {
-        if (!res.ok) throw new Error((await res.json()).error ?? "Error al cargar.");
+        if (!res.ok) throw new Error(await resError(res, "Error al cargar."));
         return res.json();
       })
       .then((data: ClientSummary[]) => {
@@ -87,7 +88,7 @@ export default function DemoNotesInboxPage() {
     setError(null);
     try {
       const res = await fetch(`/api/clients/${clientId}/demo-notes`);
-      if (!res.ok) throw new Error((await res.json()).error ?? "Error al cargar los reportes.");
+      if (!res.ok) throw new Error(await resError(res, "Error al cargar los reportes."));
       setNotes(await res.json());
     } catch (e) {
       setError(e instanceof Error ? e.message : "Error al cargar los reportes.");
@@ -123,7 +124,7 @@ export default function DemoNotesInboxPage() {
           body: JSON.stringify(patch),
         },
       );
-      if (!res.ok) throw new Error((await res.json()).error ?? "No se pudo guardar.");
+      if (!res.ok) throw new Error(await resError(res, "No se pudo guardar."));
       const updated = await res.json();
       setNotes((prev) => prev.map((n) => (n.id === note.id ? { ...n, ...updated } : n)));
     } catch (e) {
@@ -142,7 +143,7 @@ export default function DemoNotesInboxPage() {
     setError(null);
     try {
       const res = await fetch(`/api/clients/${clientId}/demo-notes/handoff`, { method: "POST" });
-      if (!res.ok) throw new Error((await res.json()).error ?? "No se pudo enviar al Editor.");
+      if (!res.ok) throw new Error(await resError(res, "No se pudo enviar al Editor."));
       const { editorSessionId, draftMessage } = await res.json();
       window.sessionStorage.setItem(`playground-handoff:${editorSessionId}`, draftMessage);
       router.push(`/editor/${editorSessionId}`);

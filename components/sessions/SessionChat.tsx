@@ -29,6 +29,7 @@ import { ChatMessage } from "@/components/editor/ChatMessage";
 import { FileUpload } from "@/components/editor/FileUpload";
 import { FinalizeButton } from "@/components/editor/FinalizeButton";
 import { FinalizeCreatorButton } from "@/components/creator/FinalizeCreatorButton";
+import { resError } from "@/lib/res-error";
 
 type Mode = "editor" | "creator";
 
@@ -199,7 +200,7 @@ export function SessionChat({
     setError(null);
     try {
       const res = await fetch(`/api/chat-sessions/${sessionId}`);
-      if (!res.ok) throw new Error((await res.json()).error ?? "Error al cargar.");
+      if (!res.ok) throw new Error(await resError(res, "Error al cargar."));
       const data: ChatSessionDetail = await res.json();
       setSession(data);
       // On first load, treat the existing draft as already seen (no badge).
@@ -789,7 +790,7 @@ export function SessionChat({
     setPromoting(true);
     try {
       const res = await fetch(`/api/versions/${finalizedVersion.id}/promote`, { method: "POST" });
-      if (!res.ok) throw new Error((await res.json()).error ?? "No se pudo promover.");
+      if (!res.ok) throw new Error(await resError(res, "No se pudo promover."));
       showToast(`${finalizedVersion.number} marcada como producción.`);
       const bRes = await fetch(`/api/clients/${session.client_id}/n8n-bindings`);
       if (bRes.ok) {
