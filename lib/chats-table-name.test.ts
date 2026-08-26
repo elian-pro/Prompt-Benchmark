@@ -12,6 +12,7 @@ import {
   isLegacyChatsTable,
   quoteIdent,
 } from "./chats-table-name.ts";
+import { updateClientSchema } from "./schemas/clients.ts";
 
 test("chatsTableName keeps the client name as written, accents and spaces included", () => {
   assert.equal(chatsTableName("Bad Boys Toys"), "Bad Boys Toys");
@@ -103,4 +104,17 @@ test("a client name matches an existing schema regardless of case or accents", (
   assert.deepEqual(casa("GRUPO TACTICAL"), ["Grupo Tactical"]);
   assert.deepEqual(casa("Sofia"), ["Sofía"]);
   assert.deepEqual(casa("Cliente Nuevo"), []);
+});
+
+test("the update schema accepts a real schema name, not just the legacy chats_*", () => {
+  // The bug: connecting "Samuel Maya" answered 400 "Nombre de tabla de
+  // historial no válido." because the Zod field still carried the pre-migration
+  // /^chats_[A-Za-z0-9_]+$/, which no schema name can match.
+  const ok = (v: unknown) => updateClientSchema.safeParse({ chats_table: v }).success;
+  assert.equal(ok("Samuel Maya"), true);
+  assert.equal(ok("Sofía"), true);
+  assert.equal(ok("chats_BadBoysToys"), true); // legacy values still parse
+  assert.equal(ok(null), true); // disconnecting
+  assert.equal(ok("a".repeat(64)), false); // past the identifier limit
+  assert.equal(ok("mal\u0000nombre"), false);
 });

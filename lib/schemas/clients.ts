@@ -1,5 +1,7 @@
 import { z } from "zod";
 
+import { isValidChatsTable } from "../chats-table-name.ts";
+
 export const clientFilterSchema = z.enum(
   ["all", "production", "editing", "legacy", "archived"],
   { errorMap: () => ({ message: "Filtro no válido." }) },
@@ -43,12 +45,16 @@ export const updateClientSchema = z
     notes: z.string().nullable(),
     draft_content: z.string().nullable(),
     n8n_host: z.enum(["zebra", "own"]),
-    // Conversation-history table in the "chats" DB, or null to disconnect.
-    // Must be a chats_<...> name (validated again server-side before querying).
+    // The client's history schema in the chats Postgres, or null to
+    // disconnect. Since the August 2026 migration this carries a SCHEMA name,
+    // which is the client's real name and therefore has spaces and accents
+    // ("Samuel Maya"), so it cannot be matched against a charset regex. Same
+    // rule the rest of the code already applies, and applied again server-side
+    // before the name reaches a statement.
     chats_table: z
       .string()
       .trim()
-      .regex(/^chats_[A-Za-z0-9_]+$/, "Nombre de tabla de historial no válido.")
+      .refine(isValidChatsTable, "Nombre de tabla de historial no válido.")
       .nullable(),
   })
   .partial()
