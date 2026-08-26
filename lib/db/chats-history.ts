@@ -52,6 +52,19 @@ export type ConversationPage = {
 const COLUMNS = "id, created_at, numero_de_mensajes, id_de_kommo, historial, turnos";
 
 /**
+ * `id` is a bigint, and the pg driver hands int8 back as a STRING so a value
+ * past 2^53 does not lose precision on the way in. These ids are identity
+ * counters in the low millions, and everything downstream treats
+ * `ConversationRow.id` as the number this type declares: `z.number()` on the
+ * case routes, `===` in the UI. Narrowing happens here, at the one place a row
+ * is born, instead of at each reader. Skipping it is what made saving a note
+ * in Replay answer "Datos inválidos: Expected number, received string".
+ */
+function asRow(row: ConversationRow): ConversationRow {
+  return { ...row, id: Number(row.id) };
+}
+
+/**
  * Lists the client schemas that hold a conversation table, with an approximate
  * row count. Used by the "connect history" picker and the new-client
  * auto-match.
@@ -193,7 +206,7 @@ export async function getClientHistory(
       limit $${pageParams.length - 1} offset $${pageParams.length}`,
     pageParams,
   );
-  const clean = rows.map(({ total_count: _drop, ...row }) => row as ConversationRow);
+  const clean = rows.map(({ total_count: _drop, ...row }) => asRow(row as ConversationRow));
 
   // count(*) over() rides along with the page for free, but it only comes back
   // when the page has rows. An empty page still has to report the real total
@@ -223,7 +236,7 @@ export async function getConversation(
     `select ${COLUMNS} from ${quoteIdent(chatsTable)}.${CHATS_TABLE} where id = $1`,
     [rowId],
   );
-  return rows[0] ?? null;
+  return rows[0] ? asRow(rows[0]) : null;
 }
 
 /** Strip accents/spaces/punctuation and lowercase, for name comparison. */
