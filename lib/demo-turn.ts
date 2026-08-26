@@ -20,6 +20,7 @@ import { RoleNotConfiguredError } from "./db/runs";
 import { chat, type ChatMessage } from "./providers";
 import { runToolLoop } from "./client-tools";
 import { asEnvelope } from "./adversarial-message";
+import { ESTADOS } from "./estados";
 
 /**
  * Debug mode's contract, injected at the API layer (n8n output-parser style):
@@ -47,7 +48,10 @@ const DEBUG_RESPONSE_FORMAT = {
         },
         estado: {
           type: "string",
-          description: "El estado de la conversación según el prompt del sistema.",
+          // No enum: the schema runs with strict:true, so a closed list would
+          // make a client with legitimate sub-states fail outright. Naming the
+          // canonical seven here is enough to expose a crooked prompt in debug.
+          description: `El estado de la conversación según el prompt del sistema. Los estados canónicos son: ${ESTADOS.join(", ")}. Si el prompt del sistema define un sub-estado propio, úsalo solo cuando ese prompt lo pida, entendiéndolo como una especialización de uno de esos siete.`,
         },
         mensajes: {
           type: "array",

@@ -14,6 +14,8 @@
  * Pure module (no DB, no React) so the parsing can be unit-tested directly.
  */
 
+import { ESTADOS } from "./estados.ts";
+
 export type TurnRole = "lead" | "bot" | "sistema";
 
 export type ConversationTurn = {
@@ -40,11 +42,17 @@ const ROLE_BY_MARKER: Record<string, TurnRole> = {
  * producing a bubble that reads "IA:activo" in the middle of a conversation.
  *
  * Recognized conservatively: a hyphenated token cannot be a real message, and
- * the three unhyphenated ones are not plausible as a whole bot message either.
+ * the unhyphenated ones here are not plausible as a whole bot message either.
  * Anything else stays a message. Being wrong here hides real text, so the rule
  * errs toward keeping it.
  */
-const BARE_ESTADOS = new Set(["activo", "humano", "agendado"]);
+const BARE_ESTADOS = new Set<string>([
+  ...ESTADOS,
+  // Not canonical, but real flows already wrote them into `historial`. Dropping
+  // them would break the parsing of conversations already stored.
+  "activo",
+  "agendado",
+]);
 
 function looksLikeEstado(text: string): boolean {
   if (!/^[a-z][a-z0-9-]*$/.test(text)) return false;
