@@ -13,8 +13,10 @@ export type NoteReviewPatch = {
 };
 
 /** A turn the report tagged, already reduced to what is shown. `stale` marks
- *  one from a conversation the visitor later restarted past. */
-export type NoteQuote = { id: string; preview: string; stale?: boolean };
+ *  one from a conversation the visitor later restarted past; `context` marks
+ *  the other half of the exchange, derived rather than tagged, so a reader
+ *  sees what the client was answering and what answered them. */
+export type NoteQuote = { id: string; preview: string; stale?: boolean; context?: boolean };
 
 /**
  * One client report and the verdict on it.
@@ -97,8 +99,12 @@ export function NoteCard({
         <div className="note-refs">
           <span className="section-label">Mensajes que marcó</span>
           {quotes.map((q) => (
-            <div key={q.id} className={`note-ref${q.stale ? " note-ref-stale" : ""}`}>
+            <div
+              key={q.id}
+              className={`note-ref${q.context ? " note-ref-context" : ""}${q.stale ? " note-ref-stale" : ""}`}
+            >
               “{q.preview}”
+              {q.context && <span className="note-ref-tag">lo que lo provocó</span>}
               {q.stale && <span className="note-ref-tag">conversación anterior</span>}
             </div>
           ))}

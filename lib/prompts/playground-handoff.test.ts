@@ -9,10 +9,15 @@ import {
   buildHandoffMessage,
 } from "./playground-handoff.ts";
 
-const message = (id: string, role: "human" | "bot", content: string): DemoMessageRow => ({
+const message = (
+  id: string,
+  role: "human" | "bot",
+  content: string,
+  turn = 1,
+): DemoMessageRow => ({
   id,
   session_id: "s1",
-  turn_number: 1,
+  turn_number: turn,
   round: 1,
   role,
   content,
@@ -141,7 +146,7 @@ test("a turn without debug fields quotes exactly as before", () => {
 
 test("a quote that cannot be resolved says so instead of vanishing", () => {
   const out = buildHandoffMessage("1.0", [note({ message_ids: ["gone"] })], []);
-  assert.ok(out.includes("Mensajes citados:"));
+  assert.ok(out.includes("Mensajes citados"));
   assert.ok(out.includes("(mensaje no disponible)"));
 });
 
@@ -230,4 +235,53 @@ test("a report with both keeps the complaint first and the fix under it", () => 
   const i = lines.findIndex((l) => l.startsWith("1. "));
   assert.equal(lines[i], "1. Dijo que abre a las 9.");
   assert.equal(lines[i + 1], '   Debió responder: "Abre a las 8."');
+});
+
+// --- El par pregunta/respuesta -------------------------------------------
+
+const lead = (id: string, text: string, turn: number) => message(id, "human", text, turn);
+const bot = (id: string, text: string, turn: number) =>
+  message(id, "bot", JSON.stringify({ estado: "activo", mensajes: [text] }), turn);
+
+test("a tagged bot answer travels with the lead message that caused it", () => {
+  const out = buildHandoffMessage(
+    "1.0",
+    [note({ message_ids: ["m2"] })],
+    [lead("m1", "¿A qué hora abren?", 1), bot("m2", "Abrimos a las 9.", 2)],
+  );
+  const lines = out.split("\n");
+  const i = lines.findIndex((l) => l.includes("Mensajes citados"));
+  assert.equal(lines[i + 1], '   - (contexto) Tú (lead): "¿A qué hora abren?"');
+  assert.equal(lines[i + 2], '   - Bot del cliente: "Abrimos a las 9."');
+});
+
+test("a tagged lead message travels with the answer it got", () => {
+  const out = buildHandoffMessage(
+    "1.0",
+    [note({ message_ids: ["m1"] })],
+    [lead("m1", "¿A qué hora abren?", 1), bot("m2", "Abrimos a las 9.", 2)],
+  );
+  assert.ok(out.includes('- Tú (lead): "¿A qué hora abren?"'));
+  assert.ok(out.includes('- (contexto) Bot del cliente: "Abrimos a las 9."'));
+});
+
+test("tagging both sides marks neither as context", () => {
+  const out = buildHandoffMessage(
+    "1.0",
+    [note({ message_ids: ["m1", "m2"] })],
+    [lead("m1", "¿A qué hora abren?", 1), bot("m2", "Abrimos a las 9.", 2)],
+  );
+  assert.ok(!out.includes("(contexto)"));
+});
+
+test("a batch report carries the pair too", () => {
+  const out = buildClientBatchHandoff("Chapur", [
+    clientNote({
+      id: "a",
+      message_ids: ["m2"],
+      messages: [lead("m1", "¿A qué hora abren?", 1), bot("m2", "Abrimos a las 9.", 2)],
+    }),
+  ]);
+  assert.ok(out.includes('- (contexto) Tú (lead): "¿A qué hora abren?"'));
+  assert.ok(out.includes('- Bot del cliente: "Abrimos a las 9."'));
 });

@@ -21,6 +21,7 @@ import type {
 } from "@/lib/db/demo-sessions";
 import type { DemoNoteRow } from "@/lib/db/demo-notes";
 import { messagePreview } from "@/lib/adversarial-message";
+import { quotedWithContext } from "@/lib/note-context";
 import { relativeTimeEs } from "@/lib/format";
 import type { VersionListItem } from "@/lib/db/versions";
 import { Button } from "@/components/ui/Button";
@@ -69,6 +70,9 @@ function NotesPanel({
   currentMessageIds: Set<string>;
 }) {
   const isComposing = editingNoteId !== null || selectedIds.length > 0 || draftText.trim().length > 0;
+  // Every message the page holds: the active round plus the older turns a note
+  // reaches back to. `quotedWithContext` needs neighbours, not a lookup table.
+  const allMessages = [...messagesById.values()];
 
   return (
     <aside className="notes-panel notes-card">
@@ -120,23 +124,23 @@ function NotesPanel({
 
             {note.message_ids.length > 0 && (
               <div className="note-refs">
-                {note.message_ids.map((mid) => {
-                  const m = messagesById.get(mid);
-                  if (!m) return null;
-                  const preview = messagePreview(m.content);
+                {quotedWithContext(note.message_ids, allMessages).map((q) => {
+                  if (!q.message) return null;
+                  const preview = messagePreview(q.message.content);
                   // A ref to a message not in the current round: its preview
                   // still resolves, but jumping to it in the chat can't (it's
                   // not shown), so it's inert and marked.
-                  const olderRound = !currentMessageIds.has(mid);
+                  const olderRound = !currentMessageIds.has(q.id);
                   return (
                     <button
-                      key={mid}
+                      key={q.id}
                       type="button"
-                      className={`note-ref${olderRound ? " note-ref-stale" : ""}`}
-                      onClick={() => !olderRound && onJumpToMessage(mid)}
+                      className={`note-ref${q.isContext ? " note-ref-context" : ""}${olderRound ? " note-ref-stale" : ""}`}
+                      onClick={() => !olderRound && onJumpToMessage(q.id)}
                       title={olderRound ? "De una conversación anterior" : "Ir al mensaje"}
                     >
                       “{preview}”
+                      {q.isContext && <span className="note-ref-tag">lo que lo provocó</span>}
                       {olderRound && <span className="note-ref-tag">conversación anterior</span>}
                     </button>
                   );
@@ -157,30 +161,38 @@ function NotesPanel({
         )}
 
         {/* The tagged bubbles show as soon as messages are selected, before
-            saving, so you see exactly what the note points at. */}
+            saving, so you see exactly what the note points at. The derived
+            half of each pair shows here too, so what you send to the Editor
+            holds no surprises. It carries no remove button: nobody picked it,
+            and dropping it would mean dropping the message it belongs to. */}
         {selectedIds.length > 0 && (
           <div className="note-refs">
-            {selectedIds.map((mid) => {
-              const m = messagesById.get(mid);
-              const preview = m ? messagePreview(m.content) : "(sin mensaje)";
+            {quotedWithContext(selectedIds, allMessages).map((q) => {
+              const preview = q.message ? messagePreview(q.message.content) : "(sin mensaje)";
               return (
-                <div key={mid} className="note-ref note-ref-draft">
+                <div
+                  key={q.id}
+                  className={`note-ref note-ref-draft${q.isContext ? " note-ref-context" : ""}`}
+                >
                   <button
                     type="button"
                     className="note-ref-quote"
-                    onClick={() => onJumpToMessage(mid)}
+                    onClick={() => onJumpToMessage(q.id)}
                     title="Ir al mensaje"
                   >
                     “{preview}”
+                    {q.isContext && <span className="note-ref-tag">lo que lo provocó</span>}
                   </button>
-                  <button
-                    type="button"
-                    className="note-ref-remove"
-                    onClick={() => onToggleSelect(mid)}
-                    aria-label="Quitar este mensaje de la nota"
-                  >
-                    <IconX size={12} />
-                  </button>
+                  {!q.isContext && (
+                    <button
+                      type="button"
+                      className="note-ref-remove"
+                      onClick={() => onToggleSelect(q.id)}
+                      aria-label="Quitar este mensaje de la nota"
+                    >
+                      <IconX size={12} />
+                    </button>
+                  )}
                 </div>
               );
             })}

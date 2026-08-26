@@ -46,8 +46,9 @@ export type DemoNoteWithContext = DemoNoteRow & {
   link_label: string | null;
   version_id: string | null;
   version_number: string | null;
-  /** The tagged turns, in the order the note lists them. Empty on a general
-   *  note, and short of `message_ids` if a round was wiped. */
+  /** The whole conversation the note was written in, every round of it, so a
+   *  reader can resolve the tagged turns AND the messages around them with
+   *  `quotedWithContext`. Not the quotes themselves. */
   messages: DemoMessageRow[];
 };
 
@@ -93,18 +94,25 @@ export async function listClientNotes(clientId: string): Promise<DemoNoteWithCon
   if (error) throw new Error(`No se pudieron listar los reportes: ${error.message}`);
 
   const rows = (data ?? []) as any[];
-  const messageIds = [...new Set(rows.flatMap((r) => (r.message_ids ?? []) as string[]))];
-  const messagesById = new Map<string, DemoMessageRow>();
-  if (messageIds.length > 0) {
+  // The whole conversation, not only the tagged ids. A report's tagged message
+  // is half of what the reader needs: `quotedWithContext` derives the other
+  // half from its neighbours, and it cannot do that from a list that was
+  // already filtered down to the quotes. These are test conversations, tens of
+  // messages each.
+  const sessionIds = [...new Set(rows.map((r) => r.session_id as string))];
+  const bySession = new Map<string, DemoMessageRow[]>();
+  if (sessionIds.length > 0) {
     const { data: messages, error: mErr } = await sb
       .from("demo_messages")
       .select(
         "id, session_id, turn_number, round, role, content, tool_calls, " +
           "version_number_snapshot, created_at",
       )
-      .in("id", messageIds);
+      .in("session_id", sessionIds);
     if (mErr) throw new Error(`No se pudieron obtener los mensajes citados: ${mErr.message}`);
-    for (const m of (messages ?? []) as unknown as DemoMessageRow[]) messagesById.set(m.id, m);
+    for (const m of (messages ?? []) as unknown as DemoMessageRow[]) {
+      bySession.set(m.session_id, [...(bySession.get(m.session_id) ?? []), m]);
+    }
   }
 
   return rows.map((row) => {
@@ -119,9 +127,7 @@ export async function listClientNotes(clientId: string): Promise<DemoNoteWithCon
       // a link can be pointed at another version mid round of testing.
       version_id: session?.version_id ?? null,
       version_number: session?.version_number_snapshot ?? null,
-      messages: ((row.message_ids ?? []) as string[])
-        .map((id) => messagesById.get(id))
-        .filter((m): m is DemoMessageRow => Boolean(m)),
+      messages: bySession.get(row.session_id) ?? [],
     };
   });
 }

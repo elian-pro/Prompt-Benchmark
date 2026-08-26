@@ -4589,6 +4589,26 @@ body[data-theme="dark"] .history-filters input[type="date"]::-webkit-calendar-pi
   animation: noteFlash 1.6s ease;
 }
 
+/* The derived half of a quote: the message on the other side of the one that
+   was tagged. It is context, not evidence, so it reads one step quieter than
+   the tagged quote it sits next to, and the dotted edge says it was not
+   picked by hand. Never rendered on /prueba: a client must not learn that
+   their own words were attached to a report they did not attach them to. */
+.note-ref-context {
+  background: transparent;
+  border: 0.5px dashed var(--border2);
+  color: var(--faint);
+}
+.note-ref-context:hover {
+  color: var(--muted);
+}
+/* In the draft the fill lives on the inner button, so the quiet treatment has
+   to reach it too or the chip reads as tagged. */
+.note-ref-draft.note-ref-context .note-ref-quote {
+  background: transparent;
+  color: var(--faint);
+}
+
 /* Note ref pointing at a message from an older round (Sprint 8, T5). */
 .note-ref-stale {
   cursor: default;

@@ -7,6 +7,7 @@ import { IconArrowRight, IconNotes } from "@tabler/icons-react";
 import type { DemoSessionDetail } from "@/lib/db/demo-sessions";
 import type { DemoNoteRow } from "@/lib/db/demo-notes";
 import { messagePreview } from "@/lib/adversarial-message";
+import { quotedWithContext } from "@/lib/note-context";
 import { DemoTurn } from "@/components/demo/DemoTurn";
 import { NoteCard, type NoteReviewPatch } from "@/components/demo/NoteCard";
 import { RoundStack, type RoundSummary } from "@/components/demo/RoundStack";
@@ -120,9 +121,7 @@ export function DemoLinkWorkspace({
   // note_messages carries the turns from rounds the client restarted past, so a
   // report about one of those still quotes what it was about instead of
   // pointing at a pin that is no longer on screen.
-  const messagesById = new Map(
-    [...session.messages, ...session.note_messages].map((m) => [m.id, m]),
-  );
+  const allMessages = [...session.messages, ...session.note_messages];
   // A restart starts a new conversation, not a new chapter of the same one.
   // They are grouped and shown one at a time; the rest live behind the stack.
   const byRound = new Map<number, typeof session.messages>();
@@ -200,14 +199,12 @@ export function DemoLinkWorkspace({
               key={note.id}
               note={note}
               index={i + 1}
-              quotes={note.message_ids.map((mid) => {
-                const m = messagesById.get(mid);
-                return {
-                  id: mid,
-                  preview: m ? messagePreview(m.content) : "(mensaje no disponible)",
-                  stale: !currentIds.has(mid),
-                };
-              })}
+              quotes={quotedWithContext(note.message_ids, allMessages).map((q) => ({
+                id: q.id,
+                preview: q.message ? messagePreview(q.message.content) : "(mensaje no disponible)",
+                stale: !currentIds.has(q.id),
+                context: q.isContext,
+              }))}
               busy={busyNoteId === note.id}
               onReview={(patch) => review(note, patch)}
             />

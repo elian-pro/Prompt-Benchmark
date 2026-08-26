@@ -7,6 +7,7 @@ import { IconArrowRight, IconNotes, IconUser } from "@tabler/icons-react";
 
 import type { DemoNoteWithContext } from "@/lib/db/demo-notes";
 import { messagePreview } from "@/lib/adversarial-message";
+import { quotedWithContext } from "@/lib/note-context";
 import { relativeTimeEs } from "@/lib/format";
 import { DemoTabs } from "@/components/demo/DemoTabs";
 import { NoteCard, type NoteReviewPatch } from "@/components/demo/NoteCard";
@@ -242,7 +243,11 @@ export default function DemoNotesInboxPage() {
             key={note.id}
             note={note}
             index={i + 1}
-            quotes={note.messages.map((m) => ({ id: m.id, preview: messagePreview(m.content) }))}
+            quotes={quotedWithContext(note.message_ids, note.messages).map((q) => ({
+              id: q.id,
+              preview: q.message ? messagePreview(q.message.content) : "(mensaje no disponible)",
+              context: q.isContext,
+            }))}
             busy={busyNoteId === note.id}
             onReview={(patch) => review(note, patch)}
             footer={

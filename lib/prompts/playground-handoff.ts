@@ -13,6 +13,7 @@
 import type { DemoMessageRow, DemoMessageRole } from "../db/demo-sessions";
 import type { DemoNoteRow, DemoNoteWithContext } from "../db/demo-notes";
 import { parseDebug, parseTurn } from "../adversarial-message.ts";
+import { quotedWithContext } from "../note-context.ts";
 
 const ROLE_LABEL: Record<DemoMessageRole, string> = {
   human: "Tú (lead)",
@@ -46,14 +47,22 @@ export function approvedNotes<T extends DemoNoteRow>(notes: T[]): T[] {
   return notes.filter((n) => n.status === "approved" && !n.sent_to_editor_at);
 }
 
-/** One numbered report: the complaint, the fix, and the turns it tagged. */
-function noteBlock(note: DemoNoteRow, index: number, messagesById: Map<string, DemoMessageRow>) {
+/**
+ * One numbered report: the complaint, the fix, and the turns it tagged, each
+ * one next to the message on the other side of it.
+ *
+ * The tagged message is nearly always the bot's answer, and an answer alone is
+ * half the report: editing the prompt means knowing what the lead had just
+ * said. `quotedWithContext` derives that other half and marks it, so the
+ * Editor can tell evidence from context.
+ */
+function noteBlock(note: DemoNoteRow, index: number, messages: DemoMessageRow[]) {
   // An id that does not resolve says so out loud. Dropping it silently is how
   // a caller that read only the active round shipped notes to the Editor with
   // their quotes missing and nothing on screen to show it.
-  const quotes = note.message_ids.map((mid) => {
-    const m = messagesById.get(mid);
-    return `   - ${m ? quoteMessage(m) : "(mensaje no disponible)"}`;
+  const quotes = quotedWithContext(note.message_ids, messages).map((q) => {
+    const text = q.message ? quoteMessage(q.message) : "(mensaje no disponible)";
+    return `   - ${q.isContext ? "(contexto) " : ""}${text}`;
   });
 
   // A client's report may carry only the fix, since "what went wrong" is
@@ -69,7 +78,7 @@ function noteBlock(note: DemoNoteRow, index: number, messagesById: Map<string, D
     lines.push(`   Debió responder: "${note.expected}"`);
   }
   if (quotes.length > 0) {
-    lines.push("   Mensajes citados:");
+    lines.push("   Mensajes citados (el contexto va marcado):");
     lines.push(...quotes);
   }
   return lines.join("\n");
@@ -81,8 +90,7 @@ export function buildHandoffMessage(
   messages: DemoMessageRow[],
   options: { source?: "playground" | "demo-link"; clientName?: string | null } = {},
 ): string {
-  const messagesById = new Map(messages.map((m) => [m.id, m]));
-  const blocks = approvedNotes(notes).map((note, i) => noteBlock(note, i + 1, messagesById));
+  const blocks = approvedNotes(notes).map((note, i) => noteBlock(note, i + 1, messages));
 
   const header =
     options.source === "demo-link"
@@ -126,7 +134,7 @@ export function buildClientBatchHandoff(
   const sections = [...groups].map(([version, groupNotes]) => {
     const blocks = groupNotes.map((note) => {
       index += 1;
-      return noteBlock(note, index, new Map(note.messages.map((m) => [m.id, m])));
+      return noteBlock(note, index, note.messages);
     });
     return [`Sobre la versión ${version}:`, "", blocks.join("\n\n")].join("\n");
   });
