@@ -25,8 +25,9 @@
  *
  * Written in Spanish: it builds the team's Spanish prompts.
  */
-import { OPTIONS_CONTRACT } from "./options-block";
-import { ANTI_OVERFIT_CONTRACT } from "./anti-overfit";
+import { ESTADOS_CONTRACT } from "../estados.ts";
+import { OPTIONS_CONTRACT } from "./options-block.ts";
+import { ANTI_OVERFIT_CONTRACT } from "./anti-overfit.ts";
 
 /** The persona's standing instructions, independent of any specific brief.
  *  Exported so Settings can display it (read-only workspace; the runtime
@@ -34,15 +35,15 @@ import { ANTI_OVERFIT_CONTRACT } from "./anti-overfit";
 export const CREATOR_PERSONA = `Eres un ingeniero de prompts especializado en agentes conversacionales de perfilamiento de leads para una agencia de mercadotecnia. Tu trabajo es construir prompts NUEVOS para clientes nuevos usando un PROMPT BASE como referencia de arquitectura, nunca de contenido. Trabajas con clientes de distintos giros (inmobiliario, restaurantero, wellness, y otros); nunca asumas que un cliente es inmobiliario salvo que el brief lo indique.
 
 DOCUMENTOS DE TRABAJO:
-- PROMPT BASE: aparece más abajo en este mensaje de sistema. Es referencia de ARQUITECTURA únicamente: define estructura, lógica de flujo, estados, formato de respuesta y sistema de perfilamiento que debes replicar.
+- PROMPT BASE: aparece más abajo en este mensaje de sistema. Es referencia de ARQUITECTURA únicamente: define estructura, lógica de flujo, formato de respuesta y sistema de perfilamiento que debes replicar. Los nombres de los estados no salen de aquí: son los siete del contrato de estados de este mismo mensaje de sistema, aunque el base use otros.
 - BRIEF DEL NUEVO CLIENTE: el usuario lo adjunta como archivo o lo describe en la conversación. Es la fuente EXCLUSIVA de contenido: producto, precios, objeciones, tono, buyer persona y reglas específicas vienen únicamente de aquí.
 
 REGLA DE CONTAMINACIÓN (crítica): ningún dato, ejemplo, precio, nombre, objeción ni regla específica del PROMPT BASE debe aparecer en el prompt nuevo. Solo se traslada la arquitectura.
 
 LO QUE SE TRASLADA DEL PROMPT BASE (solo estos elementos estructurales):
-- Formato de respuesta (JSON, estados, estructura de mensajes).
+- Formato de respuesta (el sobre JSON y la estructura de mensajes).
 - Lógica de perfilamiento (preguntas clave, orden, criterios).
-- Sistema de estados y matriz de decisión.
+- Matriz de decisión: qué señales del lead llevan a qué estado y cómo se encadena el flujo. Solo la lógica: los nombres de los estados son siempre los siete del contrato.
 - Tipos de validaciones iniciales.
 - Reglas de división de mensajes.
 - Estructura de manejo de objeciones.
@@ -89,10 +90,12 @@ export function buildCreatorSystemPrompt(
   const reference =
     referencePrompt.trim().length > 0 ? referencePrompt : "(No se proporcionó prompt base.)";
   const persona = personaOverride?.trim() ? personaOverride : CREATOR_PERSONA;
-  // OPTIONS_CONTRACT and ANTI_OVERFIT_CONTRACT are appended after the persona
-  // (default or override) so both capabilities survive a saved persona
-  // override, exactly as in buildEditorSystemPrompt.
+  // The three contracts are appended after the persona (default or override)
+  // so they survive a saved persona override, exactly as in
+  // buildEditorSystemPrompt.
   return `${persona}
+
+${ESTADOS_CONTRACT}
 
 ${OPTIONS_CONTRACT}
 
@@ -106,4 +109,4 @@ ${reference}`;
 }
 
 // The fenced-block extraction is identical to the Editor's output contract.
-export { extractPromptFromReply } from "./editor-persona";
+export { extractPromptFromReply } from "./editor-persona.ts";

@@ -19,6 +19,7 @@
  * The prompt is written in Spanish: it operates on the team's Spanish prompts
  * and reasons in the same language they edit in.
  */
+import { ESTADOS_CONTRACT } from "../estados.ts";
 import { OPTIONS_CONTRACT } from "./options-block.ts";
 import { ANTI_OVERFIT_CONTRACT } from "./anti-overfit.ts";
 
@@ -72,14 +73,17 @@ Si el usuario solo hace una pregunta o pide una aclaración sin solicitar una ed
  * each time. It travels as the conversation's last message instead: see
  * buildEditorDraftMessage.
  *
- * OPTIONS_CONTRACT and ANTI_OVERFIT_CONTRACT are appended AFTER the persona
- * (default or override) on purpose: if they lived inside EDITOR_PERSONA they
- * would vanish whenever an operator saves a persona override, so appending them
- * separately keeps both capabilities available regardless of the persona in use.
+ * ESTADOS_CONTRACT, OPTIONS_CONTRACT and ANTI_OVERFIT_CONTRACT are appended
+ * AFTER the persona (default or override) on purpose: if they lived inside
+ * EDITOR_PERSONA they would vanish whenever an operator saves a persona
+ * override, so appending them separately keeps all three available regardless
+ * of the persona in use.
  */
 export function buildEditorSystemPrompt(personaOverride?: string | null): string {
   const persona = personaOverride?.trim() ? personaOverride : EDITOR_PERSONA;
   return `${persona}
+
+${ESTADOS_CONTRACT}
 
 ${OPTIONS_CONTRACT}
 
