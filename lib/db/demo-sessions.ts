@@ -245,6 +245,50 @@ export async function touchVisitorSession(
   if (error) throw new Error(`No se pudo actualizar la conversación: ${error.message}`);
 }
 
+/** A Playground conversation nobody has written to in a month is scratch work
+ *  that went cold. Same window as the notification log. */
+export const SESSION_MAX_AGE_MS = 30 * 24 * 60 * 60 * 1000;
+
+/**
+ * Drops the conversations that aged out. Called from `listSessions` rather
+ * than from a schedule because nothing runs cron in front of this app:
+ * opening the Playground is the one moment this reliably happens. A month
+ * where nobody opens it is a month where nothing is swept, which is the
+ * trade this buys with zero infrastructure.
+ *
+ * A client's demo link sessions are never touched, the same exclusion
+ * `deleteAllSessions` makes: they are evidence, not scratch work.
+ *
+ * Failure is swallowed on purpose. Not being able to prune is no reason to
+ * refuse to show the list.
+ * ponytail: sweep on read. A pg_cron job is the upgrade if the table ever
+ * grows enough for a stale row to cost something.
+ */
+async function pruneStaleSessions(): Promise<void> {
+  const cutoff = new Date(Date.now() - SESSION_MAX_AGE_MS).toISOString();
+  const sb = getSupabase();
+  // Two questions, because neither answers it alone: `updated_at` only moves
+  // when the session row itself changes (a reset, a version switch, a handoff),
+  // and `appendMessage` writes to `demo_messages` without touching it. A
+  // conversation someone has been typing in all month has a stale
+  // `updated_at`, so the messages get the final say.
+  const { data, error } = await sb
+    .from("demo_sessions")
+    .select("id, demo_messages(created_at)")
+    .is("link_id", null)
+    .lt("updated_at", cutoff);
+  if (error) {
+    console.error("No se pudieron leer las conversaciones viejas:", error.message);
+    return;
+  }
+  const stale = (data ?? [])
+    .filter((s) => (s.demo_messages ?? []).every((m) => m.created_at < cutoff))
+    .map((s) => s.id);
+  if (stale.length === 0) return;
+  const { error: dErr } = await sb.from("demo_sessions").delete().in("id", stale);
+  if (dErr) console.error("No se pudieron limpiar las conversaciones viejas:", dErr.message);
+}
+
 /**
  * The Playground's own sessions. Conversations that came in through a client
  * demo link are deliberately excluded: they belong to their link, they are
@@ -255,6 +299,7 @@ export async function touchVisitorSession(
 export async function listSessions({
   clientId,
 }: { clientId?: string } = {}): Promise<DemoSessionListItem[]> {
+  await pruneStaleSessions();
   const sb = getSupabase();
   let query = sb
     .from("demo_sessions")

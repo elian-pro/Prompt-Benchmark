@@ -66,6 +66,7 @@ export default function PlaygroundPage() {
           <h1 className="library-title">Playground</h1>
           <p className="section-label library-subtitle">
             {sessions.length} {sessions.length === 1 ? "conversación" : "conversaciones"}
+            {sessions.length > 0 && " · se borran tras 30 días sin actividad"}
           </p>
         </div>
         <div className="header-actions">
