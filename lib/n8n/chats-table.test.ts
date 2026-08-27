@@ -95,3 +95,58 @@ test("countLegacySupabaseNodes catches a template that was never migrated", () =
   assert.equal(retargetChatsTable(legacy, "Acalai").retargeted, 0);
   assert.equal(countLegacySupabaseNodes(wf([pg("a", "Valcasa")])), 0);
 });
+
+/** A ported write as the template carries it since August 2026: no schema or
+ *  table field at all, the schema is a literal inside the SQL. */
+const sqlNode = (id: string, query: string) => ({
+  id,
+  name: id,
+  type: POSTGRES_NODE_TYPE,
+  parameters: { operation: "executeQuery", query, options: { queryReplacement: "={{ [] }}" } },
+});
+
+const queryOf = (n: { parameters?: Record<string, unknown> }) => n.parameters?.query as string;
+
+test("retargets a write whose schema lives inside the SQL", () => {
+  // The exact shape of the ported nodes. Missing this is not a cosmetic bug:
+  // the four selects still retarget, so `retargeted` is non-zero and
+  // provisioning happily creates a flow that writes into Valcasa's history.
+  const out = retargetChatsTable(
+    wf([
+      pg("Get a row", "Valcasa"),
+      sqlNode(
+        "Update a row",
+        'UPDATE "Valcasa".chats\nSET historial = $1, turnos = $2::jsonb\nWHERE id = $3::int\nRETURNING *',
+      ),
+      sqlNode(
+        "Create a row2",
+        'INSERT INTO "Valcasa".chats (created_at, id_de_kommo, historial, numero_de_mensajes, turnos)\nVALUES ($1::timestamp, $2, $3, $4::int, $5::jsonb)\nRETURNING *',
+      ),
+    ]),
+    "Grupo de la Torre",
+  );
+  assert.equal(out.retargeted, 3);
+  assert.match(queryOf(out.workflow.nodes[1]), /^UPDATE "Grupo de la Torre"\.chats\n/);
+  assert.match(queryOf(out.workflow.nodes[2]), /^INSERT INTO "Grupo de la Torre"\.chats \(/);
+  // The rest of the statement is untouched: casts, parameters, RETURNING.
+  assert.ok(queryOf(out.workflow.nodes[1]).includes("turnos = $2::jsonb"));
+  assert.ok(!queryOf(out.workflow.nodes[2]).includes("Valcasa"));
+});
+
+test("qualifies a bare chats reference instead of leaving it to search_path", () => {
+  const out = retargetChatsTable(wf([sqlNode("q", "select * from chats where id = $1")]), "Sofía");
+  assert.equal(out.retargeted, 1);
+  assert.equal(queryOf(out.workflow.nodes[0]), 'select * from "Sofía".chats where id = $1');
+});
+
+test("leaves a raw query over another table alone", () => {
+  const sql = 'select precio from "Bad Boys Toys".vehiculos';
+  const out = retargetChatsTable(wf([sqlNode("q", sql)]), "Acalai");
+  assert.equal(out.retargeted, 0);
+  assert.equal(queryOf(out.workflow.nodes[0]), sql);
+});
+
+test("does not count a raw query already on the target schema", () => {
+  const out = retargetChatsTable(wf([sqlNode("q", 'UPDATE "Acalai".chats SET historial = $1')]), "Acalai");
+  assert.equal(out.retargeted, 0);
+});

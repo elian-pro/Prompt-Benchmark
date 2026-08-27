@@ -7,16 +7,17 @@
  * on every copy instead of relying on a human editing nine nodes.
  *
  * Until August 2026 those were Supabase nodes carrying a `chats_*` tableId.
- * They are now Postgres nodes whose `schema` is the client and whose `table` is
- * always `chats`, so what gets rewritten is the schema. Only nodes pointing at
- * the conversation table are touched: a Postgres node reading anything else is
- * left alone.
+ * They are now Postgres nodes, in two shapes: the reads keep `schema`/`table`
+ * resource locators, while the writes were ported to raw SQL and carry the
+ * schema INSIDE `parameters.query` (`UPDATE "Valcasa".chats ...`). Both shapes
+ * are rewritten. Only nodes pointing at the conversation table are touched: a
+ * Postgres node reading anything else is left alone.
  *
  * Pure module, no network, so it can be unit-tested directly.
  */
 // Extension-ful imports so `node --test` can run this module, same as
 // lib/chats-admin.ts does.
-import { isValidChatsTable, CHATS_TABLE } from "../chats-table-name.ts";
+import { isValidChatsTable, quoteIdent, CHATS_TABLE } from "../chats-table-name.ts";
 import type { N8nWorkflow, N8nNode } from "./agent-node.ts";
 
 export const POSTGRES_NODE_TYPE = "n8n-nodes-base.postgres";
@@ -43,6 +44,24 @@ function writeValue(field: unknown, next: string): unknown {
 }
 
 /**
+ * A reference to the conversation table inside raw SQL: `"Valcasa".chats`,
+ * `Valcasa.chats` or a bare `chats`. Anchored on the keyword that introduces a
+ * table so a column or an alias called chats is not rewritten. The unqualified
+ * form is matched too: left alone it would resolve through search_path, which
+ * is the same silent wrong-target failure this module exists to prevent.
+ */
+const CHATS_TARGET_RE =
+  /\b(from|into|update|join)\s+(?:(?:"(?:[^"]|"")*"|[A-Za-z_][A-Za-z0-9_$]*)\s*\.\s*)?chats\b/gi;
+
+/** Rewrites every conversation-table reference of a raw query onto `schema`. */
+function retargetQuery(query: string, schema: string): string {
+  return query.replace(
+    CHATS_TARGET_RE,
+    (_match, keyword: string) => `${keyword} ${quoteIdent(schema)}.${CHATS_TABLE}`,
+  );
+}
+
+/**
  * Returns a copy of the workflow with every conversation node pointed at
  * `schema`, plus how many nodes changed.
  *
@@ -61,6 +80,16 @@ export function retargetChatsTable(
   let retargeted = 0;
   const nodes = workflow.nodes.map((node): N8nNode => {
     if (node.type !== POSTGRES_NODE_TYPE) return node;
+    // A ported write carries no schema/table field at all: the schema is a
+    // literal inside the SQL. Rewriting only the locator nodes would retarget
+    // the reads and leave every write on the template client's history.
+    const query = node.parameters?.query;
+    if (node.parameters?.operation === "executeQuery" && typeof query === "string") {
+      const next = retargetQuery(query, schema);
+      if (next === query) return node;
+      retargeted++;
+      return { ...node, parameters: { ...node.parameters, query: next } };
+    }
     // Only the conversation table. A Postgres node hitting another table
     // (a catalog, a report) keeps its own schema.
     if (readValue(node.parameters?.table) !== CHATS_TABLE) return node;

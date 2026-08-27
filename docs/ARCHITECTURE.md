@@ -489,14 +489,18 @@ detail: binding the wrong agent would later push the client's prompt over the
 router's.
 
 **The copy is retargeted before it is created.** The template in n8n is itself
-a copy of a real client's workflow, so its Supabase nodes carry that client's
-`chats_*` table. `lib/n8n/chats-table.ts` rewrites every such node to the new
-client's table before the POST, because duplicating verbatim would file the
-new client's conversations under the template client's history. Only nodes
-whose current table matches `chats_*` are touched, and the count of rewritten
-nodes goes into the step's detail so a template that stopped carrying chats
-nodes is visible. An adopted workflow is NOT retargeted (it may predate this),
-and its detail says so.
+a copy of a real client's workflow, so its Postgres nodes carry that client's
+history schema. `lib/n8n/chats-table.ts` rewrites every such node to the new
+client's schema before the POST, because duplicating verbatim would file the
+new client's conversations under the template client's history. The template
+carries two node shapes and both are rewritten: the four reads keep a
+`schema`/`table` resource locator, while the five writes were ported to raw SQL
+(August 2026) and carry the schema as a literal inside `parameters.query`, so
+what gets rewritten there is the table reference in the statement. Nodes over
+any other table keep their own schema, and the count of rewritten nodes goes
+into the step's detail so a template that stopped carrying chats nodes is
+visible. An adopted workflow is NOT retargeted (it may predate this), and its
+detail says so.
 
 **Template**: `n8n_connections.template_workflow_id` /
 `template_workflow_name` (`019_n8n_template_workflow.sql`), picked in
