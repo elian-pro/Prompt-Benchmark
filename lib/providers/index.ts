@@ -12,6 +12,7 @@ import * as openaiCompat from "./openai-compat";
 import * as anthropic from "./anthropic";
 import * as google from "./google";
 import * as openrouter from "./openrouter";
+import { withTransportContext } from "./transport-error";
 
 export type {
   ChatRequest,
@@ -69,10 +70,22 @@ export async function chat(req: ChatRequest): Promise<ChatResponse> {
       `El proveedor "${name}" no admite salida estructurada. Asigna uno de OpenAI al rol Bot de prueba en Configuración.`,
     );
   }
-  return adapter.chat(req, ctx);
+  try {
+    return await adapter.chat(req, ctx);
+  } catch (err) {
+    // A dropped connection reaches the caller as "terminated" or "fetch
+    // failed" otherwise, which says nothing about which provider broke.
+    throw withTransportContext(err, name);
+  }
 }
 
 export async function* streamChat(req: ChatRequest): AsyncIterable<StreamChunk> {
-  const { adapter, ctx } = await resolve(req.providerId);
-  yield* adapter.streamChat(req, ctx);
+  const { adapter, ctx, name } = await resolve(req.providerId);
+  try {
+    yield* adapter.streamChat(req, ctx);
+  } catch (err) {
+    // Same for a stream that breaks mid-reply: the chat route logs this
+    // message and shows it in the error log, so it has to say what happened.
+    throw withTransportContext(err, name);
+  }
 }
