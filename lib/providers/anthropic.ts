@@ -79,6 +79,9 @@ function baseParams(req: ChatRequest) {
     messages: req.messages.map((m, i) => toMessageParam(m, i === cacheIndex)),
     temperature: req.temperature,
     top_p: req.topP,
+    // Reasoning depth. Left out entirely when unset so older models that
+    // predate output_config never see the field.
+    ...(req.effort ? { output_config: { effort: req.effort } } : {}),
   };
 }
 
@@ -91,6 +94,10 @@ export async function chat(req: ChatRequest, ctx: AdapterContext): Promise<ChatR
     content,
     tokensIn: res.usage.input_tokens,
     tokensOut: res.usage.output_tokens,
+    // input_tokens EXCLUDES cached traffic; report it so callers can see the
+    // real prompt size and the cache hit rate.
+    cacheRead: res.usage.cache_read_input_tokens ?? 0,
+    cacheWrite: res.usage.cache_creation_input_tokens ?? 0,
     truncated: res.stop_reason === "max_tokens",
   };
 }
@@ -102,10 +109,14 @@ export async function* streamChat(
   const stream = await client(ctx).messages.create({ ...baseParams(req), stream: true });
   let tokensIn = 0;
   let tokensOut = 0;
+  let cacheRead = 0;
+  let cacheWrite = 0;
   let stopReason: string | null = null;
   for await (const event of stream) {
     if (event.type === "message_start") {
       tokensIn = event.message.usage.input_tokens;
+      cacheRead = event.message.usage.cache_read_input_tokens ?? 0;
+      cacheWrite = event.message.usage.cache_creation_input_tokens ?? 0;
     } else if (event.type === "content_block_delta" && event.delta.type === "text_delta") {
       yield { type: "text", text: event.delta.text };
     } else if (event.type === "message_delta") {
@@ -114,5 +125,12 @@ export async function* streamChat(
       stopReason = event.delta.stop_reason;
     }
   }
-  yield { type: "usage", tokensIn, tokensOut, truncated: stopReason === "max_tokens" };
+  yield {
+    type: "usage",
+    tokensIn,
+    tokensOut,
+    cacheRead,
+    cacheWrite,
+    truncated: stopReason === "max_tokens",
+  };
 }

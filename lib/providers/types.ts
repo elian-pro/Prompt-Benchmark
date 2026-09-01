@@ -68,6 +68,10 @@ export type ChatRequest = {
   temperature?: number;
   topP?: number;
   maxTokens?: number;
+  /** Reasoning depth for models that support it (Opus 5's output_config).
+   *  Omitted means the provider's default (high). Only the Anthropic adapter
+   *  sends it; the rest ignore it. */
+  effort?: "low" | "medium" | "high";
   /**
    * Marks the system prompt and the conversation so far as cacheable, so a
    * long history (and any attached documents in it) bills at ~10% on later
@@ -98,6 +102,11 @@ export type ChatResponse = {
   toolCalls?: ToolCall[];
   tokensIn: number;
   tokensOut: number;
+  /** Prompt-cache traffic, when the provider reports it (Anthropic only).
+   *  tokensIn EXCLUDES these: the real prompt size is
+   *  tokensIn + cacheRead + cacheWrite. */
+  cacheRead?: number;
+  cacheWrite?: number;
   /** True when the provider stopped because it hit the max_tokens ceiling,
    *  not because the reply was actually finished — the content is a cut-off
    *  fragment. Adapters that can't report this default to false. */
@@ -112,7 +121,15 @@ export type ChatResponse = {
  */
 export type StreamChunk =
   | { type: "text"; text: string }
-  | { type: "usage"; tokensIn: number; tokensOut: number; truncated: boolean };
+  | {
+      type: "usage";
+      tokensIn: number;
+      tokensOut: number;
+      truncated: boolean;
+      /** See ChatResponse: cache traffic, Anthropic adapter only. */
+      cacheRead?: number;
+      cacheWrite?: number;
+    };
 
 /** Per-request context an adapter needs: the decrypted key and optional base URL. */
 export type AdapterContext = {

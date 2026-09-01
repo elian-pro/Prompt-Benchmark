@@ -48,6 +48,14 @@ type Params = { params: Promise<{ id: string }> };
 const EDITOR_CREATOR_MAX_TOKENS = 32000;
 
 /**
+ * Reasoning depth for Editor turns. Opus 5 defaults to "high" adaptive
+ * thinking, whose reasoning bills as output; surgical edits don't need that
+ * much deliberation. The Creator keeps the default: it designs a prompt from
+ * scratch. Bump back to "high" if edit quality visibly drops.
+ */
+const EDITOR_EFFORT = "medium" as const;
+
+/**
  * Downloads each attachment from Storage and shapes it for the model: images
  * and PDFs as base64, text/markdown decoded inline. Only the current turn's
  * files are sent (historical attachments may have expired).
@@ -375,6 +383,8 @@ export async function POST(req: NextRequest, { params }: Params) {
       let fullText = "";
       let tokensIn = 0;
       let tokensOut = 0;
+      let cacheRead = 0;
+      let cacheWrite = 0;
       let truncated = false;
       // Guards the salvage path from re-persisting: a provider error landing
       // right after a clean persist would otherwise store the turn twice.
@@ -388,6 +398,7 @@ export async function POST(req: NextRequest, { params }: Params) {
           temperature: role.temperature ?? undefined,
           topP: role.top_p ?? undefined,
           maxTokens: role.max_tokens ?? EDITOR_CREATOR_MAX_TOKENS,
+          effort: isCreator ? undefined : EDITOR_EFFORT,
           // Both system prompts are now fixed for the session (Creator's base
           // version, Editor's persona), so the prefix is stable and cacheable.
           cache: true,
@@ -404,9 +415,18 @@ export async function POST(req: NextRequest, { params }: Params) {
           } else {
             tokensIn = chunk.tokensIn;
             tokensOut = chunk.tokensOut;
+            cacheRead = chunk.cacheRead ?? 0;
+            cacheWrite = chunk.cacheWrite ?? 0;
             truncated = chunk.truncated;
           }
         }
+
+        // The cache hit rate is invisible anywhere else (tokens_in excludes
+        // cached traffic), so every turn leaves its real cost in the logs.
+        console.log(
+          `[chat-sessions] usage (session ${id}, type ${session.type}): ` +
+            `in=${tokensIn} cacheRead=${cacheRead} cacheWrite=${cacheWrite} out=${tokensOut}`,
+        );
 
         if (signal.aborted) {
           await discardTurn();
