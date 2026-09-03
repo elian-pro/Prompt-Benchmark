@@ -29,7 +29,7 @@ import { Modal } from "@/components/ui/Modal";
 import { SearchableChip } from "@/components/ui/SearchableChip";
 import { InfoHint } from "@/components/ui/InfoHint";
 import { DeleteDemoSessionModal } from "@/components/playground/DeleteDemoSessionModal";
-import { DemoTurn, PendingTurn, TypingIndicator } from "@/components/demo/DemoTurn";
+import { DemoTurn, PendingTurn, STUDIO_LABELS, TypingIndicator } from "@/components/demo/DemoTurn";
 import type { ChatTrace } from "@/lib/client-tools";
 import { resError } from "@/lib/res-error";
 
@@ -255,6 +255,11 @@ export default function PlaygroundSessionPage() {
   // In-memory only, keyed by message id: a reload loses it, which is fine,
   // this is a live debugging aid, not a record kept for later.
   const [traces, setTraces] = useState<Record<string, ChatTrace[]>>({});
+  // Swaps the whole message list for its raw JSON, same toggle shape as
+  // Replay's "Ver texto crudo" (ReplayWorkspace.tsx). A message with no
+  // captured trace (older, or reloaded after a refresh) falls back to its
+  // stored content, which for a bot turn is already the raw JSON envelope.
+  const [rawView, setRawView] = useState(false);
   // Debug mode: the bot's replies carry razonamiento / regla_aplicada, injected
   // at the API layer without touching the prompt under test (lib/demo-turn.ts).
   // Starts false and reads localStorage in an effect to avoid a hydration
@@ -668,24 +673,34 @@ export default function PlaygroundSessionPage() {
                 conversación.
               </p>
             )}
-            {session.messages.map((m) => (
-              <DemoTurn
-                key={m.id}
-                id={m.id}
-                role={m.role}
-                content={m.content}
-                toolCalls={m.tool_calls}
-                trace={traces[m.id]}
-                showDebug
-                selected={selectedIds.includes(m.id)}
-                pins={pinsByMessageId.get(m.id) ?? []}
-                flashed={flashMessageId === m.id}
-                onToggleSelect={toggleSelect}
-                onJumpToNote={jumpToNote}
-                registerRef={registerMessageRef}
-                onEditOpening={m.id === openingMessageId ? startEditOpening : undefined}
-              />
-            ))}
+            {rawView
+              ? session.messages.map((m) => (
+                  <div key={m.id}>
+                    <span className="chat-turn-role">
+                      {m.role === "bot" ? STUDIO_LABELS.bot : STUDIO_LABELS.human}
+                    </span>
+                    <pre className="version-view-content">
+                      {traces[m.id] ? JSON.stringify(traces[m.id], null, 2) : m.content}
+                    </pre>
+                  </div>
+                ))
+              : session.messages.map((m) => (
+                  <DemoTurn
+                    key={m.id}
+                    id={m.id}
+                    role={m.role}
+                    content={m.content}
+                    toolCalls={m.tool_calls}
+                    showDebug
+                    selected={selectedIds.includes(m.id)}
+                    pins={pinsByMessageId.get(m.id) ?? []}
+                    flashed={flashMessageId === m.id}
+                    onToggleSelect={toggleSelect}
+                    onJumpToNote={jumpToNote}
+                    registerRef={registerMessageRef}
+                    onEditOpening={m.id === openingMessageId ? startEditOpening : undefined}
+                  />
+                ))}
             {pendingHuman && <PendingTurn content={pendingHuman} />}
             {sending && <TypingIndicator />}
           </div>
@@ -730,6 +745,17 @@ export default function PlaygroundSessionPage() {
                     <span className="slider" />
                   </span>
                   <span>Razonamiento</span>
+                </label>
+                <label className="switch-inline">
+                  <span className="switch">
+                    <input
+                      type="checkbox"
+                      checked={rawView}
+                      onChange={(e) => setRawView(e.target.checked)}
+                    />
+                    <span className="slider" />
+                  </span>
+                  <span>JSON crudo</span>
                 </label>
                 <span className="idle-composer-hint">
                   {sending ? "Enviando…" : "⌘/Ctrl + Enter para enviar"}
