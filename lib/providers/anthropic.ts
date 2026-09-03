@@ -7,19 +7,29 @@ import {
   type StreamChunk,
   type ChatMessage,
   DEFAULT_MAX_TOKENS,
-} from "./types";
+} from "./types.ts";
 
 function client(ctx: AdapterContext): Anthropic {
   return new Anthropic({ apiKey: ctx.apiKey });
 }
 
 /**
- * Renders a message into Anthropic's format. With no attachments the content
- * is a plain string; otherwise it becomes a content-block array: the text,
- * then native image/document blocks, with text files folded inline.
+ * Renders a message into Anthropic's format. With no attachments outside a
+ * caching request, the content is a plain string; otherwise it becomes a
+ * content-block array: the text, then native image/document blocks, with
+ * text files folded inline.
+ *
+ * `cacheable` (whether the whole request is caching, not whether THIS
+ * message holds the breakpoint) must decide the block-vs-string shape.
+ * Every turn re-sends this session's prior messages, and each one holds the
+ * breakpoint on exactly one turn before becoming plain history on the next.
+ * If its shape flipped between those two turns (block array while it was the
+ * breakpoint, bare string once it wasn't), the prefix Anthropic cached would
+ * no longer match byte-for-byte and every later turn would miss the cache
+ * instead of extending it.
  */
-function toMessageParam(m: ChatMessage, cache = false): Anthropic.MessageParam {
-  if ((!m.attachments || m.attachments.length === 0) && !cache) {
+function toMessageParam(m: ChatMessage, breakpoint: boolean, cacheable: boolean): Anthropic.MessageParam {
+  if ((!m.attachments || m.attachments.length === 0) && !cacheable) {
     return { role: m.role, content: m.content };
   }
   // Narrower than ContentBlockParam: every block we build accepts
@@ -46,7 +56,7 @@ function toMessageParam(m: ChatMessage, cache = false): Anthropic.MessageParam {
     }
   }
   const content: typeof blocks = [{ type: "text", text }, ...blocks];
-  if (cache) {
+  if (breakpoint) {
     // Breakpoint on the last block of the newest turn: this request writes it,
     // the next one finds it inside its own prefix and reads it back.
     content[content.length - 1].cache_control = { type: "ephemeral" };
@@ -54,7 +64,7 @@ function toMessageParam(m: ChatMessage, cache = false): Anthropic.MessageParam {
   return { role: m.role, content };
 }
 
-function baseParams(req: ChatRequest) {
+export function baseParams(req: ChatRequest) {
   // The breakpoint goes on the last message that will still look byte-identical
   // next turn. Volatile ones (a redrafted prompt) trail after it, so rewriting
   // them costs their own tokens instead of the whole conversation's.
@@ -76,7 +86,7 @@ function baseParams(req: ChatRequest) {
             },
           ]
         : req.systemPrompt,
-    messages: req.messages.map((m, i) => toMessageParam(m, i === cacheIndex)),
+    messages: req.messages.map((m, i) => toMessageParam(m, i === cacheIndex, !!req.cache)),
     temperature: req.temperature,
     top_p: req.topP,
     // Reasoning depth. Left out entirely when unset so older models that
