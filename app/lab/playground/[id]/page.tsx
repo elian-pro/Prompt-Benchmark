@@ -613,6 +613,19 @@ export default function PlaygroundSessionPage() {
                 )}
               </span>
             )}
+            {/* Sits with the version chip, not in the composer: it changes how
+                the conversation is read, not how the next message is sent. */}
+            <label className="switch-inline">
+              <span className="switch">
+                <input
+                  type="checkbox"
+                  checked={rawView}
+                  onChange={(e) => setRawView(e.target.checked)}
+                />
+                <span className="slider" />
+              </span>
+              <span>JSON crudo</span>
+            </label>
             <span className="muted" style={{ fontSize: 12 }}>
               · {relativeTimeEs(session.created_at)}
             </span>
@@ -679,7 +692,7 @@ export default function PlaygroundSessionPage() {
                     <span className="chat-turn-role">
                       {m.role === "bot" ? STUDIO_LABELS.bot : STUDIO_LABELS.human}
                     </span>
-                    <pre className="version-view-content">
+                    <pre className="version-view-content chat-raw-turn">
                       {traces[m.id] ? JSON.stringify(traces[m.id], null, 2) : m.content}
                     </pre>
                   </div>
@@ -745,17 +758,6 @@ export default function PlaygroundSessionPage() {
                     <span className="slider" />
                   </span>
                   <span>Razonamiento</span>
-                </label>
-                <label className="switch-inline">
-                  <span className="switch">
-                    <input
-                      type="checkbox"
-                      checked={rawView}
-                      onChange={(e) => setRawView(e.target.checked)}
-                    />
-                    <span className="slider" />
-                  </span>
-                  <span>JSON crudo</span>
                 </label>
                 <span className="idle-composer-hint">
                   {sending ? "Enviando…" : "⌘/Ctrl + Enter para enviar"}

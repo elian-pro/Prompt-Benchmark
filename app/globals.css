@@ -4632,6 +4632,16 @@ body[data-theme="dark"] .history-filters input[type="date"]::-webkit-calendar-pi
   flex-wrap: wrap;
 }
 
+/* One turn shown as raw JSON (the "JSON crudo" toggle). Same box as a
+   version's content, but sized by its own text: a turn is one of many in the
+   scroller, so the 420px floor that fills a version panel would leave a huge
+   hole under every short message. */
+.chat-raw-turn {
+  min-height: 0;
+  max-height: none;
+  margin-bottom: 12px;
+}
+
 /* Bot reply that couldn't be parsed (malformed envelope): a clean error
    bubble instead of raw JSON leaking into the transcript (Sprint 8 fix). */
 .chat-msg-error {
