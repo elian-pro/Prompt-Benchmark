@@ -3,7 +3,7 @@
 import { IconCheck, IconPencil } from "@tabler/icons-react";
 
 import type { DemoMessageRole } from "@/lib/db/demo-sessions";
-import type { ToolStep } from "@/lib/client-tools";
+import type { ChatTrace, ToolStep } from "@/lib/client-tools";
 import { parseDebug, parseTurnBubbles } from "@/lib/adversarial-message";
 import { parseRichText } from "@/lib/rich-text";
 
@@ -72,6 +72,7 @@ export function DemoTurn({
   onEditOpening,
   toolCalls,
   showDebug = false,
+  trace,
 }: {
   id: string;
   role: DemoMessageRole;
@@ -94,6 +95,9 @@ export function DemoTurn({
   /** Show the debug metadata (razonamiento, regla_aplicada) a debug-mode turn
    *  carries. Playground only: the client's own link never passes this. */
   showDebug?: boolean;
+  /** Raw ChatRequest/ChatResponse per provider round trip this turn made.
+   *  Playground only: the client's own link never receives this. */
+  trace?: ChatTrace[];
 }) {
   const side = role === "bot" ? "turn-bot" : "turn-lead";
   const roleLabel = role === "bot" ? labels.bot : labels.human;
@@ -224,6 +228,26 @@ export function DemoTurn({
             <span className="chat-tool-name">regla aplicada</span>
             <code>{debug.reglaAplicada}</code>
           </div>
+        </details>
+      )}
+      {trace && trace.length > 0 && (
+        <details className="chat-tools" onClick={(e) => e.stopPropagation()}>
+          <summary>
+            {trace.length === 1 ? "JSON crudo" : `JSON crudo (${trace.length} llamadas)`}
+          </summary>
+          {trace.map((t, i) => (
+            <div key={i} className="chat-tool-step">
+              {trace.length > 1 && (
+                <span className="chat-tool-name">
+                  Llamada {i + 1}/{trace.length}
+                </span>
+              )}
+              <span className="chat-tool-name">request</span>
+              <pre>{JSON.stringify(t.request, null, 2)}</pre>
+              <span className="chat-tool-name">response</span>
+              <pre>{JSON.stringify(t.response, null, 2)}</pre>
+            </div>
+          ))}
         </details>
       )}
     </div>

@@ -30,6 +30,7 @@ import { SearchableChip } from "@/components/ui/SearchableChip";
 import { InfoHint } from "@/components/ui/InfoHint";
 import { DeleteDemoSessionModal } from "@/components/playground/DeleteDemoSessionModal";
 import { DemoTurn, PendingTurn, TypingIndicator } from "@/components/demo/DemoTurn";
+import type { ChatTrace } from "@/lib/client-tools";
 import { resError } from "@/lib/res-error";
 
 function NotesPanel({
@@ -250,6 +251,10 @@ export default function PlaygroundSessionPage() {
   const [input, setInput] = useState("");
   const [pendingHuman, setPendingHuman] = useState<string | null>(null);
   const [sending, setSending] = useState(false);
+  // Raw request/response JSON per bot message, for debugging a prompt.
+  // In-memory only, keyed by message id: a reload loses it, which is fine,
+  // this is a live debugging aid, not a record kept for later.
+  const [traces, setTraces] = useState<Record<string, ChatTrace[]>>({});
   // Debug mode: the bot's replies carry razonamiento / regla_aplicada, injected
   // at the API layer without touching the prompt under test (lib/demo-turn.ts).
   // Starts false and reads localStorage in an effect to avoid a hydration
@@ -453,6 +458,10 @@ export default function PlaygroundSessionPage() {
         body: JSON.stringify({ content, debug }),
       });
       if (!res.ok) throw new Error(await resError(res, "No se pudo enviar el mensaje."));
+      const result: { botMessage: { id: string }; trace?: ChatTrace[] } = await res.json();
+      if (result.trace) {
+        setTraces((prev) => ({ ...prev, [result.botMessage.id]: result.trace! }));
+      }
       await load({ silent: true });
     } catch (e) {
       setError(e instanceof Error ? e.message : "Error al enviar el mensaje.");
@@ -666,6 +675,7 @@ export default function PlaygroundSessionPage() {
                 role={m.role}
                 content={m.content}
                 toolCalls={m.tool_calls}
+                trace={traces[m.id]}
                 showDebug
                 selected={selectedIds.includes(m.id)}
                 pins={pinsByMessageId.get(m.id) ?? []}

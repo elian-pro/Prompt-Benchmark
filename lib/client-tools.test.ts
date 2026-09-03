@@ -197,3 +197,45 @@ test("with no tools configured the call is a plain one", async () => {
   assert.equal(seen.tools, undefined);
   assert.deepEqual(steps, []);
 });
+
+test("the trace has one request/response pair per chat() call, tool round included", async () => {
+  const chat = async (req: any) => {
+    if (!req.messages.at(-1).toolResults) {
+      return {
+        content: "",
+        toolCalls: [{ id: "c1", name: TOOL.name, args: "{}" }],
+        tokensIn: 1,
+        tokensOut: 1,
+        truncated: false,
+      };
+    }
+    return { content: '{"estado":"perfilado"}', tokensIn: 1, tokensOut: 1, truncated: false };
+  };
+  const exec = async (_tool: any, call: any) => ({
+    content: "[]",
+    step: { name: call.name, args: call.args, ok: true, status: 200, ms: 1, preview: "[]" },
+  });
+
+  const { trace } = await runToolLoop(
+    { providerId: "p", modelName: "m", messages: [{ role: "user", content: "hola" }] },
+    [TOOL],
+    { chat, exec },
+  );
+
+  assert.equal(trace.length, 2);
+  assert.equal(trace[0].response.toolCalls?.[0].name, TOOL.name);
+  assert.equal(trace[1].request.messages.at(-1)?.toolResults?.[0].id, "c1");
+});
+
+test("with no tools configured, trace has exactly the one plain call", async () => {
+  const chat = async (req: any) => {
+    void req;
+    return { content: "hola", tokensIn: 0, tokensOut: 0, truncated: false };
+  };
+  const { trace } = await runToolLoop(
+    { providerId: "p", modelName: "m", messages: [{ role: "user", content: "hola" }] },
+    [],
+    { chat },
+  );
+  assert.equal(trace.length, 1);
+});

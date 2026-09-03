@@ -18,7 +18,7 @@ import { getRoleDefault } from "./db/role-defaults";
 import { getRuntimeTools } from "./db/client-tools";
 import { RoleNotConfiguredError } from "./db/runs";
 import { chat, type ChatMessage } from "./providers";
-import { runToolLoop } from "./client-tools";
+import { runToolLoop, type ChatTrace } from "./client-tools";
 import { asEnvelope } from "./adversarial-message";
 import { ESTADOS } from "./estados";
 
@@ -68,7 +68,7 @@ export async function runDemoTurn(
   session: DemoSessionDetail,
   content: string,
   debug = false,
-): Promise<{ humanMessage: DemoMessageRow; botMessage: DemoMessageRow }> {
+): Promise<{ humanMessage: DemoMessageRow; botMessage: DemoMessageRow; trace?: ChatTrace[] }> {
   const role = await getRoleDefault("test_bot");
   if (!role) {
     throw new RoleNotConfiguredError(
@@ -101,7 +101,7 @@ export async function runDemoTurn(
   // single plain call, exactly as before.
   const tools = await getRuntimeTools(session.client_id);
 
-  const { reply, steps } = await runToolLoop(
+  const { reply, steps, trace } = await runToolLoop(
     {
       providerId: role.provider_id,
       modelName: role.model_name,
@@ -130,5 +130,12 @@ export async function runDemoTurn(
     versionNumberSnapshot: session.version_number_snapshot,
   });
 
-  return { humanMessage, botMessage };
+  return {
+    humanMessage,
+    botMessage,
+    // Same reasoning as toolCalls above: raw request/response JSON can carry
+    // the client's tool payloads and prompt internals, so only the
+    // Playground gets it.
+    trace: session.link_id === null ? trace : undefined,
+  };
 }
