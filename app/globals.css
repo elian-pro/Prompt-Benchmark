@@ -2551,6 +2551,13 @@ body[data-theme="light"] .find-replace-band {
   color: var(--faint);
   font-style: italic;
 }
+/* A link inside a bubble: the global `a` rule kills color and underline, so
+   without this a URL the bot sent is indistinguishable from the text. Color
+   stays inherited so it reads on the dark bot bubble and the light lead one. */
+.chat-content a {
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
 /* Collapsed prompt-block card: replaces the raw fenced block dumped inside an
    Editor/Creator reply with a compact "here's your updated draft" affordance
    — copy straight from the chat instead of scrolling to the drawer. */

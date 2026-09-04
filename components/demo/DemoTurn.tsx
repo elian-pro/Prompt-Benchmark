@@ -29,6 +29,20 @@ export function RichText({ text }: { text: string }) {
   return (
     <>
       {parseRichText(text).map((t, i) => {
+        // stopPropagation: in the Playground the bubble itself is a button that
+        // tags the turn for a note, and following a link is not tagging it.
+        if (t.url)
+          return (
+            <a
+              key={i}
+              href={t.url}
+              target="_blank"
+              rel="noopener noreferrer"
+              onClick={(e) => e.stopPropagation()}
+            >
+              {t.text}
+            </a>
+          );
         if (t.bold) return <strong key={i}>{t.text}</strong>;
         if (t.italic) return <em key={i}>{t.text}</em>;
         if (t.strike) return <s key={i}>{t.text}</s>;

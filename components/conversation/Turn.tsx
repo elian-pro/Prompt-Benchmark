@@ -3,6 +3,7 @@
 import type { KeyboardEvent } from "react";
 
 import type { ConversationTurn } from "@/lib/conversation-turns";
+import { RichText } from "@/components/demo/DemoTurn";
 
 /**
  * One turn of a real conversation, rendered with the Playground's chat classes
@@ -78,7 +79,9 @@ export function Turn({
       )}
       <span className="chat-turn-role">{ROLE_LABEL[turn.rol]}</span>
       <div className="chat-msg">
-        <div className="chat-content">{turn.texto}</div>
+        <div className="chat-content">
+          <RichText text={turn.texto} />
+        </div>
         {turn.estado && (
           <div className="chat-state">
             <span className="chat-state-label">Estado</span>

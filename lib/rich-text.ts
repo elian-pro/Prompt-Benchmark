@@ -14,16 +14,20 @@
  */
 export type RichToken = {
   text: string;
+  /** An http(s) link the bot wrote, so the reader can just tap it. */
+  url?: string;
   bold?: boolean;
   italic?: boolean;
   strike?: boolean;
   mono?: boolean;
 };
 
-/** Ordered: the two-character markers must be tried before their
- *  one-character versions, or `**x**` matches as bold("") plus stray text. */
+/** Ordered: a URL first, so its own `_` or `~` never reads as markup, then the
+ *  two-character markers before their one-character versions, or `**x**`
+ *  matches as bold("") plus stray text. */
 const MARKUP = new RegExp(
   [
+    "(?<u>https?:\\/\\/[^\\s<>\"']+)",
     "\\*\\*(?<b2>[^*\\n]+)\\*\\*",
     "\\*(?<b1>[^*\\n]+)\\*",
     "~~(?<s2>[^~\\n]+)~~",
@@ -41,6 +45,13 @@ export function parseRichText(text: string): RichToken[] {
     const at = match.index ?? 0;
     if (at > last) tokens.push({ text: text.slice(last, at) });
     const g = match.groups ?? {};
+    if (g.u !== undefined) {
+      // Trailing punctuation belongs to the sentence, not to the link.
+      const url = g.u.replace(/[.,;:!?)\]}]+$/, "");
+      tokens.push({ text: url, url });
+      last = at + url.length;
+      continue;
+    }
     if (g.b2 !== undefined || g.b1 !== undefined) {
       tokens.push({ text: (g.b2 ?? g.b1)!, bold: true });
     } else if (g.s2 !== undefined || g.s1 !== undefined) {

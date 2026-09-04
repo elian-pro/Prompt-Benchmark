@@ -41,3 +41,20 @@ test("an unclosed marker stays literal", () => {
 test("markers do not cross a line break", () => {
   assert.deepEqual(parseRichText("*hola\nadiós*"), [{ text: "*hola\nadiós*" }]);
 });
+
+test("a link becomes its own token, punctuation left to the sentence", () => {
+  assert.deepEqual(parseRichText("reserva aquí: https://calendar.app.google/8URZ2H4Q, ¿va?"), [
+    { text: "reserva aquí: " },
+    { text: "https://calendar.app.google/8URZ2H4Q", url: "https://calendar.app.google/8URZ2H4Q" },
+    { text: ", ¿va?" },
+  ]);
+});
+
+test("markup inside a URL stays part of the URL", () => {
+  const url = "https://x.com/a_b_c";
+  assert.deepEqual(parseRichText(`ve a ${url} ya`), [
+    { text: "ve a " },
+    { text: url, url },
+    { text: " ya" },
+  ]);
+});
