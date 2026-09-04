@@ -35,10 +35,6 @@ export type ToolStep = {
   preview: string;
 };
 
-/** One provider round trip. Playground diagnostics only, never sent to the
- *  model and never shown on a demo link. */
-export type ChatTrace = { request: ChatRequest; response: ChatResponse };
-
 /**
  * Only https, and only hosts we accept. Checked when saving AND again right
  * before the request: rows get edited by hand in the SQL editor.
@@ -185,8 +181,7 @@ export async function executeTool(
 }
 
 /**
- * Asks the model, runs whatever tools it asks for, asks again. Returns the
- * final reply plus the trace.
+ * Asks the model, runs whatever tools it asks for, asks again.
  *
  * `chat` comes from the caller (the provider layer) and `exec` defaults to the
  * real HTTP call, so a test can drive the whole loop without a network.
@@ -198,21 +193,14 @@ export async function runToolLoop(
     chat: (req: ChatRequest) => Promise<ChatResponse>;
     exec?: typeof executeTool;
   },
-): Promise<{ reply: ChatResponse; steps: ToolStep[]; trace: ChatTrace[] }> {
+): Promise<{ reply: ChatResponse; steps: ToolStep[] }> {
   const chat = deps.chat;
   const exec = deps.exec ?? executeTool;
   const defs = tools.length ? tools.map(toToolDef) : undefined;
-  const trace: ChatTrace[] = [];
-  const tracedChat = async (req: ChatRequest) => {
-    const response = await chat(req);
-    trace.push({ request: req, response });
-    return response;
-  };
-
   const messages = [...base.messages];
-  let reply = await tracedChat({ ...base, messages, tools: defs });
+  let reply = await chat({ ...base, messages, tools: defs });
   const steps: ToolStep[] = [];
-  if (!defs) return { reply, steps, trace };
+  if (!defs) return { reply, steps };
 
   for (let round = 0; reply.toolCalls?.length && round < MAX_TOOL_ROUNDS; round++) {
     messages.push({ role: "assistant", content: reply.content, toolCalls: reply.toolCalls });
@@ -229,8 +217,8 @@ export async function runToolLoop(
     // The last round goes without tools, so the model has to answer with text
     // instead of asking for a fourth one.
     const isLast = round === MAX_TOOL_ROUNDS - 1;
-    reply = await tracedChat({ ...base, messages, tools: isLast ? undefined : defs });
+    reply = await chat({ ...base, messages, tools: isLast ? undefined : defs });
   }
 
-  return { reply, steps, trace };
+  return { reply, steps };
 }
