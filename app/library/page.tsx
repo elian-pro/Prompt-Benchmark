@@ -19,6 +19,7 @@ import { NewClientModal } from "@/components/library/NewClientModal";
 import { ImportModal } from "@/components/library/ImportModal";
 import { DeleteClientModal } from "@/components/library/DeleteClientModal";
 import { resError } from "@/lib/res-error";
+import { groupByAccount } from "@/lib/library-groups";
 
 const FILTERS: { key: ClientFilter; label: string }[] = [
   { key: "all", label: "Todos" },
@@ -62,7 +63,7 @@ function compareClients(a: ClientSummary, b: ClientSummary, key: SortKey): numbe
 function matches(c: ClientSummary, term: string): boolean {
   if (!term) return true;
   const t = term.toLowerCase();
-  return [c.name, c.segment]
+  return [c.name, c.segment, c.account]
     .filter(Boolean)
     .some((v) => (v as string).toLowerCase().includes(t));
 }
@@ -197,6 +198,17 @@ export default function LibraryPage() {
 
   const isEmpty = !loading && nonArchived.length === 0 && archived.length === 0;
 
+  const card = (c: ClientSummary, index: number) => (
+    <ClientCard
+      key={c.id}
+      client={c}
+      variant={view === "grid" ? "card" : "row"}
+      index={index}
+      onDelete={setDeleteTarget}
+      onToast={showToast}
+    />
+  );
+
   return (
     <div>
       <div className="library-header">
@@ -230,7 +242,7 @@ export default function LibraryPage() {
           className="input"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          placeholder="Buscar por nombre o segmento…"
+          placeholder="Buscar por nombre, segmento o cuenta…"
         />
       </div>
 
@@ -322,16 +334,24 @@ export default function LibraryPage() {
       {!loading && !error && !isEmpty && (
         // Re-key by view so toggling replays the staggered enter animation.
         <div key={view} className={view === "grid" ? "client-grid" : "client-list"}>
-          {sorted.map((c, i) => (
-            <ClientCard
-              key={c.id}
-              client={c}
-              variant={view === "grid" ? "card" : "row"}
-              index={i}
-              onDelete={setDeleteTarget}
-              onToast={showToast}
-            />
-          ))}
+          {groupByAccount(sorted).map((block, i) =>
+            block.kind === "client" ? (
+              card(block.client, i)
+            ) : (
+              <section key={`account:${block.name}`} className="client-group">
+                <div className="client-group-head">
+                  <span className="section-label">Cuenta</span>
+                  <span className="client-group-name">{block.name}</span>
+                  <span className="client-group-count">
+                    {block.clients.length} {block.clients.length === 1 ? "prompt" : "prompts"}
+                  </span>
+                </div>
+                <div className={view === "grid" ? "client-grid" : "client-list"}>
+                  {block.clients.map((c, j) => card(c, i + j))}
+                </div>
+              </section>
+            ),
+          )}
         </div>
       )}
 

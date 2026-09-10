@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { Modal } from "@/components/ui/Modal";
 import { Button } from "@/components/ui/Button";
 import { SegmentPicker } from "@/components/library/SegmentPicker";
+import { AccountInput } from "@/components/library/AccountInput";
 import { BindOnCreateToggle } from "@/components/library/BindOnCreateToggle";
 import { N8nHostPicker } from "@/components/library/N8nHostPicker";
 import { ProvisionFields, type ProvisionChoice } from "@/components/library/ProvisionFields";
@@ -19,6 +20,7 @@ export function NewClientModal({ open, onClose }: { open: boolean; onClose: () =
   const router = useRouter();
   const [name, setName] = useState("");
   const [segment, setSegment] = useState("");
+  const [account, setAccount] = useState("");
   const [notes, setNotes] = useState("");
   const [n8nHost, setN8nHost] = useState<N8nHost>("zebra");
   const [bindAfter, setBindAfter] = useState(false);
@@ -62,6 +64,7 @@ export function NewClientModal({ open, onClose }: { open: boolean; onClose: () =
         body: JSON.stringify({
           name: name.trim(),
           segment: segment.trim() || null,
+          account: account.trim() || null,
           notes: notes.trim() || null,
           n8nHost,
         }),
@@ -184,6 +187,14 @@ export function NewClientModal({ open, onClose }: { open: boolean; onClose: () =
           <div className="field">
             <label className="field-label">Segmento</label>
             <SegmentPicker value={segment} onChange={setSegment} />
+          </div>
+          <div className="field">
+            <label className="field-label">Cuenta (opcional)</label>
+            <AccountInput value={account} onChange={setAccount} />
+            <p className="field-hint">
+              Si la empresa tiene más de un producto con su propio prompt, ponles la misma
+              cuenta y quedan agrupados en la Biblioteca.
+            </p>
           </div>
           <div className="field">
             <label className="field-label">Notas</label>

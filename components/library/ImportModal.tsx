@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { Modal } from "@/components/ui/Modal";
 import { Button } from "@/components/ui/Button";
 import { SegmentPicker } from "@/components/library/SegmentPicker";
+import { AccountInput } from "@/components/library/AccountInput";
 import { BindOnCreateToggle } from "@/components/library/BindOnCreateToggle";
 import { N8nHostPicker } from "@/components/library/N8nHostPicker";
 import type { N8nHost } from "@/lib/db/clients";
@@ -15,6 +16,7 @@ export function ImportModal({ open, onClose }: { open: boolean; onClose: () => v
   const router = useRouter();
   const [name, setName] = useState("");
   const [segment, setSegment] = useState("");
+  const [account, setAccount] = useState("");
   const [content, setContent] = useState("");
   const [versionNumber, setVersionNumber] = useState("v1.0");
   const [n8nHost, setN8nHost] = useState<N8nHost>("zebra");
@@ -35,6 +37,7 @@ export function ImportModal({ open, onClose }: { open: boolean; onClose: () => v
         body: JSON.stringify({
           name: name.trim(),
           segment: segment.trim() || null,
+          account: account.trim() || null,
           // The imported version below is the only version this client should
           // have — don't seed an empty v1.0.
           seedInitialVersion: false,
@@ -91,6 +94,14 @@ export function ImportModal({ open, onClose }: { open: boolean; onClose: () => v
       <div className="field">
         <label className="field-label">Segmento</label>
         <SegmentPicker value={segment} onChange={setSegment} />
+      </div>
+      <div className="field">
+        <label className="field-label">Cuenta (opcional)</label>
+        <AccountInput value={account} onChange={setAccount} />
+        <p className="field-hint">
+          Si la empresa tiene más de un producto con su propio prompt, ponles la misma cuenta
+          y quedan agrupados en la Biblioteca.
+        </p>
       </div>
       <div className="field">
         <label className="field-label">Número de versión</label>

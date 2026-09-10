@@ -1504,6 +1504,31 @@ a.lab-card:hover {
   flex-direction: column;
   gap: 8px;
 }
+
+/* The clients of one account, framed together. Takes the whole row of the
+   grid it sits in, and lays its own clients out in a grid or list inside. */
+.client-group {
+  grid-column: 1 / -1;
+  border: 0.5px solid var(--border);
+  border-radius: 18px;
+  padding: 14px;
+}
+.client-group-head {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  margin: 4px 6px 14px;
+}
+.client-group-name {
+  font-size: 15px;
+  font-weight: 500;
+}
+.client-group-count {
+  font-size: 11px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
 .client-row {
   display: grid;
   grid-template-columns: minmax(0, 2fr) minmax(0, 1fr) 70px 110px 78px auto;

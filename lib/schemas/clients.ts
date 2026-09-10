@@ -13,6 +13,7 @@ export const createClientSchema = z.object({
     .trim()
     .min(1, "El nombre es obligatorio."),
   segment: z.string().trim().min(1).nullable().optional(),
+  account: z.string().trim().min(1).max(80, "El nombre de la cuenta es demasiado largo.").nullable().optional(),
   notes: z.string().nullable().optional(),
   // "Importar existente" adds the imported version itself, so it skips the
   // auto-seeded empty v1.0. Defaults to seeding when omitted.
@@ -42,6 +43,7 @@ export const updateClientSchema = z
   .object({
     name: z.string().trim().min(1, "El nombre es obligatorio."),
     segment: z.string().trim().min(1).nullable(),
+    account: z.string().trim().min(1).max(80, "El nombre de la cuenta es demasiado largo.").nullable(),
     notes: z.string().nullable(),
     draft_content: z.string().nullable(),
     n8n_host: z.enum(["zebra", "own"]),

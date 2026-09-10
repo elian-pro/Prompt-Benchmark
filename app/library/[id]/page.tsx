@@ -22,6 +22,7 @@ import { Button } from "@/components/ui/Button";
 import { Modal } from "@/components/ui/Modal";
 import { FindReplace } from "@/components/ui/FindReplace";
 import { SegmentPicker } from "@/components/library/SegmentPicker";
+import { AccountInput } from "@/components/library/AccountInput";
 import { N8nDeploymentCard } from "@/components/library/N8nDeploymentCard";
 import { N8nSyncHistory } from "@/components/library/N8nSyncHistory";
 import { N8nSyncModal } from "@/components/library/N8nSyncModal";
@@ -83,6 +84,8 @@ export default function ClientDetailPage() {
   const [editingSegment, setEditingSegment] = useState(false);
   const [segmentDraft, setSegmentDraft] = useState("");
   const segmentTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [editingAccount, setEditingAccount] = useState(false);
+  const [accountDraft, setAccountDraft] = useState("");
 
   const hasEdited = useRef(false);
 
@@ -421,6 +424,20 @@ export default function ClientDetailPage() {
     setEditingSegment(false);
   }
 
+  /** Saved on Enter or on leaving the field: one value, not typing to debounce. */
+  async function commitAccount() {
+    if (!detail || !editingAccount) return;
+    setEditingAccount(false);
+    const next = accountDraft.trim() || null;
+    if (next === (detail.account ?? null)) return;
+    try {
+      await patchClient({ account: next });
+      setDetail((d) => (d ? { ...d, account: next } : d));
+    } catch (e) {
+      showToast(e instanceof Error ? e.message : "No se pudo guardar la cuenta.");
+    }
+  }
+
   async function toggleN8nHost() {
     if (!detail) return;
     const next = detail.n8n_host === "zebra" ? "own" : "zebra";
@@ -511,6 +528,37 @@ export default function ClientDetailPage() {
               }}
             >
               {detail.segment ? detail.segment : "Añadir segmento"}
+            </button>
+          )}
+          {editingAccount ? (
+            <div className="segment-edit">
+              <AccountInput
+                value={accountDraft}
+                autoFocus
+                onChange={setAccountDraft}
+                onBlur={commitAccount}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    e.preventDefault();
+                    void commitAccount();
+                  } else if (e.key === "Escape") {
+                    setAccountDraft(detail.account ?? "");
+                    setEditingAccount(false);
+                  }
+                }}
+              />
+            </div>
+          ) : (
+            <button
+              type="button"
+              className="segment-chip-display"
+              title="Clic para editar la cuenta a la que pertenece"
+              onClick={() => {
+                setAccountDraft(detail.account ?? "");
+                setEditingAccount(true);
+              }}
+            >
+              {detail.account ? `Cuenta: ${detail.account}` : "Añadir cuenta"}
             </button>
           )}
           <button

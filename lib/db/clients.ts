@@ -22,6 +22,9 @@ export type Client = {
   id: string;
   name: string;
   segment: string | null;
+  /** The company this agent belongs to, when it runs more than one (migration
+   *  030). Clients sharing the exact value are grouped in the Library. */
+  account: string | null;
   notes: string | null;
   is_legacy: boolean;
   archived_at: string | null;
@@ -142,7 +145,7 @@ export async function listClients({
     // Strip characters that would break the PostgREST or() grammar.
     const term = search.trim().replace(/[%,()]/g, "");
     if (term) {
-      query = query.or(`name.ilike.%${term}%,segment.ilike.%${term}%`);
+      query = query.or(`name.ilike.%${term}%,segment.ilike.%${term}%,account.ilike.%${term}%`);
     }
   }
   query = query.order("updated_at", { ascending: false });
@@ -202,6 +205,7 @@ export async function getClient(id: string): Promise<ClientDetail | null> {
 export async function createClient(input: {
   name: string;
   segment?: string | null;
+  account?: string | null;
   notes?: string | null;
   // When false, skip the auto-seeded v1.0. Used by "Importar existente", which
   // adds the imported version itself — otherwise the client would end up with
@@ -232,6 +236,7 @@ export async function createClient(input: {
     .insert({
       name: input.name,
       segment: input.segment ?? null,
+      account: input.account ?? null,
       notes: input.notes ?? null,
       ...(input.n8nHost ? { n8n_host: input.n8nHost } : {}),
       ...(chatsTable ? { chats_table: chatsTable } : {}),
@@ -278,12 +283,14 @@ export async function updateClient(
     draft_content?: string | null;
     n8n_host?: N8nHost;
     chats_table?: string | null;
+    account?: string | null;
   },
 ): Promise<Client> {
   const sb = getSupabase();
   const patch: Record<string, unknown> = {};
   if (input.name !== undefined) patch.name = input.name;
   if (input.segment !== undefined) patch.segment = input.segment;
+  if (input.account !== undefined) patch.account = input.account;
   if (input.notes !== undefined) patch.notes = input.notes;
   if (input.draft_content !== undefined) patch.draft_content = input.draft_content;
   if (input.n8n_host !== undefined) patch.n8n_host = input.n8n_host;
