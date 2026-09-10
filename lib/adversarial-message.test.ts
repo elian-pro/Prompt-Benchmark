@@ -16,6 +16,12 @@ test("wraps a plain-text opening message in the envelope the prompt asks for", (
   assert.equal(asEnvelope("Hola", "Responde en texto plano."), "Hola");
 });
 
+test("a fenced envelope goes back as the bare envelope, never wrapped as text", () => {
+  // Wrapping it taught the bot to answer {"mensajes":["```json\n{...}```"]}.
+  const fenced = '```json\n{"estado":"por-perfilar","mensajes":["Hola"]}\n```';
+  assert.equal(asEnvelope(fenced, ENVELOPE_PROMPT), '{"estado":"por-perfilar","mensajes":["Hola"]}');
+});
+
 test("splits a JSON mensajes array into one bubble per item, estado on the side", () => {
   const content = JSON.stringify({
     estado: "por-perfilar",

@@ -168,11 +168,14 @@ export function parseTurnBubbles(content: string): {
  * of the conversation (the format rule sits thousands of tokens away in a long
  * prompt, the example is right there). No `estado` is invented: only the shape
  * matters. Content that already looks like JSON, or a prompt with no envelope
- * spec, is left untouched.
+ * spec, is left untouched. A reply the bot wrapped in a ```json fence goes back
+ * without the fence: wrapped as text instead, it taught the bot to answer with
+ * the whole fenced envelope stuffed inside `mensajes`.
  */
 export function asEnvelope(content: string, systemPrompt: string): string {
-  const trimmed = content.trim();
-  if (!trimmed || trimmed[0] === "{" || trimmed[0] === "[") return content;
+  const trimmed = stripCodeFence(content);
+  if (trimmed[0] === "{" || trimmed[0] === "[") return trimmed;
+  if (!trimmed) return content;
   const key = systemPrompt.match(/"(mensajes|messages)"\s*:/)?.[1];
   return key ? JSON.stringify({ [key]: [trimmed] }) : content;
 }
