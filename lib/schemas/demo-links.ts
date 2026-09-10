@@ -7,26 +7,34 @@ const isoDate = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Fecha inválida.");
 /** Creating a demo link freezes a client's version, the same way a Playground
  *  session does. The caps have defaults in the database; they are here so the
  *  user can tighten them per link without a migration. */
+const openingMessage = z.string().trim().max(2000, "El mensaje de inicio es demasiado largo.");
+const label = z.string().trim().max(120, "El nombre del link es demasiado largo.");
+const cap = z.number().int().min(1).max(500);
+
 export const createDemoLinkSchema = z.object({
   clientId: z.string().uuid("Elige un cliente."),
   versionId: z.string().uuid("Elige la versión a probar."),
-  openingMessage: z.string().trim().max(2000, "El mensaje de inicio es demasiado largo.").optional(),
-  label: z.string().trim().max(120, "El nombre del link es demasiado largo.").optional(),
-  maxSessions: z.number().int().min(1).max(500).optional(),
-  maxMessages: z.number().int().min(1).max(500).optional(),
+  openingMessage: openingMessage.optional(),
+  label: label.optional(),
+  maxSessions: cap.optional(),
+  maxMessages: cap.optional(),
   /** Last day the client can leave reports, inclusive. Null: no deadline. */
   expiresOn: isoDate.nullable().optional(),
 });
 
-/** Both fields are optional and independent: closing a link by hand and moving
- *  its deadline are different decisions, and the PATCH carries whichever one
- *  the user just made. */
+/** Every field is optional and independent: the PATCH carries only what the
+ *  user just changed. Null (or empty) clears the name or the greeting. The
+ *  client and the version are not here: they are frozen with the link. */
 export const updateDemoLinkSchema = z
   .object({
     status: z.enum(["active", "closed"]).optional(),
     expiresOn: isoDate.nullable().optional(),
+    label: label.nullable().optional(),
+    openingMessage: openingMessage.nullable().optional(),
+    maxSessions: cap.optional(),
+    maxMessages: cap.optional(),
   })
-  .refine((val) => val.status !== undefined || val.expiresOn !== undefined, {
+  .refine((val) => Object.values(val).some((v) => v !== undefined), {
     message: "No hay cambios que guardar.",
   });
 

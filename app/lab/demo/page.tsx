@@ -16,7 +16,7 @@ import { Button } from "@/components/ui/Button";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { SkeletonRows } from "@/components/ui/Skeleton";
 import { formatDeadlineShortEs, isExpired } from "@/lib/business-days";
-import { NewDemoLinkModal } from "@/components/demo/NewDemoLinkModal";
+import { DemoLinkModal } from "@/components/demo/DemoLinkModal";
 import { DemoTabs } from "@/components/demo/DemoTabs";
 import { resError } from "@/lib/res-error";
 
@@ -189,7 +189,7 @@ export default function DemoLinksPage() {
         ))}
       </div>
 
-      <NewDemoLinkModal open={newOpen} onClose={() => setNewOpen(false)} onCreated={load} />
+      <DemoLinkModal open={newOpen} onClose={() => setNewOpen(false)} onSaved={load} />
     </div>
   );
 }

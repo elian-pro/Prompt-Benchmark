@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { IconGitBranch, IconTargetArrow } from "@tabler/icons-react";
 
 import type { ClientSummary, ClientDetail } from "@/lib/db/clients";
+import type { DemoLink } from "@/lib/db/demo-links";
 import type { VersionListItem } from "@/lib/db/versions";
 import { Modal } from "@/components/ui/Modal";
 import { Button } from "@/components/ui/Button";
@@ -12,39 +13,52 @@ import { businessDaysFrom, formatDeadlineEs, todayInMexico, WORKING_WEEK } from 
 import { DeadlinePicker } from "@/components/ui/DeadlinePicker";
 import { resError } from "@/lib/res-error";
 
+type EditableLink = Pick<
+  DemoLink,
+  "id" | "label" | "opening_message" | "max_sessions" | "max_messages" | "expires_on"
+>;
+
 /**
- * Cuts a new demo link: a client, the version it freezes, and how the chat
- * opens. Same shape as the Playground's new session modal, since it is the same
- * decision, plus the caps that only matter once a URL is loose on the internet.
+ * Cuts a new demo link, or edits one already cut: a client, the version it
+ * freezes, and how the chat opens. Same shape as the Playground's new session
+ * modal, since it is the same decision, plus the caps that only matter once a
+ * URL is loose on the internet.
+ *
+ * Editing (`link` given) hides the client and the version: both are frozen with
+ * the link, so the client keeps testing what they were told they are testing.
+ * The caller mounts the modal per edit, so the form starts from the link.
  */
-export function NewDemoLinkModal({
+export function DemoLinkModal({
   open,
   onClose,
-  onCreated,
+  onSaved,
+  link,
 }: {
   open: boolean;
   onClose: () => void;
-  onCreated: () => void;
+  onSaved: () => void;
+  link?: EditableLink;
 }) {
+  const editing = Boolean(link);
   const [clients, setClients] = useState<ClientSummary[]>([]);
   const [clientId, setClientId] = useState("");
   const [versions, setVersions] = useState<VersionListItem[]>([]);
   const [versionId, setVersionId] = useState("");
-  const [label, setLabel] = useState("");
-  const [openingMessage, setOpeningMessage] = useState("");
+  const [label, setLabel] = useState(link?.label ?? "");
+  const [openingMessage, setOpeningMessage] = useState(link?.opening_message ?? "");
   /** A round is born with a deadline: leaving it open forever is the decision
    *  that has to be made on purpose, not the one that happens by default. */
   const [expiresOn, setExpiresOn] = useState<string | null>(() =>
-    businessDaysFrom(todayInMexico(), WORKING_WEEK),
+    link ? link.expires_on : businessDaysFrom(todayInMexico(), WORKING_WEEK),
   );
-  const [maxSessions, setMaxSessions] = useState("25");
-  const [maxMessages, setMaxMessages] = useState("60");
-  const [loading, setLoading] = useState(true);
-  const [creating, setCreating] = useState(false);
+  const [maxSessions, setMaxSessions] = useState(String(link?.max_sessions ?? 25));
+  const [maxMessages, setMaxMessages] = useState(String(link?.max_messages ?? 60));
+  const [loading, setLoading] = useState(!editing);
+  const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!open) return;
+    if (!open || editing) return;
     setLoading(true);
     setError(null);
     fetch("/api/clients?filter=all")
@@ -55,7 +69,7 @@ export function NewDemoLinkModal({
       .then((data: ClientSummary[]) => setClients(data))
       .catch((e) => setError(e instanceof Error ? e.message : "Error al cargar los clientes."))
       .finally(() => setLoading(false));
-  }, [open]);
+  }, [open, editing]);
 
   useEffect(() => {
     if (!clientId) {
@@ -75,34 +89,56 @@ export function NewDemoLinkModal({
       .catch((e) => setError(e instanceof Error ? e.message : "Error al cargar las versiones."));
   }, [clientId]);
 
+  const canSave = !saving && (editing || (clientId !== "" && versionId !== ""));
+
   async function submit() {
-    if (!clientId || !versionId || creating) return;
-    setCreating(true);
+    if (!canSave) return;
+    setSaving(true);
     setError(null);
+    const settings = {
+      maxSessions: Number(maxSessions) || undefined,
+      maxMessages: Number(maxMessages) || undefined,
+      expiresOn,
+    };
     try {
-      const res = await fetch("/api/demo-links", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          clientId,
-          versionId,
-          label: label.trim() || undefined,
-          openingMessage: openingMessage.trim() || undefined,
-          maxSessions: Number(maxSessions) || undefined,
-          maxMessages: Number(maxMessages) || undefined,
-          expiresOn,
-        }),
-      });
-      if (!res.ok) throw new Error(await resError(res, "No se pudo crear el link."));
-      onCreated();
+      const res = link
+        ? await fetch(`/api/demo-links/${link.id}`, {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            // null, not undefined: emptying a field is an edit too.
+            body: JSON.stringify({
+              ...settings,
+              label: label.trim() || null,
+              openingMessage: openingMessage.trim() || null,
+            }),
+          })
+        : await fetch("/api/demo-links", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              ...settings,
+              clientId,
+              versionId,
+              label: label.trim() || undefined,
+              openingMessage: openingMessage.trim() || undefined,
+            }),
+          });
+      if (!res.ok) {
+        throw new Error(
+          await resError(res, editing ? "No se pudieron guardar los cambios." : "No se pudo crear el link."),
+        );
+      }
+      onSaved();
       onClose();
-      setClientId("");
-      setLabel("");
-      setOpeningMessage("");
+      if (!editing) {
+        setClientId("");
+        setLabel("");
+        setOpeningMessage("");
+      }
     } catch (e) {
       setError(e instanceof Error ? e.message : "Error inesperado.");
     } finally {
-      setCreating(false);
+      setSaving(false);
     }
   }
 
@@ -110,37 +146,41 @@ export function NewDemoLinkModal({
     <Modal
       open={open}
       onClose={onClose}
-      title="Nuevo link de pruebas"
+      title={editing ? "Editar link de pruebas" : "Nuevo link de pruebas"}
       footer={
         <>
-          <Button variant="ghost" onClick={onClose} disabled={creating}>
+          <Button variant="ghost" onClick={onClose} disabled={saving}>
             Cancelar
           </Button>
-          <Button
-            variant="primary"
-            onClick={submit}
-            disabled={creating || !clientId || !versionId}
-          >
-            {creating ? "Creando…" : "Crear link"}
+          <Button variant="primary" onClick={submit} disabled={!canSave}>
+            {editing
+              ? saving
+                ? "Guardando…"
+                : "Guardar cambios"
+              : saving
+                ? "Creando…"
+                : "Crear link"}
           </Button>
         </>
       }
     >
-      <div className="field">
-        <label className="field-label">Cliente</label>
-        <SearchableChip
-          icon={<IconTargetArrow size={13} />}
-          placeholder="Selecciona un cliente"
-          searchPlaceholder="Buscar cliente por nombre…"
-          items={clients.map((c) => ({ id: c.id, label: c.name }))}
-          value={clientId}
-          onChange={setClientId}
-          loading={loading}
-          emptyText="No se encontraron clientes."
-        />
-      </div>
+      {!editing && (
+        <div className="field">
+          <label className="field-label">Cliente</label>
+          <SearchableChip
+            icon={<IconTargetArrow size={13} />}
+            placeholder="Selecciona un cliente"
+            searchPlaceholder="Buscar cliente por nombre…"
+            items={clients.map((c) => ({ id: c.id, label: c.name }))}
+            value={clientId}
+            onChange={setClientId}
+            loading={loading}
+            emptyText="No se encontraron clientes."
+          />
+        </div>
+      )}
 
-      {clientId && (
+      {!editing && clientId && (
         <div className="field">
           <label className="field-label">Versión que va a probar</label>
           <SearchableChip
@@ -197,8 +237,9 @@ export function NewDemoLinkModal({
           onChange={(e) => setOpeningMessage(e.target.value)}
         />
         <p className="field-hint">
-          Si lo llenas, el chat abre con este mensaje ya enviado, en vez de esperar a que el
-          cliente escriba primero.
+          {editing
+            ? "Las conversaciones donde todavía no escriben abren con este mensaje. Las que ya empezaron lo verán si reinician el chat."
+            : "Si lo llenas, el chat abre con este mensaje ya enviado, en vez de esperar a que el cliente escriba primero."}
         </p>
       </div>
 

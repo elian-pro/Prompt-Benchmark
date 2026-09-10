@@ -235,18 +235,25 @@ export async function closeLink(id: string): Promise<DemoLink> {
   return data as unknown as DemoLink;
 }
 
-/** The deadline, set or cleared. Separate from close/reopen because they mean
- *  different things: this is when the link stops on its own, that is a person
- *  deciding it stops now. */
-export async function setLinkExpiry(id: string, expiresOn: string | null): Promise<DemoLink> {
+/** What can change on a link after it was cut: its name, how the chat opens,
+ *  its caps and its deadline. The client and the frozen version are left out on
+ *  purpose, the client has to keep testing what they were told they are
+ *  testing. Separate from close/reopen because those are a person deciding the
+ *  link stops now, and the deadline is when it stops on its own. */
+export async function updateLink(
+  id: string,
+  patch: Partial<
+    Pick<DemoLink, "label" | "opening_message" | "max_sessions" | "max_messages" | "expires_on">
+  >,
+): Promise<DemoLink> {
   const sb = getSupabase();
   const { data, error } = await sb
     .from("demo_links")
-    .update({ expires_on: expiresOn })
+    .update(patch)
     .eq("id", id)
     .select(LINK_COLS)
     .single();
-  if (error) throw new Error(`No se pudo cambiar la fecha de cierre: ${error.message}`);
+  if (error) throw new Error(`No se pudo guardar el link: ${error.message}`);
   return data as unknown as DemoLink;
 }
 

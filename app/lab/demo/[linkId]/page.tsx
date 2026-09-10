@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
-import { IconArrowLeft, IconList, IconMessages, IconTrash } from "@tabler/icons-react";
+import { IconArrowLeft, IconList, IconMessages, IconPencil, IconTrash } from "@tabler/icons-react";
 
 import type { DemoLink, LinkSessionListItem } from "@/lib/db/demo-links";
 import { Button } from "@/components/ui/Button";
@@ -12,6 +12,7 @@ import { formatDeadlineEs, isExpired } from "@/lib/business-days";
 import { DeadlinePicker } from "@/components/ui/DeadlinePicker";
 import { DangerConfirmModal } from "@/components/ui/DangerConfirmModal";
 import { DemoLinkWorkspace } from "@/components/demo/DemoLinkWorkspace";
+import { DemoLinkModal } from "@/components/demo/DemoLinkModal";
 import { resError } from "@/lib/res-error";
 
 type LinkDetail = Omit<DemoLink, "prompt_snapshot"> & {
@@ -57,6 +58,7 @@ export default function DemoLinkDetailPage() {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [listOpen, setListOpen] = useState(true);
   const [deleteOpen, setDeleteOpen] = useState(false);
+  const [editOpen, setEditOpen] = useState(false);
 
   const load = useCallback(async () => {
     try {
@@ -127,6 +129,15 @@ export default function DemoLinkDetailPage() {
               onChange={(next) => void saveExpiry(next)}
             />
           )}
+          <Button
+            variant="secondary"
+            size="sm"
+            onClick={() => setEditOpen(true)}
+            disabled={!detail}
+            icon={<IconPencil size={14} />}
+          >
+            Editar
+          </Button>
           <Button
             variant="danger"
             size="sm"
@@ -202,6 +213,11 @@ export default function DemoLinkDetailPage() {
             )}
           </section>
         </div>
+      )}
+
+      {/* Mounted per edit, so the form always starts from the link as it is now. */}
+      {editOpen && detail && (
+        <DemoLinkModal open link={detail} onClose={() => setEditOpen(false)} onSaved={load} />
       )}
 
       {deleteOpen && (

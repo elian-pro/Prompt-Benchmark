@@ -10,6 +10,7 @@ import { getVersion } from "./versions";
 import { getRoleDefault } from "./role-defaults";
 import { RoleNotConfiguredError } from "./runs";
 import { listNotes, type DemoNoteRow } from "./demo-notes";
+import { openingSyncAction } from "../demo-opening";
 import type { ToolStep } from "../client-tools";
 
 export type DemoSessionStatus = "active" | "sent_to_editor";
@@ -580,6 +581,44 @@ export async function updateOpeningMessage(
   if (mErr) throw new Error(`No se pudo actualizar el mensaje visible: ${mErr.message}`);
 
   return session;
+}
+
+/**
+ * Carries a demo link's edited greeting into the conversations already opened
+ * on it. Every one stores the new text, so a restart replays it; the visible
+ * bubble only changes where `openingSyncAction` says it is safe to.
+ */
+export async function syncLinkOpeningMessage(linkId: string, text: string | null): Promise<void> {
+  const sb = getSupabase();
+  const { data: sessions, error } = await sb
+    .from("demo_sessions")
+    .update({ opening_message: text })
+    .eq("link_id", linkId)
+    .select("id, current_round, version_number_snapshot");
+  if (error) throw new Error(`No se pudo actualizar el mensaje de inicio: ${error.message}`);
+
+  // ponytail: one read per conversation, bounded by the link's max_sessions cap.
+  for (const session of sessions ?? []) {
+    const { data: messages, error: mErr } = await sb
+      .from("demo_messages")
+      .select("id, role, turn_number")
+      .eq("session_id", session.id)
+      .eq("round", session.current_round);
+    if (mErr) throw new Error(`No se pudieron leer los mensajes: ${mErr.message}`);
+
+    const current = messages ?? [];
+    const action = openingSyncAction(current, text);
+    if (action === "insert") {
+      await seedOpeningMessage(session.id, session.current_round, text, session.version_number_snapshot);
+    } else if (action !== "keep") {
+      const greeting = current.find((m) => m.role === "bot" && m.turn_number === 1)!;
+      const { error: wErr } =
+        action === "update"
+          ? await sb.from("demo_messages").update({ content: text }).eq("id", greeting.id)
+          : await sb.from("demo_messages").delete().eq("id", greeting.id);
+      if (wErr) throw new Error(`No se pudo actualizar el mensaje visible: ${wErr.message}`);
+    }
+  }
 }
 
 /** Marks a Playground session as handed off, linking the Editor session it
