@@ -292,6 +292,7 @@ export async function updateClient(
     notes?: string | null;
     draft_content?: string | null;
     n8n_host?: N8nHost;
+    crm?: Crm;
     chats_table?: string | null;
     account?: string | null;
   },
@@ -304,6 +305,7 @@ export async function updateClient(
   if (input.notes !== undefined) patch.notes = input.notes;
   if (input.draft_content !== undefined) patch.draft_content = input.draft_content;
   if (input.n8n_host !== undefined) patch.n8n_host = input.n8n_host;
+  if (input.crm !== undefined) patch.crm = input.crm;
   if (input.chats_table !== undefined) patch.chats_table = input.chats_table;
 
   const { data, error } = await sb

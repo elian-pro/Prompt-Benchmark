@@ -479,6 +479,17 @@ name they would create, so the real world is the state:
 The client detail derives what to offer: no api binding means "Duplicar
 plantilla", a null `chats_table` means "Crear tabla chats_X".
 
+**A client on its own n8n gets the artifacts, not the actions.** Nothing can
+be duplicated into an instance we do not reach, so
+`GET /api/clients/[id]/template-export?crm=` returns the copy provisioning
+would have made: the template retargeted at the client's schema and renamed,
+with `credentials`, `webhookId`, `pinData` and every instance-level field
+stripped (`lib/n8n/export.ts`), so importing it asks for their credentials
+instead of carrying dangling references to ours. The SQL card needs no
+endpoint: `buildCreateChatsTableSql(schema, { grants: false })` is the same
+DDL `createChatsTable` runs, minus the grants to n8n_writer and metabase_app,
+roles that exist only in our database and would abort the script in theirs.
+
 **One template per CRM.** `n8n_connections` carries two pairs of template
 columns: the original ones are Kommo's (hence no suffix) and
 `template_workflow_id_ghl` is Go High Level's. `clients.crm` remembers which

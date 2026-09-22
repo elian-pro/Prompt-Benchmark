@@ -54,6 +54,7 @@ export const updateClientSchema = z
     notes: z.string().nullable(),
     draft_content: z.string().nullable(),
     n8n_host: z.enum(["zebra", "own"]),
+    crm: z.enum(CRM_IDS, { invalid_type_error: "CRM no válido." }),
     // The client's history schema in the chats Postgres, or null to
     // disconnect. Since the August 2026 migration this carries a SCHEMA name,
     // which is the client's real name and therefore has spaces and accents

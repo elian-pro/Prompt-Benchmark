@@ -28,6 +28,8 @@ import { N8nSyncHistory } from "@/components/library/N8nSyncHistory";
 import { N8nSyncModal } from "@/components/library/N8nSyncModal";
 import { ConversationHistory } from "@/components/library/ConversationHistory";
 import { ClientToolsCard } from "@/components/library/ClientToolsCard";
+import { OwnN8nHandoff } from "@/components/library/OwnN8nHandoff";
+import type { Crm } from "@/lib/crm";
 import { resError } from "@/lib/res-error";
 
 const SOURCE_LABELS: Record<string, string> = {
@@ -438,6 +440,19 @@ export default function ClientDetailPage() {
     }
   }
 
+  /** The CRM decides which template the handoff JSON is built from. */
+  async function changeCrm(next: Crm) {
+    if (!detail || detail.crm === next) return;
+    const previous = detail.crm;
+    setDetail((d) => (d ? { ...d, crm: next } : d));
+    try {
+      await patchClient({ crm: next });
+    } catch (e) {
+      setDetail((d) => (d ? { ...d, crm: previous } : d));
+      showToast(e instanceof Error ? e.message : "No se pudo cambiar el CRM.");
+    }
+  }
+
   async function toggleN8nHost() {
     if (!detail) return;
     const next = detail.n8n_host === "zebra" ? "own" : "zebra";
@@ -799,41 +814,44 @@ export default function ClientDetailPage() {
             })}
           </div>
 
-          {/* A client on its own n8n has no flow of ours to duplicate, nothing
-              for the sync engine to push and no conversations in our history
-              database. The three cards stay visible, so the ficha still shows
-              what would be there, and inert. Herramientas is ours either way,
-              which is why it lives outside and last. */}
-          {detail.n8n_host === "own" && (
-            <p className="field-hint" style={{ marginTop: 20 }}>
-              Este agente vive en el n8n del cliente: su flujo, sus sincronizaciones y su
-              historial de conversaciones no pasan por aquí.
-            </p>
-          )}
-          <fieldset className="host-locked" disabled={detail.n8n_host === "own"}>
-            <N8nDeploymentCard
+          {/* On our n8n we do the work: duplicate, sync, create the table.
+              On the client's, none of that is reachable, so the same two
+              things are handed over as a JSON and a SQL they run themselves,
+              and there is no sync to show. Herramientas is ours either way,
+              which is why it sits last on both branches. */}
+          {detail.n8n_host === "own" ? (
+            <OwnN8nHandoff
               clientId={id}
-              productionVersion={
-                detail.production_version
-                  ? {
-                      id: detail.production_version.id,
-                      version_number: detail.production_version.version_number,
-                      content: detail.production_version.content,
-                    }
-                  : null
-              }
-              onRequestSync={() => {
-                if (!detail.production_version) return;
-                setSyncTarget({
-                  versionId: detail.production_version.id,
-                  versionNumber: detail.production_version.version_number,
-                  versionContent: detail.production_version.content,
-                });
-              }}
+              clientName={detail.name}
+              crm={detail.crm}
+              onCrmChange={changeCrm}
             />
-            <N8nSyncHistory clientId={id} />
-            <ConversationHistory clientId={id} clientName={detail.name} />
-          </fieldset>
+          ) : (
+            <>
+              <N8nDeploymentCard
+                clientId={id}
+                productionVersion={
+                  detail.production_version
+                    ? {
+                        id: detail.production_version.id,
+                        version_number: detail.production_version.version_number,
+                        content: detail.production_version.content,
+                      }
+                    : null
+                }
+                onRequestSync={() => {
+                  if (!detail.production_version) return;
+                  setSyncTarget({
+                    versionId: detail.production_version.id,
+                    versionNumber: detail.production_version.version_number,
+                    versionContent: detail.production_version.content,
+                  });
+                }}
+              />
+              <N8nSyncHistory clientId={id} />
+              <ConversationHistory clientId={id} clientName={detail.name} />
+            </>
+          )}
           <ClientToolsCard clientId={id} />
         </aside>
 
