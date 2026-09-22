@@ -1217,6 +1217,10 @@ body[data-theme="light"] .notif-dot {
 .modal {
   animation: modal-in 0.18s ease;
 }
+/* Read-only content that needs the room: code, diffs. */
+.modal-wide {
+  max-width: 820px;
+}
 .toast {
   animation: toast-in 0.2s ease;
 }
@@ -3787,22 +3791,39 @@ body[data-theme="light"] .dot-grid::after {
    n8n deployment (client detail card + binding picker)
    =========================================================================== */
 
-/* The JSON and the SQL handed to a client that runs its own n8n. Narrow
-   column, so the block scrolls in both directions instead of wrapping SQL and
-   JSON into something nobody can read. */
+/* The JSON and the SQL handed to a client that runs its own n8n. They open in
+   a wide modal: the client detail column is 30% of the page, where neither is
+   readable. */
 .handoff-code {
-  margin: 10px 0 0;
-  max-height: 260px;
+  margin: 0;
+  max-height: 60vh;
   overflow: auto;
   background: var(--bg);
   border: 0.5px solid var(--border);
   border-radius: 10px;
-  padding: 10px;
+  padding: 14px;
   font-family: ui-monospace, "SFMono-Regular", Menlo, monospace;
   font-size: 12px;
-  line-height: 1.5;
+  line-height: 1.6;
   color: var(--muted);
   white-space: pre;
+}
+/* Colours from the palette, nothing invented: what is not recognized stays
+   the block's own grey rather than guessing. */
+.sql-keyword {
+  color: var(--accent);
+}
+.sql-ident {
+  color: var(--fg);
+}
+.sql-string {
+  color: var(--success);
+}
+.sql-number {
+  color: var(--warn);
+}
+.sql-comment {
+  color: var(--faint);
 }
 
 .n8n-card {

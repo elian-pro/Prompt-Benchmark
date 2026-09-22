@@ -8,9 +8,11 @@ type Props = {
   title: string;
   children: ReactNode;
   footer?: ReactNode;
+  /** For content that is read, not filled in: code, diffs, long tables. */
+  wide?: boolean;
 };
 
-export function Modal({ open, onClose, title, children, footer }: Props) {
+export function Modal({ open, onClose, title, children, footer, wide }: Props) {
   useEffect(() => {
     if (!open) return;
     const onKey = (e: KeyboardEvent) => {
@@ -25,7 +27,7 @@ export function Modal({ open, onClose, title, children, footer }: Props) {
   return (
     <div className="modal-overlay" onClick={onClose}>
       <div
-        className="modal"
+        className={wide ? "modal modal-wide" : "modal"}
         role="dialog"
         aria-modal="true"
         onClick={(e) => e.stopPropagation()}

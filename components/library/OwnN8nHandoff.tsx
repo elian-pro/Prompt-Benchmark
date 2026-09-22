@@ -1,16 +1,13 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import {
-  IconChevronDown,
-  IconChevronRight,
-  IconCopy,
-  IconFileCode,
-  IconDatabase,
-} from "@tabler/icons-react";
+import { IconCopy, IconFileCode, IconDatabase } from "@tabler/icons-react";
 import { Button } from "@/components/ui/Button";
+import { Modal } from "@/components/ui/Modal";
+import { InfoHint } from "@/components/ui/InfoHint";
 import { CRMS, type Crm } from "@/lib/crm";
 import { buildCreateChatsTableSql, chatsTableName } from "@/lib/chats-table-name";
+import { tokenizeSql } from "@/lib/sql-highlight";
 
 type Props = {
   clientId: string;
@@ -35,8 +32,7 @@ export function OwnN8nHandoff({ clientId, clientName, crm, onCrmChange }: Props)
   const [json, setJson] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [openJson, setOpenJson] = useState(false);
-  const [openSql, setOpenSql] = useState(false);
+  const [viewing, setViewing] = useState<"json" | "sql" | null>(null);
   const [copied, setCopied] = useState<"json" | "sql" | null>(null);
 
   // A CRM with no template configured anywhere is not offered: its chip could
@@ -80,6 +76,7 @@ export function OwnN8nHandoff({ clientId, clientName, crm, onCrmChange }: Props)
   // No grants: n8n_writer and metabase_app are roles of OUR database, and
   // granting to a role that does not exist aborts the whole script.
   const sql = schema ? buildCreateChatsTableSql(schema, { grants: false }) : null;
+  const name = clientName.trim();
 
   async function copy(what: "json" | "sql", text: string) {
     await navigator.clipboard.writeText(text);
@@ -91,8 +88,11 @@ export function OwnN8nHandoff({ clientId, clientName, crm, onCrmChange }: Props)
     <>
       <div className="n8n-card">
         <div className="row-between" style={{ marginBottom: 10 }}>
-          <p className="section-label" style={{ margin: 0 }}>
+          <p className="section-label" style={{ margin: 0, display: "flex", gap: 6 }}>
             Plantilla del flujo
+            <InfoHint
+              text={`El flujo va renombrado «IA Mensajes ${name}», escribiendo en el esquema «${schema ?? name}» y sin nuestras credenciales: al importarlo, n8n les pedirá las suyas.`}
+            />
           </p>
           <Button
             size="sm"
@@ -106,10 +106,7 @@ export function OwnN8nHandoff({ clientId, clientName, crm, onCrmChange }: Props)
         </div>
 
         <p className="field-hint" style={{ marginTop: 0 }}>
-          El agente vive en el n8n del cliente, así que el flujo se entrega para importarlo. Va
-          renombrado &laquo;IA Mensajes {clientName.trim()}&raquo;, escribiendo en el esquema
-          &laquo;{schema ?? clientName.trim()}&raquo; y sin nuestras credenciales: al importarlo
-          les pedirá las suyas.
+          Para importar en el n8n del cliente.
         </p>
 
         {crms.length > 1 && (
@@ -139,21 +136,24 @@ export function OwnN8nHandoff({ clientId, clientName, crm, onCrmChange }: Props)
         )}
         {error && <p className="form-error">{error}</p>}
         {json && (
-          <div style={{ marginTop: 10 }}>
-            <button className="n8n-history-toggle" onClick={() => setOpenJson((v) => !v)}>
-              {openJson ? <IconChevronDown size={16} /> : <IconChevronRight size={16} />}
-              <IconFileCode size={14} />
-              <span>Ver JSON del flujo</span>
-            </button>
-            {openJson && <pre className="handoff-code">{json}</pre>}
-          </div>
+          <button
+            className="n8n-history-toggle"
+            style={{ marginTop: 10 }}
+            onClick={() => setViewing("json")}
+          >
+            <IconFileCode size={14} />
+            <span>Ver JSON del flujo</span>
+          </button>
         )}
       </div>
 
       <div className="n8n-card">
         <div className="row-between" style={{ marginBottom: 10 }}>
-          <p className="section-label" style={{ margin: 0 }}>
+          <p className="section-label" style={{ margin: 0, display: "flex", gap: 6 }}>
             Tabla de historial
+            <InfoHint
+              text={`Crea el esquema «${schema ?? name}» con su tabla chats en el Postgres del cliente. Sin los permisos a n8n_writer ni metabase_app, que solo existen en el nuestro.`}
+            />
           </p>
           <Button
             size="sm"
@@ -169,18 +169,16 @@ export function OwnN8nHandoff({ clientId, clientName, crm, onCrmChange }: Props)
         {sql ? (
           <>
             <p className="field-hint" style={{ marginTop: 0 }}>
-              Sus conversaciones se guardan en el Postgres del cliente. Este SQL crea el esquema
-              &laquo;{schema}&raquo; con su tabla chats, sin los permisos a n8n_writer ni
-              metabase_app, que solo existen en el nuestro.
+              Para correr en el Postgres del cliente.
             </p>
-            <div style={{ marginTop: 10 }}>
-              <button className="n8n-history-toggle" onClick={() => setOpenSql((v) => !v)}>
-                {openSql ? <IconChevronDown size={16} /> : <IconChevronRight size={16} />}
-                <IconDatabase size={14} />
-                <span>Ver SQL</span>
-              </button>
-              {openSql && <pre className="handoff-code">{sql}</pre>}
-            </div>
+            <button
+              className="n8n-history-toggle"
+              style={{ marginTop: 10 }}
+              onClick={() => setViewing("sql")}
+            >
+              <IconDatabase size={14} />
+              <span>Ver SQL</span>
+            </button>
           </>
         ) : (
           <p className="field-hint" style={{ marginTop: 0 }}>
@@ -189,6 +187,40 @@ export function OwnN8nHandoff({ clientId, clientName, crm, onCrmChange }: Props)
           </p>
         )}
       </div>
+
+      <Modal
+        open={viewing !== null}
+        onClose={() => setViewing(null)}
+        wide
+        title={viewing === "sql" ? "SQL de la tabla de historial" : `Flujo «IA Mensajes ${name}»`}
+        footer={
+          <>
+            <Button variant="ghost" onClick={() => setViewing(null)}>
+              Cerrar
+            </Button>
+            <Button
+              variant="primary"
+              icon={<IconCopy size={13} />}
+              onClick={() => {
+                const text = viewing === "sql" ? sql : json;
+                if (text) copy(viewing as "json" | "sql", text);
+              }}
+            >
+              {copied === viewing ? "Copiado" : "Copiar"}
+            </Button>
+          </>
+        }
+      >
+        <pre className="handoff-code">
+          {viewing === "sql" && sql
+            ? tokenizeSql(sql).map((t, i) => (
+                <span key={i} className={t.kind === "plain" ? undefined : `sql-${t.kind}`}>
+                  {t.text}
+                </span>
+              ))
+            : json}
+        </pre>
+      </Modal>
     </>
   );
 }

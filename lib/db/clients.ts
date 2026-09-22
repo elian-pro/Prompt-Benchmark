@@ -9,7 +9,7 @@
  * - 'archived'   → archived clients only.
  */
 import { getSupabase } from "../supabase";
-import type { Crm } from "../crm";
+import { DEFAULT_CRM, type Crm } from "../crm";
 import { syncVersionMarkers } from "../version-utils";
 import { listVersions } from "./versions";
 import { suggestChatsTable } from "./chats-history";
@@ -74,6 +74,15 @@ type NestedVersion = {
   is_production: boolean;
 };
 
+/**
+ * A row as the rest of the app expects it. `crm` is filled in here because a
+ * database where migration 031 has not run yet answers without the column, and
+ * an undefined CRM would travel into a request as the string "undefined".
+ */
+function toClient(row: any): Client {
+  return { ...(row as Client), crm: (row.crm as Crm) ?? DEFAULT_CRM };
+}
+
 function toSummary(row: any, pendingClientIds: Set<string>): ClientSummary {
   const versions: NestedVersion[] = row.versions ?? [];
   const sorted = [...versions].sort((a, b) => b.created_at.localeCompare(a.created_at));
@@ -81,7 +90,7 @@ function toSummary(row: any, pendingClientIds: Set<string>): ClientSummary {
   const production = versions.find((v) => v.is_production) ?? null;
   const { versions: _omit, ...client } = row;
   return {
-    ...(client as Client),
+    ...toClient(client),
     version_count: versions.length,
     latest_version_number: latest?.version_number ?? null,
     latest_version_created_at: latest?.created_at ?? null,
@@ -202,7 +211,7 @@ export async function getClient(id: string): Promise<ClientDetail | null> {
   if (pErr) throw new Error(`No se pudo obtener la versión de producción: ${pErr.message}`);
 
   return {
-    ...(client as Client),
+    ...toClient(client),
     versions,
     production_version: (prod as Version | null) ?? null,
   };
@@ -257,7 +266,7 @@ export async function createClient(input: {
 
   // Import supplies its own (imported) version next, so no empty seed.
   if (input.seedInitialVersion === false) {
-    return { client: client as Client, version: null };
+    return { client: toClient(client), version: null };
   }
 
   // Seed v1.0 directly (not via createVersion, which always bumps). Not
@@ -281,7 +290,7 @@ export async function createClient(input: {
     .single();
   if (vErr) throw new Error(`No se pudo crear la versión inicial: ${vErr.message}`);
 
-  return { client: client as Client, version: version as Version };
+  return { client: toClient(client), version: version as Version };
 }
 
 export async function updateClient(
@@ -315,7 +324,7 @@ export async function updateClient(
     .select("*")
     .single();
   if (error) throw new Error(`No se pudo actualizar el cliente: ${error.message}`);
-  return data as Client;
+  return toClient(data);
 }
 
 export async function archiveClient(id: string): Promise<Client> {
@@ -327,7 +336,7 @@ export async function archiveClient(id: string): Promise<Client> {
     .select("*")
     .single();
   if (error) throw new Error(`No se pudo archivar el cliente: ${error.message}`);
-  return data as Client;
+  return toClient(data);
 }
 
 export async function restoreClient(id: string): Promise<Client> {
@@ -339,7 +348,7 @@ export async function restoreClient(id: string): Promise<Client> {
     .select("*")
     .single();
   if (error) throw new Error(`No se pudo restaurar el cliente: ${error.message}`);
-  return data as Client;
+  return toClient(data);
 }
 
 export async function deleteClient(id: string): Promise<void> {
