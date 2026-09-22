@@ -10,6 +10,7 @@ import { BindOnCreateToggle } from "@/components/library/BindOnCreateToggle";
 import { N8nHostPicker } from "@/components/library/N8nHostPicker";
 import { ProvisionFields, type ProvisionChoice } from "@/components/library/ProvisionFields";
 import type { N8nHost } from "@/lib/db/clients";
+import { DEFAULT_CRM } from "@/lib/crm";
 
 type StepResult =
   | { ok: true; detail: string }
@@ -27,6 +28,7 @@ export function NewClientModal({ open, onClose }: { open: boolean; onClose: () =
   const [provision, setProvision] = useState<ProvisionChoice>({
     duplicateWorkflow: true,
     createChatsTable: true,
+    crm: DEFAULT_CRM,
     template: null,
   });
   const [saving, setSaving] = useState(false);
@@ -67,6 +69,9 @@ export function NewClientModal({ open, onClose }: { open: boolean; onClose: () =
           account: account.trim() || null,
           notes: notes.trim() || null,
           n8nHost,
+          // Stored on the client so a provisioning retry from its page knows
+          // which template to copy. Only meaningful on our own n8n.
+          crm: onZebra ? provision.crm : undefined,
         }),
       });
       if (!res.ok) {
@@ -92,6 +97,7 @@ export function NewClientModal({ open, onClose }: { open: boolean; onClose: () =
           body: JSON.stringify({
             duplicateWorkflow: provision.duplicateWorkflow,
             createChatsTable: provision.createChatsTable,
+            crm: provision.crm,
             ...(provision.template
               ? {
                   templateConnectionId: provision.template.connectionId,

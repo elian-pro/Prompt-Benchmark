@@ -212,6 +212,11 @@ clipboard button.
   Agent node is bound automatically so promoting a version pushes the prompt
   with no extra setup. The template is configured once per n8n connection in
   Settings, and can be overridden for a single creation.
+  - **Which CRM.** A connection holds one template per CRM (Kommo and Go High
+    Level), so the checkbox carries a CRM chip: Kommo is always preselected,
+    and a CRM with no template configured is not offered. The choice is stored
+    on the client, which is what makes the retry button on its page copy the
+    same template the modal would have.
 - **Crear la tabla de historial**, which creates the client's schema (holding
   a single `chats` table) in the conversation-history database and connects it
   to the history panel. The schema is named after the client exactly as

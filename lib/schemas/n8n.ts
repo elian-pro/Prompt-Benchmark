@@ -14,9 +14,12 @@ export const updateConnectionSchema = z
     name: z.string().trim().min(1, "El nombre es obligatorio."),
     base_url: z.string().url("La URL base debe ser una URL válida."),
     api_key: z.string().trim().min(1),
-    // Base workflow for "duplicar flujo al crear cliente". Null clears it.
+    // Base workflow for "duplicar flujo al crear cliente", one per CRM.
+    // Null clears it.
     template_workflow_id: z.string().trim().min(1).nullable(),
     template_workflow_name: z.string().trim().min(1).nullable(),
+    template_workflow_id_ghl: z.string().trim().min(1).nullable(),
+    template_workflow_name_ghl: z.string().trim().min(1).nullable(),
   })
   .partial()
   .refine((v) => Object.keys(v).length > 0, {

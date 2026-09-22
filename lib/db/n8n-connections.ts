@@ -16,9 +16,12 @@ export type MaskedConnection = {
   base_url: string;
   api_key_masked: string;
   // Base workflow duplicated for a new client (Sprint 16). Null when this
-  // connection has no template configured.
+  // connection has no template configured. One pair per CRM: the unsuffixed
+  // columns are Kommo's, which is why they keep their original names.
   template_workflow_id: string | null;
   template_workflow_name: string | null;
+  template_workflow_id_ghl: string | null;
+  template_workflow_name_ghl: string | null;
   created_at: string;
   updated_at: string;
 };
@@ -52,6 +55,8 @@ function toMasked(row: any): MaskedConnection {
     api_key_masked: maskFromEncrypted(row.api_key_encrypted),
     template_workflow_id: row.template_workflow_id ?? null,
     template_workflow_name: row.template_workflow_name ?? null,
+    template_workflow_id_ghl: row.template_workflow_id_ghl ?? null,
+    template_workflow_name_ghl: row.template_workflow_name_ghl ?? null,
     created_at: row.created_at,
     updated_at: row.updated_at,
   };
@@ -105,6 +110,8 @@ export async function updateConnection(
     api_key?: string;
     template_workflow_id?: string | null;
     template_workflow_name?: string | null;
+    template_workflow_id_ghl?: string | null;
+    template_workflow_name_ghl?: string | null;
   },
 ): Promise<MaskedConnection> {
   const sb = getSupabase();
@@ -118,6 +125,12 @@ export async function updateConnection(
   }
   if (input.template_workflow_name !== undefined) {
     patch.template_workflow_name = input.template_workflow_name;
+  }
+  if (input.template_workflow_id_ghl !== undefined) {
+    patch.template_workflow_id_ghl = input.template_workflow_id_ghl;
+  }
+  if (input.template_workflow_name_ghl !== undefined) {
+    patch.template_workflow_name_ghl = input.template_workflow_name_ghl;
   }
 
   const { data, error } = await sb

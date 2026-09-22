@@ -20,8 +20,14 @@
  *   the state.
  */
 import type { Client } from "./db/clients";
+import { DEFAULT_CRM, crmLabel, type Crm } from "./crm";
 import { getClient, updateClient } from "./db/clients";
-import { getConnectionCreds, getConnection, listConnections } from "./db/n8n-connections";
+import {
+  getConnectionCreds,
+  getConnection,
+  listConnections,
+  type MaskedConnection,
+} from "./db/n8n-connections";
 import { createApiBinding, listBindings } from "./db/n8n-bindings";
 import { listChatsTables, resolveClientSchema } from "./db/chats-history";
 import { isChatsConfigured } from "./supabase";
@@ -51,8 +57,12 @@ export type ProvisioningResult = {
 
 export type ProvisionOptions = {
   duplicateWorkflow: boolean;
-  /** Which template to copy. Resolved by the route (override or connection default). */
-  template?: { connectionId: string; workflowId: string };
+  /** Per-creation override of which template to copy. Both or neither. */
+  template?: { connectionId?: string; workflowId?: string };
+  /** Which CRM's template to copy. Defaults to the client's stored CRM, which
+   *  is what makes the retry button on the client's page pick the same
+   *  template the Nuevo cliente modal did. */
+  crm?: Crm;
   createChatsTable: boolean;
 };
 
@@ -235,17 +245,17 @@ export async function provisionClient(
   const result: ProvisioningResult = { workflow: null, chats: null };
 
   if (opts.duplicateWorkflow) {
-    if (!opts.template) {
-      result.workflow = {
-        ok: false,
-        error: "No hay flujo plantilla configurado. Elígelo en Ajustes, en la conexión de n8n.",
-      };
-    } else {
-      try {
-        result.workflow = await duplicateAndBind(client, opts.template);
-      } catch (err) {
-        result.workflow = { ok: false, error: errorText(err) };
-      }
+    const crm = opts.crm ?? client.crm ?? DEFAULT_CRM;
+    try {
+      const template = await resolveTemplate({ ...opts.template, crm });
+      result.workflow = template
+        ? await duplicateAndBind(client, template)
+        : {
+            ok: false,
+            error: `No hay flujo plantilla de ${crmLabel(crm)} configurado. Elígelo en Ajustes, en la conexión de n8n.`,
+          };
+    } catch (err) {
+      result.workflow = { ok: false, error: errorText(err) };
     }
   }
 
@@ -261,36 +271,61 @@ export async function provisionClient(
 }
 
 /**
- * Resolves which template to duplicate: an explicit override, else the default
- * stored on the connection. Returns null when neither yields one.
+ * Resolves which template to duplicate: an explicit override, else the
+ * connection's template FOR THAT CRM. Returns null when neither yields one.
  */
 export async function resolveTemplate(override?: {
   connectionId?: string;
   workflowId?: string;
+  crm?: Crm;
 }): Promise<{ connectionId: string; workflowId: string } | null> {
   if (override?.connectionId && override.workflowId) {
     return { connectionId: override.connectionId, workflowId: override.workflowId };
   }
+  const crm = override?.crm ?? DEFAULT_CRM;
   if (override?.connectionId) {
     const conn = await getConnection(override.connectionId);
-    return conn?.template_workflow_id
-      ? { connectionId: conn.id, workflowId: conn.template_workflow_id }
-      : null;
+    const workflowId = conn && templateIdFor(conn, crm);
+    return workflowId ? { connectionId: conn.id, workflowId } : null;
   }
-  const withTemplate = (await listConnectionsWithTemplate())[0];
-  return withTemplate ?? null;
+  const withTemplate = (await listConnectionsWithTemplate()).find((t) => t.crm === crm);
+  return withTemplate
+    ? { connectionId: withTemplate.connectionId, workflowId: withTemplate.workflowId }
+    : null;
 }
 
-/** Connections that have a template configured, in creation order. */
-export async function listConnectionsWithTemplate(): Promise<
-  { connectionId: string; workflowId: string; connectionName: string; workflowName: string | null }[]
-> {
-  return (await listConnections())
-    .filter((c) => c.template_workflow_id)
-    .map((c) => ({
-      connectionId: c.id,
-      workflowId: c.template_workflow_id as string,
-      connectionName: c.name,
-      workflowName: c.template_workflow_name,
-    }));
+export type TemplateOption = {
+  crm: Crm;
+  connectionId: string;
+  workflowId: string;
+  connectionName: string;
+  workflowName: string | null;
+};
+
+/** A connection's template for one CRM. Kommo keeps the unsuffixed columns. */
+function templateIdFor(conn: MaskedConnection, crm: Crm): string | null {
+  return crm === "ghl" ? conn.template_workflow_id_ghl : conn.template_workflow_id;
+}
+
+/**
+ * Every template configured anywhere, one entry per connection and CRM, in
+ * creation order. What the Nuevo cliente modal offers: a CRM with no template
+ * in any connection is not offered at all, so the chip can never pick an
+ * option that would only fail.
+ */
+export async function listConnectionsWithTemplate(): Promise<TemplateOption[]> {
+  return (await listConnections()).flatMap((c) =>
+    [
+      { crm: "kommo" as Crm, id: c.template_workflow_id, name: c.template_workflow_name },
+      { crm: "ghl" as Crm, id: c.template_workflow_id_ghl, name: c.template_workflow_name_ghl },
+    ]
+      .filter((t) => t.id)
+      .map((t) => ({
+        crm: t.crm,
+        connectionId: c.id,
+        workflowId: t.id as string,
+        connectionName: c.name,
+        workflowName: t.name,
+      })),
+  );
 }

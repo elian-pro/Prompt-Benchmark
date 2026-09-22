@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { provisionClient, resolveTemplate } from "@/lib/provisioning";
+import { provisionClient } from "@/lib/provisioning";
 import { provisionClientSchema } from "@/lib/schemas/clients";
 import { handleError } from "@/lib/http";
 
@@ -21,16 +21,16 @@ export async function POST(req: NextRequest, { params }: Params) {
   try {
     const { id } = await params;
     const input = provisionClientSchema.parse(await req.json());
-    const template = input.duplicateWorkflow
-      ? await resolveTemplate({
-          connectionId: input.templateConnectionId,
-          workflowId: input.templateWorkflowId,
-        })
-      : null;
 
     const provisioning = await provisionClient(id, {
       duplicateWorkflow: input.duplicateWorkflow,
-      template: template ?? undefined,
+      template: {
+        connectionId: input.templateConnectionId,
+        workflowId: input.templateWorkflowId,
+      },
+      // Absent (the retry button on the client's page) the client's own CRM
+      // decides, not the default.
+      crm: input.crm,
       createChatsTable: input.createChatsTable,
     });
     return NextResponse.json({ provisioning });

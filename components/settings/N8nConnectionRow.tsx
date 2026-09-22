@@ -18,8 +18,13 @@ export function N8nConnectionRow({ connection, onEdit, onDelete }: Props) {
           <div className="adapter-label">{connection.base_url}</div>
           <div className="adapter-label">
             {connection.template_workflow_name
-              ? `Plantilla: ${connection.template_workflow_name}`
-              : "Sin flujo plantilla"}
+              ? `Plantilla Kommo: ${connection.template_workflow_name}`
+              : "Sin flujo plantilla de Kommo"}
+          </div>
+          <div className="adapter-label">
+            {connection.template_workflow_name_ghl
+              ? `Plantilla Go High Level: ${connection.template_workflow_name_ghl}`
+              : "Sin flujo plantilla de Go High Level"}
           </div>
         </div>
         <div className="provider-actions">

@@ -9,6 +9,7 @@
  * - 'archived'   → archived clients only.
  */
 import { getSupabase } from "../supabase";
+import type { Crm } from "../crm";
 import { syncVersionMarkers } from "../version-utils";
 import { listVersions } from "./versions";
 import { suggestChatsTable } from "./chats-history";
@@ -34,6 +35,11 @@ export type Client = {
    *  has been set up yet. Always set (mandatory at creation, defaults to
    *  'zebra' for pre-existing rows). Drives the Library's yellow host tag. */
   n8n_host: N8nHost;
+  /** Which CRM this agent runs against (migration 031). Decides which n8n
+   *  template its flow is duplicated from, including on a retry from the
+   *  client's page, where the modal's choice is long gone. 'kommo' for every
+   *  client created before the column existed. */
+  crm: Crm;
   /** Conversation-history table for this client in the "chats" DB
    *  (chats_<Cliente>), or null when no history is connected yet. Set by
    *  auto-match on creation or by hand in the Library. See lib/db/chats-history. */
@@ -224,6 +230,9 @@ export async function createClient(input: {
   // the DB default ('zebra'), which covers callers that don't ask (e.g. the
   // Creator finalize flow).
   n8nHost?: N8nHost;
+  // Which CRM the agent runs against. Omitted it falls back to the DB default
+  // ('kommo'), which covers the callers that don't ask (Creator finalize).
+  crm?: Crm;
 }): Promise<{ client: Client; version: Version | null }> {
   const sb = getSupabase();
   // Best-effort: auto-connect the client's conversation-history table when its
@@ -239,6 +248,7 @@ export async function createClient(input: {
       account: input.account ?? null,
       notes: input.notes ?? null,
       ...(input.n8nHost ? { n8n_host: input.n8nHost } : {}),
+      ...(input.crm ? { crm: input.crm } : {}),
       ...(chatsTable ? { chats_table: chatsTable } : {}),
     })
     .select("*")

@@ -4,8 +4,10 @@ import { useEffect, useState } from "react";
 import { IconTemplate } from "@tabler/icons-react";
 import { SearchableChip } from "@/components/ui/SearchableChip";
 import { chatsTableName } from "@/lib/chats-table-name";
+import { CRMS, DEFAULT_CRM, type Crm } from "@/lib/crm";
 
 export type TemplateOption = {
+  crm: Crm;
   connectionId: string;
   workflowId: string;
   connectionName: string;
@@ -15,6 +17,7 @@ export type TemplateOption = {
 export type ProvisionChoice = {
   duplicateWorkflow: boolean;
   createChatsTable: boolean;
+  crm: Crm;
   template: TemplateOption | null;
 };
 
@@ -36,6 +39,9 @@ function workflowNameFor(clientName: string): string {
  * chats_<Cliente> history table. Both default to checked, and each one hides
  * itself when it is not configured, so the modal never offers an option that
  * can only fail.
+ *
+ * The CRM chips follow the same rule: they only appear once more than one CRM
+ * has a template configured, and Kommo stays selected by default.
  */
 export function ProvisionFields({ clientName, value, onChange, disabled }: Props) {
   const [templates, setTemplates] = useState<TemplateOption[]>([]);
@@ -51,8 +57,11 @@ export function ProvisionFields({ clientName, value, onChange, disabled }: Props
         setTemplates(data.templates ?? []);
         setChatsReady(Boolean(data.chatsReady));
         setLoaded(true);
-        // Preselect the first template so the default path needs no clicks.
-        if (data.templates?.length) onChange({ ...value, template: data.templates[0] });
+        // Preselect Kommo's template so the default path needs no clicks. Only
+        // an instance without a Kommo template falls back to whatever is there.
+        const first =
+          data.templates?.find((t) => t.crm === DEFAULT_CRM) ?? data.templates?.[0] ?? null;
+        if (first) onChange({ ...value, crm: first.crm, template: first });
       })
       .catch(() => {
         if (alive) setLoaded(true);
@@ -66,6 +75,18 @@ export function ProvisionFields({ clientName, value, onChange, disabled }: Props
 
   const table = chatsTableName(clientName);
   const canDuplicate = templates.length > 0;
+  // Templates for the CRM in play. More than one means more than one n8n
+  // connection carries a template for it, and the user picks which.
+  const forCrm = templates.filter((t) => t.crm === value.crm);
+  const crms = CRMS.filter((c) => templates.some((t) => t.crm === c.id));
+
+  function chooseCrm(crm: Crm) {
+    onChange({
+      ...value,
+      crm,
+      template: templates.find((t) => t.crm === crm) ?? null,
+    });
+  }
   if (!loaded || (!canDuplicate && !chatsReady)) return null;
 
   return (
@@ -84,12 +105,32 @@ export function ProvisionFields({ clientName, value, onChange, disabled }: Props
               {clientName.trim() ? workflowNameFor(clientName) : "IA Mensajes {Cliente}"}&raquo;
             </span>
           </label>
-          {value.duplicateWorkflow && templates.length > 1 && (
+          {value.duplicateWorkflow && crms.length > 1 && (
+            <>
+              <label className="field-label" style={{ marginTop: "0.75rem" }}>
+                CRM
+              </label>
+              <div className="chip-row">
+                {crms.map((c) => (
+                  <button
+                    key={c.id}
+                    type="button"
+                    className={`chip${value.crm === c.id ? " active" : ""}`}
+                    onClick={() => chooseCrm(c.id)}
+                    disabled={disabled}
+                  >
+                    {c.label}
+                  </button>
+                ))}
+              </div>
+            </>
+          )}
+          {value.duplicateWorkflow && forCrm.length > 1 && (
             <SearchableChip
               icon={<IconTemplate size={14} />}
               placeholder="Elige la plantilla"
               searchPlaceholder="Buscar plantilla…"
-              items={templates.map((t) => ({
+              items={forCrm.map((t) => ({
                 id: t.connectionId,
                 label: t.workflowName ?? t.workflowId,
                 meta: t.connectionName,
@@ -98,16 +139,22 @@ export function ProvisionFields({ clientName, value, onChange, disabled }: Props
               onChange={(id) =>
                 onChange({
                   ...value,
-                  template: templates.find((t) => t.connectionId === id) ?? null,
+                  template: forCrm.find((t) => t.connectionId === id) ?? null,
                 })
               }
               disabled={disabled}
             />
           )}
-          {value.duplicateWorkflow && templates.length === 1 && (
+          {value.duplicateWorkflow && forCrm.length === 1 && (
             <p className="field-hint">
-              Plantilla: {templates[0].workflowName ?? templates[0].workflowId} (
-              {templates[0].connectionName})
+              Plantilla: {forCrm[0].workflowName ?? forCrm[0].workflowId} (
+              {forCrm[0].connectionName})
+            </p>
+          )}
+          {value.duplicateWorkflow && forCrm.length === 0 && (
+            <p className="field-hint">
+              Esa opción no tiene flujo plantilla configurado. Elígelo en Ajustes, en la conexión
+              de n8n.
             </p>
           )}
         </div>

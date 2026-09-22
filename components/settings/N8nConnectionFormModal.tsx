@@ -26,6 +26,7 @@ export function N8nConnectionFormModal({ open, onClose, onSaved, connection }: P
   const [saving, setSaving] = useState(false);
   const [testing, setTesting] = useState(false);
   const [templateId, setTemplateId] = useState(connection?.template_workflow_id ?? "");
+  const [templateIdGhl, setTemplateIdGhl] = useState(connection?.template_workflow_id_ghl ?? "");
   const [workflows, setWorkflows] = useState<WorkflowOption[]>([]);
   const [loadingWorkflows, setLoadingWorkflows] = useState(false);
 
@@ -94,6 +95,11 @@ export function N8nConnectionFormModal({ open, onClose, onSaved, connection }: P
       payload.template_workflow_id = templateId || null;
       payload.template_workflow_name = templateId
         ? chosen?.name ?? connection?.template_workflow_name ?? null
+        : null;
+      const chosenGhl = workflows.find((w) => w.id === templateIdGhl);
+      payload.template_workflow_id_ghl = templateIdGhl || null;
+      payload.template_workflow_name_ghl = templateIdGhl
+        ? chosenGhl?.name ?? connection?.template_workflow_name_ghl ?? null
         : null;
     }
 
@@ -181,7 +187,7 @@ export function N8nConnectionFormModal({ open, onClose, onSaved, connection }: P
       </div>
 
       <div className="field">
-        <label className="field-label">Flujo plantilla</label>
+        <label className="field-label">Flujo plantilla de Kommo</label>
         {editing ? (
           <>
             <SearchableChip
@@ -196,6 +202,7 @@ export function N8nConnectionFormModal({ open, onClose, onSaved, connection }: P
             />
             <p className="field-hint">
               Se duplica y se renombra &laquo;IA Mensajes {"{Cliente}"}&raquo; al crear un cliente.
+              Es la opción por omisión.
             </p>
             {templateId && (
               <Button size="sm" variant="ghost" onClick={() => setTemplateId("")}>
@@ -204,9 +211,33 @@ export function N8nConnectionFormModal({ open, onClose, onSaved, connection }: P
             )}
           </>
         ) : (
-          <p className="field-hint">Guarda la conexión para poder elegir su flujo plantilla.</p>
+          <p className="field-hint">Guarda la conexión para poder elegir sus flujos plantilla.</p>
         )}
       </div>
+
+      {editing && (
+        <div className="field">
+          <label className="field-label">Flujo plantilla de Go High Level</label>
+          <SearchableChip
+            icon={<IconTemplate size={14} />}
+            placeholder="Sin plantilla"
+            searchPlaceholder="Buscar flujo…"
+            items={workflows.map((w) => ({ id: w.id, label: w.name }))}
+            value={templateIdGhl}
+            onChange={setTemplateIdGhl}
+            loading={loadingWorkflows}
+            emptyText="Esta instancia no tiene flujos."
+          />
+          <p className="field-hint">
+            En blanco, la opción de Go High Level no aparece al crear un cliente.
+          </p>
+          {templateIdGhl && (
+            <Button size="sm" variant="ghost" onClick={() => setTemplateIdGhl("")}>
+              Quitar plantilla
+            </Button>
+          )}
+        </div>
+      )}
 
       {testMsg && <p className="form-ok">{testMsg}</p>}
       {error && <p className="form-error">{error}</p>}

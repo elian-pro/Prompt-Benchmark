@@ -479,6 +479,14 @@ name they would create, so the real world is the state:
 The client detail derives what to offer: no api binding means "Duplicar
 plantilla", a null `chats_table` means "Crear tabla chats_X".
 
+**One template per CRM.** `n8n_connections` carries two pairs of template
+columns: the original ones are Kommo's (hence no suffix) and
+`template_workflow_id_ghl` is Go High Level's. `clients.crm` remembers which
+one a client was created with, so the retry button, which sends no template,
+resolves the same one instead of falling back to the default. Adding a third
+CRM means a column pair, an entry in `lib/crm.ts` and a picker in Settings:
+the chips, the resolution and the migration read from that list.
+
 **Which agent gets bound.** The `IA mensajes <Cliente>` workflows carry three
 agent nodes: a `Router` that dispatches, `dudas/conversacion` that talks to
 the lead, and an `AI Agent` for the calendar. `pickPromptAgent` takes the only

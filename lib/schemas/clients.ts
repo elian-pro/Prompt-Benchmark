@@ -1,6 +1,7 @@
 import { z } from "zod";
 
 import { isValidChatsTable } from "../chats-table-name.ts";
+import { CRM_IDS } from "../crm.ts";
 
 export const clientFilterSchema = z.enum(
   ["all", "production", "editing", "legacy", "archived"],
@@ -24,6 +25,9 @@ export const createClientSchema = z.object({
     required_error: "Indica dónde vive el agente: n8n de Zebra o n8n propio.",
     invalid_type_error: "Host de n8n no válido.",
   }),
+  // Which CRM the agent runs against. Optional: only the modals that offer the
+  // choice send it, the rest keep the DB default ('kommo').
+  crm: z.enum(CRM_IDS, { invalid_type_error: "CRM no válido." }).optional(),
 });
 
 /**
@@ -36,6 +40,9 @@ export const provisionClientSchema = z.object({
   // Per-creation override of the connection's default template. Both or neither.
   templateConnectionId: z.string().uuid("connection_id debe ser un UUID válido.").optional(),
   templateWorkflowId: z.string().trim().min(1).optional(),
+  // Which CRM's template to duplicate. Omitted, the client's stored CRM wins,
+  // so the retry button on the client's page copies the right template.
+  crm: z.enum(CRM_IDS, { invalid_type_error: "CRM no válido." }).optional(),
   createChatsTable: z.boolean().default(false),
 });
 
