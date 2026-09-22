@@ -187,7 +187,11 @@ Each card shows:
   Zebra's own n8n or the client's own. This tag is independent of whether
   the detailed n8n binding below (connection + workflow + node, or a manual
   label) has actually been configured yet; it's editable any time by
-  clicking it on the client detail page.
+  clicking it on the client detail page. On "n8n propio" the client detail
+  locks the three cards that only make sense on our side (Despliegue n8n,
+  Sincronizaciones, Historial de conversaciones): they stay visible, greyed
+  and inert, with a line saying why. Herramientas is ours either way, so it
+  stays live and sits last on every client.
 - A small icon (since Sprint 7) when the client has a manual n8n binding
   that hasn't confirmed the current production version yet, so a pending
   hand-deploy is visible without opening the client.

@@ -799,29 +799,42 @@ export default function ClientDetailPage() {
             })}
           </div>
 
-          <N8nDeploymentCard
-            clientId={id}
-            productionVersion={
-              detail.production_version
-                ? {
-                    id: detail.production_version.id,
-                    version_number: detail.production_version.version_number,
-                    content: detail.production_version.content,
-                  }
-                : null
-            }
-            onRequestSync={() => {
-              if (!detail.production_version) return;
-              setSyncTarget({
-                versionId: detail.production_version.id,
-                versionNumber: detail.production_version.version_number,
-                versionContent: detail.production_version.content,
-              });
-            }}
-          />
-          <N8nSyncHistory clientId={id} />
+          {/* A client on its own n8n has no flow of ours to duplicate, nothing
+              for the sync engine to push and no conversations in our history
+              database. The three cards stay visible, so the ficha still shows
+              what would be there, and inert. Herramientas is ours either way,
+              which is why it lives outside and last. */}
+          {detail.n8n_host === "own" && (
+            <p className="field-hint" style={{ marginTop: 20 }}>
+              Este agente vive en el n8n del cliente: su flujo, sus sincronizaciones y su
+              historial de conversaciones no pasan por aquí.
+            </p>
+          )}
+          <fieldset className="host-locked" disabled={detail.n8n_host === "own"}>
+            <N8nDeploymentCard
+              clientId={id}
+              productionVersion={
+                detail.production_version
+                  ? {
+                      id: detail.production_version.id,
+                      version_number: detail.production_version.version_number,
+                      content: detail.production_version.content,
+                    }
+                  : null
+              }
+              onRequestSync={() => {
+                if (!detail.production_version) return;
+                setSyncTarget({
+                  versionId: detail.production_version.id,
+                  versionNumber: detail.production_version.version_number,
+                  versionContent: detail.production_version.content,
+                });
+              }}
+            />
+            <N8nSyncHistory clientId={id} />
+            <ConversationHistory clientId={id} clientName={detail.name} />
+          </fieldset>
           <ClientToolsCard clientId={id} />
-          <ConversationHistory clientId={id} clientName={detail.name} />
         </aside>
 
         {viewingVersion ? (

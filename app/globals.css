@@ -3787,6 +3787,19 @@ body[data-theme="light"] .dot-grid::after {
    n8n deployment (client detail card + binding picker)
    =========================================================================== */
 
+/* The n8n + Postgres block of the client detail. `disabled` on the fieldset
+   makes every control inside inert in one go (a client on its own n8n), with
+   no per-card prop, and the cards keep their own block flow. */
+.host-locked {
+  border: 0;
+  margin: 0;
+  padding: 0;
+  min-width: 0;
+}
+.host-locked:disabled {
+  opacity: 0.45;
+}
+
 .n8n-card {
   margin-top: 20px;
   padding: 14px;
