@@ -53,12 +53,25 @@ function writeValue(field: unknown, next: string): unknown {
 const CHATS_TARGET_RE =
   /\b(from|into|update|join)\s+(?:(?:"(?:[^"]|"")*"|[A-Za-z_][A-Za-z0-9_$]*)\s*\.\s*)?chats\b/gi;
 
+/**
+ * A qualified COLUMN reference: `"Lezgo".chats.historial`, the shape an
+ * `INSERT ... ON CONFLICT DO UPDATE SET historial = "Lezgo".chats.historial`
+ * uses to read the row it is replacing. No keyword introduces it, so
+ * CHATS_TARGET_RE never sees it, and left behind it points at a schema the
+ * statement no longer touches: Postgres rejects the query at run time, after
+ * provisioning reported success.
+ */
+const CHATS_COLUMN_REF_RE =
+  /(?:"(?:[^"]|"")*"|[A-Za-z_][A-Za-z0-9_$]*)\s*\.\s*chats\s*\.\s*(?=[A-Za-z_"])/gi;
+
 /** Rewrites every conversation-table reference of a raw query onto `schema`. */
 function retargetQuery(query: string, schema: string): string {
-  return query.replace(
-    CHATS_TARGET_RE,
-    (_match, keyword: string) => `${keyword} ${quoteIdent(schema)}.${CHATS_TABLE}`,
-  );
+  return query
+    .replace(
+      CHATS_TARGET_RE,
+      (_match, keyword: string) => `${keyword} ${quoteIdent(schema)}.${CHATS_TABLE}`,
+    )
+    .replace(CHATS_COLUMN_REF_RE, `${quoteIdent(schema)}.${CHATS_TABLE}.`);
 }
 
 /**

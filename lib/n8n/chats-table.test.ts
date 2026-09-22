@@ -150,3 +150,36 @@ test("does not count a raw query already on the target schema", () => {
   const out = retargetChatsTable(wf([sqlNode("q", 'UPDATE "Acalai".chats SET historial = $1')]), "Acalai");
   assert.equal(out.retargeted, 0);
 });
+
+test("retargets the qualified column refs of an ON CONFLICT clause", () => {
+  // The Go High Level template writes its turns this way. Leaving "Lezgo" in
+  // the DO UPDATE clause makes the copy fail on every message, in n8n, long
+  // after provisioning said it went fine.
+  const out = retargetChatsTable(
+    wf([
+      sqlNode(
+        "Registra turno lead",
+        'INSERT INTO "Lezgo".chats (id_crm, historial, turnos)\n' +
+          "VALUES ($1, $2, $3::jsonb)\n" +
+          "ON CONFLICT (id_crm) DO UPDATE\n" +
+          'SET historial = "Lezgo".chats.historial || $2,\n' +
+          '    turnos = "Lezgo".chats.turnos || $3::jsonb\n' +
+          "RETURNING *",
+      ),
+    ]),
+    "Grupo de la Torre",
+  );
+  assert.equal(out.retargeted, 1);
+  assert.ok(!queryOf(out.workflow.nodes[0]).includes("Lezgo"));
+  assert.equal(
+    (queryOf(out.workflow.nodes[0]).match(/"Grupo de la Torre"\.chats/g) ?? []).length,
+    3,
+  );
+});
+
+test("leaves a qualified column of another table alone", () => {
+  const sql = 'select "Lezgo".vehiculos.precio from "Lezgo".vehiculos';
+  const out = retargetChatsTable(wf([sqlNode("q", sql)]), "Acalai");
+  assert.equal(out.retargeted, 0);
+  assert.equal(queryOf(out.workflow.nodes[0]), sql);
+});
