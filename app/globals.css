@@ -3791,6 +3791,69 @@ body[data-theme="light"] .dot-grid::after {
    n8n deployment (client detail card + binding picker)
    =========================================================================== */
 
+/* Header of a handoff card: the name of the artifact, its hint, and the copy
+   action. The column is 330px wide, so the action holds its line and the
+   title is the one that wraps. */
+.handoff-head {
+  margin-bottom: 12px;
+}
+.handoff-head .btn {
+  white-space: nowrap;
+}
+
+/* The one way into the artifact a client that runs its own n8n receives: a row
+   that names the file, with its type on the left and the affordance on the
+   right, under a hairline. The card above it says what the file is; this row
+   opens it, so the two never read as one paragraph. */
+.handoff-open {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  margin-top: 16px;
+  padding: 16px 0 0;
+  border: none;
+  border-top: 0.5px solid var(--border);
+  background: none;
+  text-align: left;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--fg);
+  cursor: pointer;
+}
+.handoff-open:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+.handoff-open-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  width: 30px;
+  height: 30px;
+  border-radius: 8px;
+  border: 0.5px solid var(--border);
+  background: var(--surface2);
+  color: var(--muted);
+  transition: color 0.15s, border-color 0.15s;
+}
+.handoff-open-chevron {
+  margin-left: auto;
+  flex: none;
+  color: var(--faint);
+  transition: color 0.15s;
+}
+.handoff-open:hover .handoff-open-icon,
+.handoff-open:focus-visible .handoff-open-icon {
+  color: var(--fg);
+  border-color: var(--border2);
+}
+.handoff-open:hover .handoff-open-chevron,
+.handoff-open:focus-visible .handoff-open-chevron {
+  color: var(--fg);
+}
+
 /* The JSON and the SQL handed to a client that runs its own n8n. They open in
    a wide modal: the client detail column is 30% of the page, where neither is
    readable. */

@@ -1,7 +1,12 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { IconCopy, IconFileCode, IconDatabase } from "@tabler/icons-react";
+import {
+  IconChevronRight,
+  IconCopy,
+  IconDatabase,
+  IconFileCode,
+} from "@tabler/icons-react";
 import { Button } from "@/components/ui/Button";
 import { Modal } from "@/components/ui/Modal";
 import { InfoHint } from "@/components/ui/InfoHint";
@@ -87,7 +92,7 @@ export function OwnN8nHandoff({ clientId, clientName, crm, onCrmChange }: Props)
   return (
     <>
       <div className="n8n-card">
-        <div className="row-between" style={{ marginBottom: 10 }}>
+        <div className="row-between handoff-head">
           <p className="section-label" style={{ margin: 0, display: "flex", gap: 6 }}>
             Plantilla del flujo
             <InfoHint
@@ -105,16 +110,10 @@ export function OwnN8nHandoff({ clientId, clientName, crm, onCrmChange }: Props)
           </Button>
         </div>
 
-        <p className="field-hint" style={{ marginTop: 0 }}>
-          Para importar en el n8n del cliente.
-        </p>
-
         {crms.length > 1 && (
           <>
-            <label className="field-label" style={{ marginTop: "0.75rem" }}>
-              CRM
-            </label>
-            <div className="chip-row">
+            <label className="field-label">CRM</label>
+            <div className="chip-row" style={{ margin: "6px 0 14px" }}>
               {crms.map((c) => (
                 <button
                   key={c.id}
@@ -129,6 +128,10 @@ export function OwnN8nHandoff({ clientId, clientName, crm, onCrmChange }: Props)
           </>
         )}
 
+        <p className="field-hint" style={{ marginTop: 0 }}>
+          Para importar en el n8n del cliente.
+        </p>
+
         {loading && (
           <p className="muted" style={{ fontSize: 13, marginTop: 10 }}>
             Preparando el flujo…
@@ -136,19 +139,18 @@ export function OwnN8nHandoff({ clientId, clientName, crm, onCrmChange }: Props)
         )}
         {error && <p className="form-error">{error}</p>}
         {json && (
-          <button
-            className="n8n-history-toggle"
-            style={{ marginTop: 10 }}
-            onClick={() => setViewing("json")}
-          >
-            <IconFileCode size={14} />
+          <button className="handoff-open" onClick={() => setViewing("json")}>
+            <span className="handoff-open-icon">
+              <IconFileCode size={15} stroke={1.5} />
+            </span>
             <span>Ver JSON del flujo</span>
+            <IconChevronRight size={15} className="handoff-open-chevron" />
           </button>
         )}
       </div>
 
       <div className="n8n-card">
-        <div className="row-between" style={{ marginBottom: 10 }}>
+        <div className="row-between handoff-head">
           <p className="section-label" style={{ margin: 0, display: "flex", gap: 6 }}>
             Tabla de historial
             <InfoHint
@@ -171,13 +173,12 @@ export function OwnN8nHandoff({ clientId, clientName, crm, onCrmChange }: Props)
             <p className="field-hint" style={{ marginTop: 0 }}>
               Para correr en el Postgres del cliente.
             </p>
-            <button
-              className="n8n-history-toggle"
-              style={{ marginTop: 10 }}
-              onClick={() => setViewing("sql")}
-            >
-              <IconDatabase size={14} />
+            <button className="handoff-open" onClick={() => setViewing("sql")}>
+              <span className="handoff-open-icon">
+                <IconDatabase size={15} stroke={1.5} />
+              </span>
               <span>Ver SQL</span>
+              <IconChevronRight size={15} className="handoff-open-chevron" />
             </button>
           </>
         ) : (
