@@ -120,6 +120,31 @@ end;
 $fn$;`;
 
 /**
+ * What is wrong with an EXISTING history table for the CRM that writes to it,
+ * or null when nothing is. Adopting a schema that was already there skips the
+ * DDL, so this is the only thing standing between a client and a flow that
+ * fails on its first real lead, hours after provisioning said it went fine.
+ *
+ * Pure: the caller asks the database what exists and passes the two answers.
+ */
+export function chatsShapeProblem(
+  schema: string,
+  crm: Crm,
+  found: { column: boolean; uniqueIndex: boolean },
+): string | null {
+  const column = LEAD_ID_COLUMN[crm];
+  if (!found.column) {
+    return `La tabla ${quoteIdent(schema)}.${CHATS_TABLE} no tiene la columna ${column}, que es la que escribe el flujo de este CRM. Créala antes de conectar el agente o sus conversaciones no se guardarán.`;
+  }
+  // Only Go High Level upserts (`on conflict (id_crm) do update`), and an
+  // ON CONFLICT target without a unique index fails on every message.
+  if (crm === "ghl" && !found.uniqueIndex) {
+    return `La tabla ${quoteIdent(schema)}.${CHATS_TABLE} no tiene índice único sobre ${column}. El flujo de Go High Level guarda cada turno con «on conflict (${column})», que sin ese índice falla en todos los mensajes. Créalo con: create unique index chats_crm_idx on ${quoteIdent(schema)}.${CHATS_TABLE} (${column});`;
+  }
+  return null;
+}
+
+/**
  * The fixed DDL for a new client's history: the schema, the table, the lookup
  * index and the grants. Byte-identical in shape to the schemas the agent flows
  * already write to, so a provisioned client behaves like a migrated one.

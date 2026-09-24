@@ -34,7 +34,11 @@ import { isChatsConfigured } from "./supabase";
 import { createWorkflow, getWorkflow, listWorkflows } from "./n8n/client";
 import { listAgentNodes, pickPromptAgent } from "./n8n/agent-node";
 import { retargetChatsTable, countLegacySupabaseNodes } from "./n8n/chats-table";
-import { createChatsTable, isChatsAdminConfigured } from "./chats-admin";
+import {
+  createChatsTable,
+  findChatsShapeProblem,
+  isChatsAdminConfigured,
+} from "./chats-admin";
 import { chatsTableName } from "./chats-table-name";
 
 export type StepResult =
@@ -204,8 +208,17 @@ async function ensureChatsTable(client: Client): Promise<StepResult> {
       error: "El nombre del cliente no produce un nombre de esquema válido.",
     };
   }
+  // Every path that ends well passes through here: a table this step did not
+  // create (an adopted schema, a retry) is the one that can have the wrong
+  // shape for the client's CRM, and saying so now is the difference between a
+  // red line in the modal and a flow that dies on its first real lead.
+  const linked = async (detail: string): Promise<StepResult> => {
+    const problem = await findChatsShapeProblem(table, client.crm);
+    return problem ? { ok: false, error: problem } : { ok: true, detail };
+  };
+
   if (client.chats_table === table) {
-    return { ok: true, detail: `${table} (ya estaba conectada)` };
+    return linked(`${table} (ya estaba conectada)`);
   }
   if (!isChatsConfigured()) {
     return { ok: false, error: "La base de datos de chats no está configurada." };
@@ -219,15 +232,14 @@ async function ensureChatsTable(client: Client): Promise<StepResult> {
     await createChatsTable(table, client.crm);
   }
   await updateClient(client.id, { chats_table: table });
-  if (existing) return { ok: true, detail: `${table} (esquema existente, conectado)` };
+  if (existing) return linked(`${table} (esquema existente, conectado)`);
   // Say when the table went into a schema that was already there under another
   // spelling, so the difference is visible instead of looking like a typo.
-  return {
-    ok: true,
-    detail: existingSchema
+  return linked(
+    existingSchema
       ? `${table} (tabla creada en el esquema que ya existía para este cliente)`
       : `${table} (creado)`,
-  };
+  );
 }
 
 /**

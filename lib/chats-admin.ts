@@ -18,9 +18,14 @@
  */
 // Extension-ful import so `node --test` can run this module, same as
 // lib/prompts/editor-persona.ts does with ./options-block.ts.
-import { buildCreateChatsTableSql } from "./chats-table-name.ts";
+import {
+  buildCreateChatsTableSql,
+  chatsShapeProblem,
+  CHATS_TABLE,
+  LEAD_ID_COLUMN,
+} from "./chats-table-name.ts";
 import type { Crm } from "./crm.ts";
-import { getChatsPool, isChatsDbConfigured } from "./chats-db.ts";
+import { chatsQuery, getChatsPool, isChatsDbConfigured } from "./chats-db.ts";
 
 /** Custom error so API routes can tell an upstream failure from a bad request. */
 export class ChatsAdminError extends Error {
@@ -68,4 +73,37 @@ export async function createChatsTable(schemaName: string, crm?: Crm): Promise<v
   } finally {
     client.release();
   }
+}
+
+/**
+ * Asks the history database whether a client's table has what its CRM's flow
+ * needs, and returns the problem in Spanish, or null. Read-only, and it never
+ * changes a table it did not create: fixing someone else's schema by hand is a
+ * decision, not a side effect of pressing "crear tabla".
+ */
+export async function findChatsShapeProblem(
+  schema: string,
+  crm: Crm,
+): Promise<string | null> {
+  const column = LEAD_ID_COLUMN[crm];
+  const [found] = await chatsQuery<{ column: boolean; unique_index: boolean }>(
+    `select
+       exists (
+         select 1 from information_schema.columns
+          where table_schema = $1 and table_name = $2 and column_name = $3
+       ) as "column",
+       exists (
+         select 1
+           from pg_index i
+           join pg_class c on c.oid = i.indrelid
+           join pg_namespace n on n.oid = c.relnamespace
+           join pg_attribute a on a.attrelid = c.oid and a.attnum = any (i.indkey)
+          where n.nspname = $1 and c.relname = $2 and i.indisunique and a.attname = $3
+       ) as unique_index`,
+    [schema, CHATS_TABLE, column],
+  );
+  return chatsShapeProblem(schema, crm, {
+    column: Boolean(found?.column),
+    uniqueIndex: Boolean(found?.unique_index),
+  });
 }

@@ -570,6 +570,13 @@ message. `LEAD_ID_COLUMN` in `lib/chats-table-name.ts` is the mapping;
 is there, so one reader serves both shapes and no existing table is ever
 renamed.
 
+Provisioning creates the right shape, but it does not create anything when the
+schema was already there, which is the case that bites: the step then checks
+what the table actually has (`findChatsShapeProblem`) and fails with the
+missing piece named, rather than reporting success over a table the client's
+flow cannot write to. It never alters a table it did not create; repairing
+someone else's schema is a decision, not a side effect.
+
 The naming rule lives in `lib/chats-table-name.ts`, a pure module (no
 Supabase imports) so the modal can preview the name in the browser: strip
 accents, drop everything that is not alphanumeric, keep capitalization,

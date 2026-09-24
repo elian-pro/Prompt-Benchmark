@@ -7,6 +7,7 @@ import assert from "node:assert/strict";
 
 import {
   buildCreateChatsTableSql,
+  chatsShapeProblem,
   chatsTableName,
   isValidChatsTable,
   isLegacyChatsTable,
@@ -137,4 +138,27 @@ test("the update schema accepts a real schema name, not just the legacy chats_*"
   assert.equal(ok(null), true); // disconnecting
   assert.equal(ok("a".repeat(64)), false); // past the identifier limit
   assert.equal(ok("mal\u0000nombre"), false);
+});
+
+test("an adopted table is reported when it cannot hold this CRM's conversations", () => {
+  // Kommo only needs its column; the index it uses is not unique and never was.
+  assert.equal(
+    chatsShapeProblem("Valcasa", "kommo", { column: true, uniqueIndex: false }),
+    null,
+  );
+  assert.match(
+    chatsShapeProblem("Valcasa", "kommo", { column: false, uniqueIndex: true }) ?? "",
+    /no tiene la columna id_de_kommo/,
+  );
+
+  // Go High Level upserts, so the unique index is not optional for it.
+  assert.equal(chatsShapeProblem("Matchouses", "ghl", { column: true, uniqueIndex: true }), null);
+  assert.match(
+    chatsShapeProblem("Matchouses", "ghl", { column: true, uniqueIndex: false }) ?? "",
+    /índice único sobre id_crm/,
+  );
+  assert.match(
+    chatsShapeProblem("Matchouses", "ghl", { column: false, uniqueIndex: false }) ?? "",
+    /no tiene la columna id_crm/,
+  );
 });
