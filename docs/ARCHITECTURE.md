@@ -556,10 +556,19 @@ control characters. Nothing user-authored reaches the database as SQL.
 
 The table shape is fixed and matches what the agents already write to:
 `id bigint identity primary key`, `created_at timestamptz not null default
-now()`, `numero_de_mensajes numeric`, `id_de_kommo text`, `historial text`,
+now()`, `numero_de_mensajes numeric`, the lead's CRM id, `historial text`,
 RLS enabled with no policies (service_role bypasses it). The statement ends
 with `notify pgrst, 'reload schema'` so the history panel sees the new table
 immediately instead of 404-ing until PostgREST refreshes its cache.
+
+**The lead's id column is the one thing the CRM changes.** A Kommo flow writes
+`id_de_kommo`, a Go High Level one writes `id_crm`, and the Go High Level
+column is unique, because that flow saves a turn with `on conflict (id_crm) do
+update` and an ON CONFLICT target without a unique index fails on every
+message. `LEAD_ID_COLUMN` in `lib/chats-table-name.ts` is the mapping;
+`lib/db/chats-history.ts` reads the row as jsonb and takes whichever of the two
+is there, so one reader serves both shapes and no existing table is ever
+renamed.
 
 The naming rule lives in `lib/chats-table-name.ts`, a pure module (no
 Supabase imports) so the modal can preview the name in the browser: strip

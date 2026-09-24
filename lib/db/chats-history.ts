@@ -4,7 +4,8 @@
  *
  * One SCHEMA per client, each with a single table `chats`, one row per
  * conversation:
- *   id, created_at, numero_de_mensajes, id_de_kommo (Kommo CRM lead id),
+ *   id, created_at, numero_de_mensajes, the lead's CRM id (id_de_kommo on a
+ *   Kommo client, id_crm on a Go High Level one, read as id_de_kommo here),
  *   historial (the full conversation as plain text: "User: ...\nIA: ..."),
  *   turnos (the same conversation as one object per turn).
  * Rows written before the flows started filling `turnos` have it null; those
@@ -48,8 +49,17 @@ export type ConversationPage = {
   hasMore: boolean;
 };
 
+/**
+ * The lead's id in the CRM. The column is named after the CRM whose flow fills
+ * it (`id_de_kommo`, `id_crm`), and this module is not told which client is on
+ * which, so it reads the row as jsonb and takes whichever one is there. A
+ * table with neither yields null instead of failing the whole query, which is
+ * what a reader of someone else's schema should do.
+ */
+const LEAD_ID = `coalesce(to_jsonb(c) ->> 'id_de_kommo', to_jsonb(c) ->> 'id_crm')`;
+
 /** The columns every read returns, in a fixed order. */
-const COLUMNS = "id, created_at, numero_de_mensajes, id_de_kommo, historial, turnos";
+const COLUMNS = `c.id, c.created_at, c.numero_de_mensajes, ${LEAD_ID} as id_de_kommo, c.historial, c.turnos`;
 
 /**
  * `id` is a bigint, and the pg driver hands int8 back as a STRING so a value
@@ -178,7 +188,7 @@ export async function getClientHistory(
     where.push(`historial ilike ${add(`%${search.value}%`)}`);
   } else if (search?.kind === "numeric") {
     // Digits can be the Kommo lead id, our own row id, or appear mid-transcript.
-    const alts = [`id_de_kommo = ${add(search.value)}`, `historial ilike ${add(`%${search.value}%`)}`];
+    const alts = [`${LEAD_ID} = ${add(search.value)}`, `historial ilike ${add(`%${search.value}%`)}`];
     if (search.includeId) alts.unshift(`id = ${add(search.value)}::bigint`);
     where.push(`(${alts.join(" or ")})`);
   }
@@ -195,7 +205,7 @@ export async function getClientHistory(
   }
 
   const clause = where.length ? `where ${where.join(" and ")}` : "";
-  const from = `from ${quoteIdent(chatsTable)}.${CHATS_TABLE} ${clause}`;
+  const from = `from ${quoteIdent(chatsTable)}.${CHATS_TABLE} c ${clause}`;
   // The filter params are shared by both queries below, so the page params are
   // appended to a copy: pushing them into `params` would corrupt the count.
   const pageParams = [...params, limit, offset];
@@ -233,7 +243,7 @@ export async function getConversation(
     throw new Error("Tabla de historial no válida.");
   }
   const rows = await chatsQuery<ConversationRow>(
-    `select ${COLUMNS} from ${quoteIdent(chatsTable)}.${CHATS_TABLE} where id = $1`,
+    `select ${COLUMNS} from ${quoteIdent(chatsTable)}.${CHATS_TABLE} c where c.id = $1`,
     [rowId],
   );
   return rows[0] ? asRow(rows[0]) : null;

@@ -80,7 +80,7 @@ export function OwnN8nHandoff({ clientId, clientName, crm, onCrmChange }: Props)
   const schema = chatsTableName(clientName);
   // No grants: n8n_writer and metabase_app are roles of OUR database, and
   // granting to a role that does not exist aborts the whole script.
-  const sql = schema ? buildCreateChatsTableSql(schema, { grants: false }) : null;
+  const sql = schema ? buildCreateChatsTableSql(schema, { crm, grants: false }) : null;
   const name = clientName.trim();
 
   async function copy(what: "json" | "sql", text: string) {

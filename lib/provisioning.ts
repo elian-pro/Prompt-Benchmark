@@ -216,7 +216,7 @@ async function ensureChatsTable(client: Client): Promise<StepResult> {
     if (!isChatsAdminConfigured()) {
       return { ok: false, error: "Falta configurar CHATS_DB_PASSWORD." };
     }
-    await createChatsTable(table);
+    await createChatsTable(table, client.crm);
   }
   await updateClient(client.id, { chats_table: table });
   if (existing) return { ok: true, detail: `${table} (esquema existente, conectado)` };

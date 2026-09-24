@@ -74,6 +74,26 @@ test("buildCreateChatsTableSql emits the schema, the table and the grants", () =
   assert.match(sql, /grant select, insert, update on "Zebra QA"\.chats to n8n_writer/);
 });
 
+test("a Go High Level client gets the column and the unique index its flow needs", () => {
+  // Its flow saves a turn with `insert ... on conflict (id_crm) do update`, so
+  // the wrong column name fails the insert and a non-unique index fails the
+  // ON CONFLICT. Both have to be right or the client loses every conversation.
+  const sql = buildCreateChatsTableSql("Badell Law Mail", { crm: "ghl" });
+  assert.ok(sql.includes("id_crm"), "id_crm");
+  assert.ok(!sql.includes("id_de_kommo"), "no id_de_kommo");
+  assert.match(sql, /create unique index if not exists chats_crm_idx on "Badell Law Mail"\.chats \(id_crm\)/);
+});
+
+test("a Kommo client keeps the column and the index it always had", () => {
+  const sql = buildCreateChatsTableSql("Zebra QA", { crm: "kommo" });
+  assert.ok(sql.includes("id_de_kommo"), "id_de_kommo");
+  assert.ok(!sql.includes("id_crm"), "no id_crm");
+  // Not unique: these tables already exist with repeated lead ids, and this
+  // DDL is re-run over them.
+  assert.match(sql, /create index if not exists chats_kommo_idx/);
+  assert.equal(sql, buildCreateChatsTableSql("Zebra QA"));
+});
+
 test("buildCreateChatsTableSql neutralizes a quote-breaking name", () => {
   // The dangerous input does not throw (it is a legal identifier) but comes out
   // as ONE quoted identifier, so the injected statement never executes.

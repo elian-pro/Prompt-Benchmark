@@ -19,6 +19,7 @@
 // Extension-ful import so `node --test` can run this module, same as
 // lib/prompts/editor-persona.ts does with ./options-block.ts.
 import { buildCreateChatsTableSql } from "./chats-table-name.ts";
+import type { Crm } from "./crm.ts";
 import { getChatsPool, isChatsDbConfigured } from "./chats-db.ts";
 
 /** Custom error so API routes can tell an upstream failure from a bad request. */
@@ -44,14 +45,14 @@ export function isChatsAdminConfigured(): boolean {
  * All statements run in one transaction, so a failure half way (a missing
  * grant role, say) does not leave a schema with no table in it.
  */
-export async function createChatsTable(schemaName: string): Promise<void> {
+export async function createChatsTable(schemaName: string, crm?: Crm): Promise<void> {
   if (!isChatsAdminConfigured()) {
     throw new ChatsAdminError(
       "La creación de tablas de chats no está configurada (falta CHATS_DB_PASSWORD).",
     );
   }
   // Throws on anything that is not a valid identifier, before it reaches SQL.
-  const sql = buildCreateChatsTableSql(schemaName);
+  const sql = buildCreateChatsTableSql(schemaName, { crm });
 
   const client = await getChatsPool().connect().catch(() => {
     throw new ChatsAdminError("No se pudo conectar a la base de datos de conversaciones.");
