@@ -19,20 +19,22 @@ export type CatalogModel = {
 
 export const MODEL_CATALOG: Record<AdapterType, CatalogModel[]> = {
   anthropic: [
+    { model_name: "claude-fable-5-1", display_name: "Claude Fable 5.1" },
+    { model_name: "claude-opus-5-5", display_name: "Claude Opus 5.5" },
     { model_name: "claude-opus-5", display_name: "Claude Opus 5" },
     { model_name: "claude-sonnet-5", display_name: "Claude Sonnet 5" },
-    // Stays listed while roles still point at it: a <select> whose value is
-    // missing from its options renders blank, not "the old model".
-    { model_name: "claude-opus-4-8", display_name: "Claude Opus 4.8" },
     { model_name: "claude-haiku-4-5", display_name: "Claude Haiku 4.5" },
   ],
   openai_compat: [
-    { model_name: "gpt-4o", display_name: "GPT-4o" },
-    { model_name: "gpt-4o-mini", display_name: "GPT-4o mini" },
+    { model_name: "gpt-6-astra", display_name: "GPT-6 Astra" },
+    { model_name: "gpt-6.1-sol", display_name: "GPT-6.1 Sol" },
+    { model_name: "gpt-6-luna", display_name: "GPT-6 Luna" },
+    { model_name: "gpt-5.5", display_name: "GPT-5.5" },
+    { model_name: "gpt-5.4-mini", display_name: "GPT-5.4 mini" },
+    { model_name: "gpt-5.4-nano", display_name: "GPT-5.4 nano" },
+    // Production chatbots still run these; the chatbot under test must mirror prod.
     { model_name: "gpt-4.1", display_name: "GPT-4.1" },
     { model_name: "gpt-4.1-mini", display_name: "GPT-4.1 mini" },
-    { model_name: "o3", display_name: "o3" },
-    { model_name: "o4-mini", display_name: "o4-mini" },
   ],
   google: [
     { model_name: "gemini-2.5-pro", display_name: "Gemini 2.5 Pro" },
