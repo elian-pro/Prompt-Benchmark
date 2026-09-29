@@ -166,6 +166,13 @@ function RoleRow({
                 ))}
               </optgroup>
             )}
+            {/* A saved model that left the catalog keeps its own option; a
+                <select> whose value has no option renders blank. */}
+            {modelName &&
+              !configuredNames.has(modelName) &&
+              !catalogExtras.some((c) => c.model_name === modelName) && (
+                <option value={modelName}>{modelName}</option>
+              )}
             {catalogExtras.length > 0 && (
               <optgroup label="Disponibles">
                 {catalogExtras.map((c) => (
