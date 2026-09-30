@@ -73,6 +73,12 @@ Sprint 8 changes:
   personas receive live in `lib/estados.ts`; the Creator writes the seven into
   every new prompt, and the Editor flags a prompt that drifted without fixing
   it on its own.
+- **Message split.** Meta charges per message, so `mensajes` carries at most
+  two elements per turn (it used to be four). The rule lives in
+  `lib/prompts/message-split.ts` and works like the states: the Creator writes
+  it into every new prompt even when the base allows more, and the Editor
+  flags a prompt that allows more than two without changing it on its own.
+  The Lab does not enforce the limit: it mirrors production.
 - **Opening message (Sprint 14).** Starting a conversation can optionally
   include a canned bot message (e.g. a WhatsApp-style greeting), so the chat
   opens with the bot having already "spoken" instead of always waiting on

@@ -21,6 +21,7 @@ import { N8nConnectionFormModal } from "@/components/settings/N8nConnectionFormM
 import { ComposerSettingsCard } from "@/components/settings/ComposerSettingsCard";
 import { GoogleChatCard, type GoogleChatConfig } from "@/components/settings/GoogleChatCard";
 import { ESTADOS_CONTRACT } from "@/lib/estados";
+import { MESSAGE_SPLIT_CONTRACT } from "@/lib/prompts/message-split";
 import { EDITOR_PERSONA } from "@/lib/prompts/editor-persona";
 import { OPTIONS_CONTRACT } from "@/lib/prompts/options-block";
 import { ANTI_OVERFIT_CONTRACT } from "@/lib/prompts/anti-overfit";
@@ -30,10 +31,11 @@ import { resError } from "@/lib/res-error";
 
 /** What buildEditorSystemPrompt and buildCreatorSystemPrompt append after the
  *  persona, shown here read only so the card matches what is actually sent.
- *  Both builders concatenate these three in this order; if that changes, this
+ *  Both builders concatenate these four in this order; if that changes, this
  *  list changes with it. */
 const APPENDED_CONTRACTS = [
   { title: "Estados de la conversación", text: ESTADOS_CONTRACT },
+  { title: "División de mensajes", text: MESSAGE_SPLIT_CONTRACT },
   { title: "Bloque de opciones seleccionables", text: OPTIONS_CONTRACT },
   { title: "Reglas que no sobreajustan", text: ANTI_OVERFIT_CONTRACT },
 ];

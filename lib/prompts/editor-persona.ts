@@ -20,6 +20,7 @@
  * and reasons in the same language they edit in.
  */
 import { ESTADOS_CONTRACT } from "../estados.ts";
+import { MESSAGE_SPLIT_CONTRACT } from "./message-split.ts";
 import { OPTIONS_CONTRACT } from "./options-block.ts";
 import { ANTI_OVERFIT_CONTRACT } from "./anti-overfit.ts";
 
@@ -73,10 +74,11 @@ Si el usuario solo hace una pregunta o pide una aclaración sin solicitar una ed
  * each time. It travels as the conversation's last message instead: see
  * buildEditorDraftMessage.
  *
- * ESTADOS_CONTRACT, OPTIONS_CONTRACT and ANTI_OVERFIT_CONTRACT are appended
+ * ESTADOS_CONTRACT, MESSAGE_SPLIT_CONTRACT, OPTIONS_CONTRACT and
+ * ANTI_OVERFIT_CONTRACT are appended
  * AFTER the persona (default or override) on purpose: if they lived inside
  * EDITOR_PERSONA they would vanish whenever an operator saves a persona
- * override, so appending them separately keeps all three available regardless
+ * override, so appending them separately keeps all four available regardless
  * of the persona in use.
  */
 export function buildEditorSystemPrompt(personaOverride?: string | null): string {
@@ -84,6 +86,8 @@ export function buildEditorSystemPrompt(personaOverride?: string | null): string
   return `${persona}
 
 ${ESTADOS_CONTRACT}
+
+${MESSAGE_SPLIT_CONTRACT}
 
 ${OPTIONS_CONTRACT}
 
