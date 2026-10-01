@@ -10,11 +10,11 @@ import { buildEditorSystemPrompt } from "./editor-persona.ts";
 import { buildCreatorSystemPrompt } from "./creator-persona.ts";
 
 test("the contract states the limit", () => {
-  assert.equal(MAX_MENSAJES, 2);
-  assert.ok(MESSAGE_SPLIT_CONTRACT.includes("Máximo 2 elementos"));
+  assert.equal(MAX_MENSAJES, 3);
+  assert.ok(MESSAGE_SPLIT_CONTRACT.includes("Máximo 3 elementos"));
 });
 
-// The model copies examples more faithfully than rules: one example with three
+// The model copies examples more faithfully than rules: one example with four
 // bubbles would teach the old behavior back.
 test("no example in the contract exceeds the limit", () => {
   const examples = MESSAGE_SPLIT_CONTRACT.split("\n").filter((l) => l.startsWith('{"estado"'));
