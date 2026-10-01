@@ -10,6 +10,7 @@ import {
   hasUnclosedOptionsBlock,
   optionsBlockPreamble,
   buildAnswerSummary,
+  mergeOptionsSummary,
   moveRankItem,
   parseOptionsJson,
   OPTIONS_START,
@@ -187,4 +188,17 @@ test("hasUnclosedOptionsBlock catches a second block still streaming", () => {
   const closed = wrap(SINGLE_JSON, "Elige:\n\n");
   assert.equal(hasUnclosedOptionsBlock(closed), false);
   assert.equal(hasUnclosedOptionsBlock(`${closed}\n\nY otra:\n\n${OPTIONS_START}\n{ "questi`), true);
+});
+
+test("mergeOptionsSummary keeps what the user typed and swaps only the old summary", () => {
+  assert.equal(mergeOptionsSummary("", null, "Presupuesto: Medio"), "Presupuesto: Medio");
+  assert.equal(
+    mergeOptionsSummary("ojo con el tono", null, "Presupuesto: Medio"),
+    "Presupuesto: Medio\n\nojo con el tono",
+  );
+  // Confirming again replaces the first summary, the typed text survives.
+  assert.equal(
+    mergeOptionsSummary("Presupuesto: Medio\n\nojo con el tono", "Presupuesto: Medio", "Presupuesto: Alto"),
+    "Presupuesto: Alto\n\nojo con el tono",
+  );
 });

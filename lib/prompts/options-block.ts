@@ -257,3 +257,20 @@ export function moveRankItem(order: string[], index: number, dir: -1 | 1): strin
   next[target] = tmp;
   return next;
 }
+
+/**
+ * Composer text after confirming an options block: the new summary first, then
+ * whatever the user had typed. `previous` is the summary an earlier confirm
+ * wrote, swapped out so confirming twice never stacks two summaries.
+ */
+export function mergeOptionsSummary(
+  current: string,
+  previous: string | null,
+  summary: string,
+): string {
+  const typed = (previous && current.startsWith(previous)
+    ? current.slice(previous.length)
+    : current
+  ).trim();
+  return typed ? `${summary}\n\n${typed}` : summary;
+}

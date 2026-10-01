@@ -47,8 +47,8 @@ function isQuestionAnswered(type: string, value: string | string[]): boolean {
  * lives in the assistant message; confirming hands `onSubmit` the
  * human-readable summary plus the structured selection, which the chat drops
  * into the composer WITHOUT sending, so the user can add a clarification
- * before the model starts working. Confirming again overwrites the composer
- * text: the block stays live until the message is actually sent and the server
+ * before the model starts working. Confirming again swaps the previous summary
+ * and keeps what the user typed: the block stays live until the message is actually sent and the server
  * echoes back an `answered` selection. An already-answered or non-interactive
  * block renders read-only and starts collapsed to its summary (reopenable).
  */

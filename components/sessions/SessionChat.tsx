@@ -21,6 +21,7 @@ import type { ComposerSettings } from "@/lib/db/composer-settings";
 import { isAcceptedFile, uploadAttachment } from "@/lib/attachments";
 import { nextPasteName } from "@/lib/smart-paste";
 import { relativeTimeEs } from "@/lib/format";
+import { mergeOptionsSummary } from "@/lib/prompts/options-block";
 import { Button } from "@/components/ui/Button";
 import { Modal } from "@/components/ui/Modal";
 import { FindReplace } from "@/components/ui/FindReplace";
@@ -137,6 +138,7 @@ export function SessionChat({
   // until the user actually hits send. It survives free-text edits on purpose,
   // it records which options were tapped even if the wording changed.
   const [pendingAnswer, setPendingAnswer] = useState<MessageAnswer | null>(null);
+  const lastOptionsSummaryRef = useRef<string | null>(null);
   const [pendingUser, setPendingUser] = useState<string | null>(null);
   const [pendingAttachments, setPendingAttachments] = useState<Attachment[]>([]);
   const [streamingText, setStreamingText] = useState<string | null>(null);
@@ -442,6 +444,7 @@ export function SessionChat({
         setInput("");
         setAttachments([]);
         setPendingAnswer(null);
+        lastOptionsSummaryRef.current = null;
         if (textareaRef.current) textareaRef.current.style.height = "auto";
       }
       setPendingUser(content);
@@ -549,8 +552,12 @@ export function SessionChat({
   // Confirming an options block writes its human-readable summary into the
   // composer and parks the structured selection, WITHOUT sending: the user
   // gets to clarify (or fix a wrong tap) before the model burns any tokens.
+  // Whatever the user already typed survives below the summary; confirming
+  // again swaps only the previous summary, not their text.
   const onSubmitOptions = useCallback((answerText: string, answer: MessageAnswer) => {
-    setInput(answerText);
+    const previous = lastOptionsSummaryRef.current;
+    lastOptionsSummaryRef.current = answerText;
+    setInput((prev) => mergeOptionsSummary(prev, previous, answerText));
     setPendingAnswer(answer);
     textareaRef.current?.focus();
   }, []);
