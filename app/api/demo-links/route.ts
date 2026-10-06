@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 
-import { createLink, listLinks } from "@/lib/db/demo-links";
+import { createLink, deleteAllLinks, listLinks } from "@/lib/db/demo-links";
 import { createDemoLinkSchema } from "@/lib/schemas/demo-links";
 import { handleError } from "@/lib/http";
 
@@ -21,6 +21,17 @@ export async function POST(req: NextRequest) {
   try {
     const input = createDemoLinkSchema.parse(await req.json());
     return NextResponse.json(await createLink(input), { status: 201 });
+  } catch (err) {
+    return handleError(err);
+  }
+}
+
+/** Empties the Demo history: every link with its conversations and reports.
+ *  The page asks for a typed confirmation first. */
+export async function DELETE() {
+  try {
+    await deleteAllLinks();
+    return new NextResponse(null, { status: 204 });
   } catch (err) {
     return handleError(err);
   }

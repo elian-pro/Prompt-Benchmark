@@ -288,6 +288,14 @@ export async function deleteLink(id: string): Promise<void> {
   if (error) throw new Error(`No se pudo eliminar el link: ${error.message}`);
 }
 
+/** Every link, and through the cascade every client conversation and report.
+ *  PostgREST refuses an unfiltered delete, hence the always-true filter. */
+export async function deleteAllLinks(): Promise<void> {
+  const sb = getSupabase();
+  const { error } = await sb.from("demo_links").delete().not("id", "is", null);
+  if (error) throw new Error(`No se pudo vaciar el historial: ${error.message}`);
+}
+
 export type PendingNotesSummary = {
   total: number;
   by_link: { link_id: string; client_name: string | null; label: string | null; count: number }[];

@@ -9,6 +9,7 @@ import {
   IconLock,
   IconLockOpen,
   IconPlus,
+  IconTrash,
 } from "@tabler/icons-react";
 
 import type { DemoLinkListItem } from "@/lib/db/demo-links";
@@ -18,6 +19,7 @@ import { SkeletonRows } from "@/components/ui/Skeleton";
 import { formatDeadlineShortEs, isExpired } from "@/lib/business-days";
 import { DemoLinkModal } from "@/components/demo/DemoLinkModal";
 import { DemoTabs } from "@/components/demo/DemoTabs";
+import { DangerConfirmModal } from "@/components/ui/DangerConfirmModal";
 import { resError } from "@/lib/res-error";
 
 /**
@@ -41,6 +43,8 @@ export default function DemoLinksPage() {
   const [error, setError] = useState<string | null>(null);
   const [newOpen, setNewOpen] = useState(false);
   const [copied, setCopied] = useState<string | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<DemoLinkListItem | null>(null);
+  const [clearOpen, setClearOpen] = useState(false);
 
   const load = useCallback(async () => {
     try {
@@ -92,6 +96,24 @@ export default function DemoLinksPage() {
     }
   }
 
+  // Both throw on failure so DangerConfirmModal shows the error in place.
+  async function deleteLink(link: DemoLinkListItem) {
+    const res = await fetch(`/api/demo-links/${link.id}`, { method: "DELETE" });
+    if (!res.ok) throw new Error(await resError(res, "No se pudo eliminar el link."));
+    setDeleteTarget(null);
+    await load();
+  }
+
+  async function clearHistory() {
+    const res = await fetch("/api/demo-links", { method: "DELETE" });
+    if (!res.ok) throw new Error(await resError(res, "No se pudo vaciar el historial."));
+    setClearOpen(false);
+    await load();
+  }
+
+  const totalUnsent = links.reduce((n, l) => n + l.unsent_notes, 0);
+  const totalPending = links.reduce((n, l) => n + l.pending_notes, 0);
+
   return (
     <div>
       <div className="library-header">
@@ -103,6 +125,15 @@ export default function DemoLinksPage() {
         </div>
         <div className="header-actions">
           <DemoTabs current="links" />
+          {links.length > 0 && (
+            <Button
+              variant="secondary"
+              icon={<IconTrash size={14} />}
+              onClick={() => setClearOpen(true)}
+            >
+              Vaciar historial
+            </Button>
+          )}
           <Button
             variant="primary"
             onClick={() => setNewOpen(true)}
@@ -187,12 +218,64 @@ export default function DemoLinksPage() {
               >
                 {link.status === "active" ? "Cerrar" : "Reabrir"}
               </Button>
+              <button
+                type="button"
+                className="icon-btn danger"
+                onClick={() => setDeleteTarget(link)}
+                aria-label={`Eliminar link de ${link.client_name ?? "cliente eliminado"}`}
+                title="Eliminar link"
+              >
+                <IconTrash size={15} />
+              </button>
             </div>
           </div>
         ))}
       </div>
 
       <DemoLinkModal open={newOpen} onClose={() => setNewOpen(false)} onSaved={load} />
+
+      {deleteTarget && (
+        <DangerConfirmModal
+          onClose={() => setDeleteTarget(null)}
+          onConfirm={() => deleteLink(deleteTarget)}
+          confirmTitle="¿Eliminar este link?"
+          consequences={[
+            deleteTarget.session_count === 1
+              ? "Se borrará su conversación y sus reportes."
+              : `Se borrarán sus ${deleteTarget.session_count} conversaciones y sus reportes.`,
+            ...(deleteTarget.unsent_notes > 0
+              ? [
+                  deleteTarget.unsent_notes === 1
+                    ? "1 reporte aprobado no se ha enviado al Editor y se perderá."
+                    : `${deleteTarget.unsent_notes} reportes aprobados no se han enviado al Editor y se perderán.`,
+                ]
+              : []),
+            "El cliente ya no podrá abrir el link.",
+            "Esta acción no se puede deshacer.",
+          ]}
+        />
+      )}
+
+      {clearOpen && (
+        <DangerConfirmModal
+          onClose={() => setClearOpen(false)}
+          onConfirm={clearHistory}
+          confirmTitle="¿Vaciar todo el historial de Demo?"
+          consequences={[
+            links.length === 1
+              ? "Se borrará el único link, con sus conversaciones y reportes."
+              : `Se borrarán los ${links.length} links, con todas sus conversaciones y reportes.`,
+            ...(totalUnsent + totalPending > 0
+              ? [`Se perderán reportes que aún no llegan al Editor: ${totalPending} sin revisar y ${totalUnsent} aprobados sin enviar.`]
+              : []),
+            "Los clientes ya no podrán abrir ningún link.",
+            "Esta acción no se puede deshacer.",
+          ]}
+          confirmPhrase="VACIAR"
+          confirmLabel="Sí, vaciar"
+          busyLabel="Vaciando…"
+        />
+      )}
     </div>
   );
 }
