@@ -42,6 +42,8 @@ export type DemoLinkListItem = DemoLink & {
   client_name: string | null;
   session_count: number;
   pending_notes: number;
+  /** Approved but not handed to the Editor yet: what is still owed. */
+  unsent_notes: number;
 };
 
 const LINK_COLS =
@@ -120,6 +122,12 @@ export async function getLink(id: string): Promise<DemoLink | null> {
   return (data as unknown as DemoLink) ?? null;
 }
 
+/** Approved and not sent: the same rule the "Enviar N al Editor" buttons use.
+ *  A rejected note never counts, so discarding everything leaves nothing owed. */
+function isUnsent(note: { status: string; sent_to_editor_at: string | null }): boolean {
+  return note.status === "approved" && !note.sent_to_editor_at;
+}
+
 /**
  * Every link, newest first, with the two numbers the list actually needs:
  * how many people have used it and how many of their notes are still waiting
@@ -130,7 +138,7 @@ export async function listLinks(clientId?: string): Promise<DemoLinkListItem[]> 
   const sb = getSupabase();
   let query = sb
     .from("demo_links")
-    .select(`${LINK_COLS}, clients(name), demo_sessions(id, demo_notes(id, status))`);
+    .select(`${LINK_COLS}, clients(name), demo_sessions(id, demo_notes(id, status, sent_to_editor_at))`);
   if (clientId) query = query.eq("client_id", clientId);
   query = query.order("created_at", { ascending: false });
 
@@ -141,15 +149,15 @@ export async function listLinks(clientId?: string): Promise<DemoLinkListItem[]> 
     const client = Array.isArray(row.clients) ? row.clients[0] : row.clients;
     const sessions: any[] = Array.isArray(row.demo_sessions) ? row.demo_sessions : [];
     const { clients: _c, demo_sessions: _s, ...link } = row;
-    const pending = sessions.reduce((total, session) => {
-      const notes: any[] = Array.isArray(session.demo_notes) ? session.demo_notes : [];
-      return total + notes.filter((n) => n.status === "pending").length;
-    }, 0);
+    const notes: any[] = sessions.flatMap((session) =>
+      Array.isArray(session.demo_notes) ? session.demo_notes : [],
+    );
     return {
       ...(link as DemoLink),
       client_name: client?.name ?? null,
       session_count: sessions.length,
-      pending_notes: pending,
+      pending_notes: notes.filter((n) => n.status === "pending").length,
+      unsent_notes: notes.filter(isUnsent).length,
     };
   });
 }
@@ -177,6 +185,7 @@ export type LinkSessionListItem = {
   round_count: number;
   note_count: number;
   pending_notes: number;
+  unsent_notes: number;
 };
 
 /** The conversations of one link, for the admin's left column. */
@@ -186,7 +195,7 @@ export async function listLinkSessions(linkId: string): Promise<LinkSessionListI
     .from("demo_sessions")
     .select(
       "id, created_at, last_seen_at, visitor_ip, visitor_user_agent, current_round, " +
-        "demo_messages(id, round), demo_notes(id, status)",
+        "demo_messages(id, round), demo_notes(id, status, sent_to_editor_at)",
     )
     .eq("link_id", linkId)
     .order("created_at", { ascending: false });
@@ -205,6 +214,7 @@ export async function listLinkSessions(linkId: string): Promise<LinkSessionListI
       round_count: row.current_round ?? 1,
       note_count: notes.length,
       pending_notes: notes.filter((n) => n.status === "pending").length,
+      unsent_notes: notes.filter(isUnsent).length,
     };
   });
 }

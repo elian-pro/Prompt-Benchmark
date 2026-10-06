@@ -160,6 +160,9 @@ export default function DemoLinksPage() {
                     {link.pending_notes} sin revisar
                   </span>
                 )}
+                {link.unsent_notes > 0 && (
+                  <span className="demo-link-unsent">{link.unsent_notes} por enviar</span>
+                )}
               </div>
             </Link>
 

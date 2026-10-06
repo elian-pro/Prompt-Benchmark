@@ -180,9 +180,14 @@ export default function DemoLinkDetailPage() {
                   >
                     <div className="demo-session-top">
                       <span>{formatDate(s.created_at)}</span>
-                      {s.pending_notes > 0 && (
-                        <span className="demo-link-pending">{s.pending_notes}</span>
-                      )}
+                      <span className="demo-session-chips">
+                        {s.pending_notes > 0 && (
+                          <span className="demo-link-pending">{s.pending_notes}</span>
+                        )}
+                        {s.unsent_notes > 0 && (
+                          <span className="demo-link-unsent">{s.unsent_notes} por enviar</span>
+                        )}
+                      </span>
                     </div>
                     <div className="demo-session-meta">
                       {s.message_count} mensaje{s.message_count === 1 ? "" : "s"}
